@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Main Next.js application
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-file:./data/cocoa_canvas.db}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+    volumes:
+      # SQLite database persistence
+      - ./data:/app/data
+      # Volume for node_modules to avoid conflicts
+      - /app/node_modules
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - cocoa-network
+
+  # PostgreSQL (optional, commented out by default for Phase 1)
+  # Uncomment to use PostgreSQL instead of SQLite
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cocoa_canvas}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cocoa-network
+    # Uncomment the below section to enable PostgreSQL for Phase 1
+    profiles: ["postgres"]
+
+volumes:
+  postgres_data:
+
+networks:
+  cocoa-network:
+    driver: bridge

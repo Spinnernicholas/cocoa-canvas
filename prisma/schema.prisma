@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTHENTICATION (Phase 1)
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  isActive      Boolean   @default(true)
+  
+  // Session/login tracking
+  lastLogin     DateTime?
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+  
+  // Relations
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  jobsCreated   Job[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// CAMPAIGNS (Phase 1)
+// ============================================================================
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  description String?   @db.Text
+  
+  // Timeline
+  startDate   DateTime
+  endDate     DateTime
+  status      String    @default("planning") // planning, active, paused, completed
+  
+  // Target area (simple text for Phase 1)
+  targetArea  String?
+  
+  // Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ============================================================================
+// JOB QUEUE (Phase 1 - Generic async job tracking)
+// ============================================================================
+
+model Job {
+  id          String    @id @default(cuid())
+  
+  // Job metadata
+  type        String    // "import_voters", "geocode", "export", etc.
+  status      String    @default("pending") // pending, processing, completed, failed
+  
+  // Progress
+  totalItems  Int       @default(0)
+  processedItems Int    @default(0)
+  
+  // Error tracking
+  errorLog    String?   @db.Text  // JSON array of errors
+  
+  // Job-specific data (stored as JSON for flexibility)
+  data        Json?
+  // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
+  
+  // Timestamps
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AUDIT LOGGING (Phase 1)
+// ============================================================================
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  action      String    // "login", "logout", "view_dashboard", "create_campaign", etc.
+  resource    String?   // "user", "campaign", "job", etc.
+  resourceId  String?
+  
+  details     String?   @db.Text // JSON for context
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SETTINGS (Phase 1)
+// ============================================================================
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text // Can be JSON
+  
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
