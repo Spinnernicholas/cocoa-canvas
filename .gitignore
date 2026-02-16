@@ -55,3 +55,5 @@ prisma/migrations
 .cache
 .turbo
 dist
+# Temporary
+tmp/
