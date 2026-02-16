@@ -10,21 +10,103 @@
 
 A voter file contains dense records. We normalize into 5 interconnected models:
 
-```
-┌─────────────────────────────────────────┐
-│      VOTER FILE (One Record)            │
-│  - Identity (name, DOB, gender)         │
-│  - Registration (voter ID, party)       │
-│  - Address (residence, mailing)         │
-│  - Contact (phone, email)               │
-│  - Election History (5 ballots cast)    │
-└─────────────────────────────────────────┘
-           │
-           ├─→ VOTER (person identity)
-           ├─→ HOUSEHOLD (residence address + grouping)
-           ├─→ CONTACT_INFO (all contact methods)
-           ├─→ VOTE_HISTORY (5 elections per voter)
-           └─→ ELECTION (shared election metadata)
+```mermaid
+erDiagram
+    VOTER_FILE ||--|| VOTER : splits_into
+    VOTER_FILE ||--|| HOUSEHOLD : creates
+    VOTER_FILE ||--o{ CONTACT_INFO : generates
+    VOTER_FILE ||--o{ VOTE_HISTORY : contains
+    VOTE_HISTORY ||--|| ELECTION : references
+
+    VOTER }o--|| HOUSEHOLD: "belongs_to"
+    VOTER ||--o{ CONTACT_INFO: "has"
+    VOTER ||--o{ CONTACT_LOG: "receives"
+    VOTER ||--o{ VOTE_HISTORY: "participates_in"
+
+    CONTACT_INFO ||--|| LOCATION: "typed_by"
+    VOTE_HISTORY ||--o| ELECTION: "references"
+
+    VOTER_FILE {
+        string registrationNumber
+        string firstName
+        string lastName
+        string gender
+        datetime birthDate
+        string partyAbbr
+        string houseNumber
+        string streetName
+        string city
+        string zipCode
+        string phone
+        string email
+        datetime electionDate_1
+        string ballotPartyAbbr_1
+    }
+
+    VOTER {
+        string id PK
+        string registrationNumber UK
+        string firstName
+        string lastName
+        string gender
+        datetime birthDate
+        string partyAbbr
+        datetime registrationDate
+        string contactStatus
+        string householdId FK
+    }
+
+    HOUSEHOLD {
+        string id PK
+        string streetName
+        string city
+        string zipCode
+        string fullAddress UK
+        int voterCount
+        float latitude
+        float longitude
+    }
+
+    CONTACT_INFO {
+        string id PK
+        string voterId FK
+        string locationId FK
+        string phone
+        string email
+        string fullAddress
+        boolean isPrimary
+        boolean isVerified
+    }
+
+    VOTE_HISTORY {
+        string id PK
+        string voterId FK
+        string electionId FK
+        datetime electionDate
+        boolean ballotCounted
+        string votingMethod
+    }
+
+    ELECTION {
+        string id PK
+        datetime electionDate UK
+        string electionAbbr
+        string electionType
+        string electionDesc
+    }
+
+    LOCATION {
+        string id PK
+        string name
+    }
+
+    CONTACT_LOG {
+        string id PK
+        string voterId FK
+        string contactType
+        string outcome
+        datetime createdAt
+    }
 ```
 
 ---
