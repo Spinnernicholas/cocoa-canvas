@@ -16,18 +16,24 @@ A voter file contains dense records. We normalize into 5 interconnected models:
 graph TD
     V["👤 VOTER<br/>(Person Identity)"]
     H["🏠 HOUSEHOLD<br/>(Address Grouping)"]
+    B["🏢 BUILDING<br/>(Apartment Complex)"]
     C["📞 CONTACT_INFO<br/>(All Contact Methods)"]
+    L["📍 LOCATION<br/>(Contact Type)"]
     E["🗳️ ELECTION<br/>(Shared Election Metadata)"]
     VH["📊 VOTE_HISTORY<br/>(Election Participation)"]
     
     V -->|belongs to| H
+    H -->|may belong to| B
     V -->|has| C
+    C -->|typed by| L
     V -->|participated in| VH
     VH -->|references| E
     
     style V fill:#f3e5f5
     style H fill:#e8f5e9
+    style B fill:#e0f2f1
     style C fill:#fff3e0
+    style L fill:#ffe0b2
     style VH fill:#fce4ec
     style E fill:#f1f8e9
 ```
@@ -43,6 +49,7 @@ erDiagram
     VOTE_HISTORY ||--|| ELECTION : references
 
     VOTER }o--|| HOUSEHOLD: "belongs_to"
+    HOUSEHOLD }o--|| BUILDING: "may_be_in"
     VOTER ||--o{ CONTACT_INFO: "has"
     VOTER ||--o{ CONTACT_LOG: "receives"
     VOTER ||--o{ VOTE_HISTORY: "participates_in"
@@ -80,8 +87,23 @@ erDiagram
         string householdId FK
     }
 
+    BUILDING {
+        string id PK
+        string streetNumber
+        string streetName
+        string city
+        string zipCode
+        string fullAddress UK
+        string buildingType
+        int totalUnits
+        float latitude
+        float longitude
+    }
+
     HOUSEHOLD {
         string id PK
+        string buildingId FK
+        string streetNumber
         string streetName
         string city
         string zipCode
@@ -178,12 +200,18 @@ Groups voters at the same residence address together.
 model Household {
   id              String   @id @default(cuid())
   
+  // If this address is within an apartment building
+  buildingId      String?
+  building        Building? @relation(fields: [buildingId], references: [id])
+  
   // Address (normalized from residence)
   houseNumber     String?
   preDirection    String?
   streetName      String
   streetSuffix    String?
   postDirection   String?
+  unitAbbr        String?   // Apt, Unit, Ste, etc. (redundant if building-based)
+  unitNumber      String?   // (redundant if building-based)
   city            String
   state           String   @default("CA")
   zipCode         String
@@ -206,18 +234,56 @@ model Household {
   updatedAt       DateTime @updatedAt
   
   @@unique([houseNumber, streetName, zipCode])
+  @@index([buildingId])
+  @@index([fullAddress])
+  @@index([zipCode])
+}
+
+/**
+ * Building (Optional - for apartment complexes and multi-unit buildings)
+ * Represents a single building address that contains multiple units/households
+ */
+model Building {
+  id              String   @id @default(cuid())
+  
+  // Building address
+  streetNumber    String
+  preDirection    String?
+  streetName      String
+  streetSuffix    String?
+  postDirection   String?
+  city            String
+  state           String   @default("CA")
+  zipCode         String
+  fullAddress     String   @unique
+  
+  // Building metadata
+  buildingType    String?   // "apartment", "condo", "townhouse", "mixed_use", etc.
+  totalUnits      Int?      // Number of units in building
+  
+  // Geolocation
+  latitude        Float?
+  longitude       Float?
+  geocoded        Boolean   @default(false)
+  
+  // Relations
+  households      Household[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
   @@index([fullAddress])
   @@index([zipCode])
 }
 ```
 
-**When Created**: During voter import, grouped by residence address
+**When Created**: During voter import, when a household has a unit number (apartment)
 
 **Why Separate**:
-- Address is the grouping key
-- One-to-many voters per address (family households)
-- Supports precinct work (knock on door once, contact all residents)
-- Enables targeted canvassing (whole household contact strategy)
+- Multi-unit buildings (apartment complexes) share the same street address
+- One building can have many households (one per unit)
+- Enables building-level canvassing (contact all residents in building)
+- Useful for voter outreach at common areas (lobbies, mailrooms)
 
 ---
 
@@ -662,14 +728,17 @@ LIMIT 100
 | Model | Purpose | Source | Mutability |
 |-------|---------|--------|-----------|
 | **Election** | Shared election metadata | File parsing | Immutable (created once) |
-| **Household** | Address grouping | Voter residence | Mostly immutable (voterCount changes) |
+| **Building** | Multi-unit apartment complex | Voter address (if has unit) | Mostly immutable (totalUnits may change) |
+| **Household** | Address grouping (may be in building) | Voter residence | Mostly immutable (voterCount changes) |
 | **Voter** | Person identity | File (core), App (canvassing status) | Mostly immutable (county) + Mutable (app) |
 | **ContactInfo** | All contact methods | File + Enrichment | Mutable (verification) |
 | **VoteHistory** | Election participation | File (county history) | Immutable (from file) |
 
 This architecture enables:
 - ✅ Fast voter lookups (by name, address, phone, email)
+- ✅ Apartment-aware grouping (building → households → voters)
 - ✅ Household-based canvassing (whole address contact)
+- ✅ Building-level outreach (common area strategies)
 - ✅ Predictive targeting (voting frequency scores)
 - ✅ Multi-format imports (Contra Costa, Simple CSV, etc.)
 - ✅ Separation of concerns (registration data vs app state)
