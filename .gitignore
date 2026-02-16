@@ -45,6 +45,7 @@ prisma/data/
 prisma/*.db
 prisma/*.db-shm
 prisma/*.db-wal
+prisma/prisma/  # Nested prisma directory (should not exist, but ignore if it does)
 
 # Prisma
 prisma/migrations
