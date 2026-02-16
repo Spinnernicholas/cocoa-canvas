@@ -2,20 +2,22 @@
 
 **For developers who want to start coding right now.**
 
-## Step 1: Get Docker
+## Step 1: Prerequisites
 
-Cocoa Canvas runs in Docker, so you need Docker Desktop installed.
+You need Node.js 22 LTS installed.
 
-**Windows or Mac:**
-1. Go to https://www.docker.com/products/docker-desktop
-2. Click "Download"
-3. Install it (just follow the prompts)
-4. Start the Docker Desktop app
-
-**Linux:**
+**Check if you have it:**
 ```bash
-sudo apt install docker.io docker-compose
+node --version  # Should show v22.x.x
 ```
+
+**Don't have Node 22?**
+- **Windows/Mac**: Download from https://nodejs.org (choose LTS version)
+- **Linux**: 
+  ```bash
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+  ```
 
 ## Step 2: Clone the Project
 
@@ -24,71 +26,85 @@ git clone https://github.com/Spinnernicholas/cocoa-canvas.git
 cd cocoa-canvas
 ```
 
-## Step 3: Start Development Environment
+## Step 3: Install Dependencies
 
-**Windows (PowerShell):**
-```powershell
-./run.ps1 dev
-```
-
-**Mac or Linux:**
 ```bash
-./run.sh dev
+npm install
 ```
 
-The first time takes 2-3 minutes (downloading and building). After that, it's instant.
+## Step 4: Set Up Environment
 
-## Step 4: Open the App
+Create a `.env` file for local development:
 
-Once you see `Up` status in the logs, visit:
+```bash
+echo "DATABASE_URL=file:./data/cocoa_canvas.db
+NEXTAUTH_SECRET=dev-secret-only-for-development-not-secure
+NEXTAUTH_URL=http://localhost:3000" > .env
+```
+
+## Step 5: Initialize the Database
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+## Step 6: Start Development Server
+
+```bash
+npm run dev
+```
+
+The app will be running at:
 
 👉 **http://localhost:3000**
 
-## Step 5: Create Your Admin Account
+## Step 7: Create Your Admin Account
 
 1. You'll see the setup wizard
 2. Enter an email and password (this is your admin account)
 3. Fill in basic campaign info (name, dates, target area)
 4. Done! You're in
 
+## Making Changes
+
+Now you can edit files and see changes instantly:
+- Edit React components in `app/` folder
+- Changes appear automatically (hot reload)
+- No need to restart the server
+
 ## Stop the App
 
-**Windows:**
-```powershell
-docker-compose down
-```
-
-**Mac or Linux:**
-```bash
-docker-compose down
-```
-
-Or just close the terminal and press Ctrl+C.
+Press **Ctrl+C** in the terminal where `npm run dev` is running.
 
 ---
 
 ## ❓ Troubleshooting
 
-### Docker Desktop won't start?
-- Try restarting your computer
-- Make sure virtualization is enabled in BIOS (usually is by default)
-
 ### Port 3000 already in use?
-Edit `docker-compose.yml` or `docker-compose.dev.yml`:
-```yaml
-ports:
-  - "3001:3000"  # Change 3000 to 3001 (or any unused port)
+Another app is using port 3000. Change it:
+```bash
+npm run dev -- -p 3001
+```
+Then visit http://localhost:3001
+
+### Database errors?
+Reset the database:
+```bash
+rm -rf data/cocoa_canvas.db
+npx prisma db push
 ```
 
 ### Changes not showing up?
-If you edit code and changes don't appear:
-- Dev mode has hot reload, but sometimes you need to refresh the browser
-- If that doesn't work, stop the app and restart: `./run.ps1 dev`
+- Refresh your browser (sometimes needed)
+- Check the terminal for errors
+- If stuck, stop (`Ctrl+C`) and restart (`npm run dev`)
 
-### Out of disk space?
-Docker can take up space. Clean up:
+### Module not found errors?
+Reinstall dependencies:
 ```bash
-docker system prune -a
+rm -rf node_modules package-lock.json
+npm install
 ```
 
 ---
@@ -96,8 +112,16 @@ docker system prune -a
 ## 🚀 Next Steps
 
 - Read [planning/PHASE_PLAN.md](planning/PHASE_PLAN.md) to understand what comes next
-- Check [DOCKER_SETUP.md](DOCKER_SETUP.md) for more advanced options (PostgreSQL, production mode, etc.)
+- Check [DOCKER_SETUP.md](DOCKER_SETUP.md) for production deployment with Docker
 - Start implementing Phase 1 features! See [planning/API_PLAN.md](planning/API_PLAN.md)
+
+## 🐳 Production Deployment
+
+For production, use Docker. See [DOCKER_SETUP.md](DOCKER_SETUP.md) for details:
+
+```bash
+docker-compose up -d
+```
 
 ## 💬 Need Help?
 

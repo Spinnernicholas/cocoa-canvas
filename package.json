@@ -14,26 +14,26 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
     "@prisma/client": "^5.0.0",
     "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.3",
+    "next": "^16.1.6",
     "next-auth": "^4.24.0",
-    "jsonwebtoken": "^9.0.0"
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/bcryptjs": "^2.4.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "@types/bcryptjs": "^2.4.2",
-    "@types/jsonwebtoken": "^9.0.2",
-    "typescript": "^5.0.0",
-    "prisma": "^5.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0",
-    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^16.1.6",
     "postcss": "^8.4.0",
-    "autoprefixer": "^10.4.0"
+    "prisma": "^5.0.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0"
   }
 }

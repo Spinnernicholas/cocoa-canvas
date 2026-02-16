@@ -74,18 +74,19 @@ cocoa-canvas/
 
 ## Deployment Scenarios
 
-### Scenario 1: Local Development with SQLite
-**Use Case**: Single user, development environment, testing
+### Scenario 1: Local Development
+**Use Case**: Developer working on features
 ```bash
-docker-compose -f docker-compose.dev.yml up
-# SQLite database in local volume
-# App accessible at http://localhost:3000
+npm install
+npm run dev
+# SQLite database in ./data directory
+# App accessible at http://localhost:3000 with hot reload
 ```
 
 ### Scenario 2: Small Organization with SQLite
 **Use Case**: Small grassroots group, single server
 ```bash
-docker-compose -f docker-compose.lite.yml up
+docker-compose up -d
 # SQLite database persisted to volume
 # Can run on modest hardware
 ```
@@ -181,23 +182,17 @@ ENABLE_OFFLINE_MODE=false
 
 ## Docker Compose Strategy
 
-### Development (`docker-compose.dev.yml`)
-- Next.js app with hot reload
+### Development (Local)
+- Run `npm run dev` for local development
 - SQLite database
-- Volume mounts for code
-- Exposed for local development
+- Hot reload enabled
+- No Docker needed for development
 
-### Lite (`docker-compose.lite.yml`)
+### Production (`docker-compose.yml`)
 - Production Next.js build
-- SQLite database in persistent volume
-- Single container, minimal resources
-
-### Production (`docker-compose.prod.yml`)
-- Production Next.js build
-- PostgreSQL database (separate container or external)
-- Environment secrets properly configured
+- SQLite or PostgreSQL database (optional PostgreSQL profile)
 - Health checks and restart policies
-- Ready for load balancing
+- Optimized for deployment
 
 ---
 

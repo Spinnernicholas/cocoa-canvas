@@ -1,56 +1,18 @@
 # Docker Setup Guide
 
-This guide explains how to run Cocoa Canvas using Docker in **development** or **production** mode.
+This guide explains how to run Cocoa Canvas using Docker for **production deployments**.
+
+**For local development**, see [QUICK_START.md](QUICK_START.md) - just run `npm run dev`.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) (v20.10+)
 - [Docker Compose](https://docs.docker.com/compose/install/) (v1.29+)
 
-## Quick Start
-
-### Development Mode (Recommended for local development)
-
-**With helper script:**
+## Quick Start - Production
 
 ```bash
-# Linux/macOS
-./run.sh dev
-
-# Windows PowerShell
-./run.ps1 dev
-```
-
-**Or manually:**
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
-
-Features:
-- Hot reload (changes reflect instantly)
-- Source maps for debugging
-- Development logging
-- SQLite database
-
-Visit: `http://localhost:3000`
-
-### Production Mode
-
-**With helper script:**
-
-```bash
-# Linux/macOS
-./run.sh prod
-
-# Windows PowerShell
-./run.ps1 prod
-```
-
-**Or manually:**
-
-```bash
-docker-compose up
+docker-compose up -d
 ```
 
 Features:
@@ -58,36 +20,32 @@ Features:
 - Minimal dependencies
 - PostgreSQL support
 - Compressed assets
+- Health checks enabled
 
 Visit: `http://localhost:3000`
 
 ## Environment Setup
 
-Choose your environment file based on mode:
-
-### Development
-```bash
-cp .env.development .env
-```
-
-Environment variables:
-- `NODE_ENV=development`
-- `DATABASE_URL=file:./data/cocoa_canvas.db` (SQLite)
-- `NEXTAUTH_SECRET=dev-secret-only-for-development-not-secure`
-
 ### Production
+
+Create a `.env` file for production:
+
 ```bash
-cp .env.production .env
+cp .env.example .env
 ```
 
-**Important**: Before running in production, update `.env`:
-- `NEXTAUTH_URL=https://your-domain.com`
-- `NEXTAUTH_SECRET=<generate-with: `openssl rand -base64 32`>`
-- `DATABASE_URL=postgresql://user:pass@postgres:5432/cocoa_canvas`
+**Important**: Update these values in `.env`:
+
+```env
+NODE_ENV=production
+DATABASE_URL=file:./data/cocoa_canvas.db  # or PostgreSQL connection string
+NEXTAUTH_URL=https://your-domain.com
+NEXTAUTH_SECRET=<generate-with: openssl rand -base64 32>
+```
 
 ## First Time Setup
 
-1. **Start the app** (dev or prod mode above)
+1. **Start the app**: `docker-compose up -d`
 2. **Create Admin Account**: Visit `http://localhost:3000` and complete the setup wizard
 3. **Create Campaign**: Set up your first campaign with dates and target area
 
@@ -105,12 +63,12 @@ docker-compose down -v
 
 ## Using PostgreSQL
 
-By default, Phase 1 uses SQLite for local development. To switch to PostgreSQL:
+By default, production uses SQLite. To switch to PostgreSQL for better scalability:
 
 ### Option 1: Use Docker Compose Profile
 
 ```bash
-docker-compose --profile postgres up
+docker-compose --profile postgres up -d
 ```
 
 Then update `.env`:
@@ -119,12 +77,12 @@ Then update `.env`:
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cocoa_canvas
 ```
 
-### Option 2: Manual PostgreSQL Connection
+### Option 2: External PostgreSQL
 
-Install PostgreSQL locally and set:
+Use a managed PostgreSQL service or local installation:
 
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/cocoa_canvas
+DATABASE_URL=postgresql://user:password@your-host:5432/cocoa_canvas
 ```
 
 ## Database Management
@@ -184,9 +142,9 @@ docker-compose exec web npm run build
 docker-compose exec web npx prisma db seed
 ```
 
-## BuildConfiguration
+## Build Configuration
 
-The Dockerfile uses a **multi-stage build**:
+The Dockerfile uses a **multi-stage build** for optimal production images:
 
 1. **Builder Stage**: Installs dependencies, generates Prisma client, builds Next.js
 2. **Runtime Stage**: Only includes production dependencies, reduces image size

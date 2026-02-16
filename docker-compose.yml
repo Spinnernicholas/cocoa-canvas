@@ -1,16 +1,16 @@
 version: '3.8'
 
 # Production Docker Compose configuration
-# For development, use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# For local development, use: npm run dev
 
 services:
-  # Main Next.js application (Production)
+  # Main Next.js application
   web:
     build: .
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: ${DATABASE_URL:-file:./data/cocoa_canvas.db}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}

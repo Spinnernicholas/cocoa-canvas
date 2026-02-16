@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { AuthPayload } from './types';
 
-const SECRET = process.env.NEXTAUTH_SECRET || 'dev-secret-key-change-in-production';
-const EXPIRY = process.env.JWT_EXPIRY || '30m';
+const SECRET: string = process.env.NEXTAUTH_SECRET || 'dev-secret-key-change-in-production';
+const EXPIRY: string = process.env.JWT_EXPIRY || '30m';
 
 /**
  * Generate a JWT token for a user
@@ -17,8 +17,8 @@ export function generateToken(userId: string, email: string): string {
   };
 
   return jwt.sign(payload, SECRET, {
-    expiresIn: EXPIRY,
-  });
+    expiresIn: EXPIRY as string,
+  } as jwt.SignOptions);
 }
 
 /**
