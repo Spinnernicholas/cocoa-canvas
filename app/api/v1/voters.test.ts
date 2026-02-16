@@ -27,9 +27,6 @@ jest.mock('@/lib/prisma', () => ({
       findMany: jest.fn(),
       deleteMany: jest.fn(),
     },
-    campaignVoter: {
-      deleteMany: jest.fn(),
-    },
     auditLog: {
       create: jest.fn(),
     },
@@ -336,7 +333,6 @@ describe('Voter API Endpoints (Integration)', () => {
 
       (prisma.voter.findUnique as jest.Mock).mockResolvedValue(voter);
       (prisma.contactLog.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (prisma.campaignVoter.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
       (prisma.voter.delete as jest.Mock).mockResolvedValue(voter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1'), {
@@ -350,7 +346,6 @@ describe('Voter API Endpoints (Integration)', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(prisma.contactLog.deleteMany).toHaveBeenCalled();
-      expect(prisma.campaignVoter.deleteMany).toHaveBeenCalled();
       expect(prisma.voter.delete).toHaveBeenCalled();
     });
   });

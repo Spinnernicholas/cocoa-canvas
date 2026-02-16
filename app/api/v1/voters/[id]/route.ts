@@ -116,12 +116,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
     }
 
-    // Delete related records first
+    // Delete related contact logs
     await prisma.contactLog.deleteMany({
-      where: { voterId: id },
-    });
-
-    await prisma.campaignVoter.deleteMany({
       where: { voterId: id },
     });
 

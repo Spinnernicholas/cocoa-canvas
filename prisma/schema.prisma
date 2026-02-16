@@ -54,12 +54,16 @@ model Session {
 }
 
 // ============================================================================
-// CAMPAIGNS (Phase 1)
+// CAMPAIGN (Single Campaign Per Deployment)
 // ============================================================================
+// Only ONE campaign record exists per deployment (single political race).
+// Campaign metadata is stored here. For multi-race support, deploy multiple instances.
 
 model Campaign {
   id          String    @id @default(cuid())
-  name        String
+  
+  // Single campaign metadata
+  name        String    // e.g., "Jane Smith for Mayor 2026"
   description String?
   
   // Timeline
@@ -67,15 +71,19 @@ model Campaign {
   endDate     DateTime
   status      String    @default("planning") // planning, active, paused, completed
   
-  // Target area (simple text for Phase 1)
-  targetArea  String?
+  // Target area (jurisdiction)
+  targetArea  String?   // e.g., "San Francisco County"
   
-  // Relations
-  voters      CampaignVoter[]
+  // Configuration
+  color       String    @default("#6B4423") // Campaign brand color
+  logoUrl     String?
   
   // Metadata
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  
+  // Enforce single record via unique constraint
+  @@unique([id])
 }
 
 // ============================================================================
@@ -145,25 +153,24 @@ model Voter {
   id                String    @id @default(cuid())
   
   // Basic info
+  name              String
   email             String?   @unique
   phone             String?   @unique
-  name              String
   address           String?
   notes             String?
   
-  // Contact status
+  // Contact status (all voters implicitly in THE campaign)
   contactStatus     String    @default("pending") // pending, attempted, contacted, refused, unreachable, moved
   lastContactDate   DateTime?
   lastContactMethod String?   // call, email, door, sms
   
-  // Campaign assignments
-  campaigns         CampaignVoter[]
+  // Contact history
   contactLogs       ContactLog[]
   
   // Metadata
   importedFrom      String?   // Source of import (filename, API, manual)
   registrationDate  DateTime?
-  votingPreference  String?   // For enhancements in future phases
+  votingPreference  String?   // For future enhancements
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -174,26 +181,7 @@ model Voter {
   @@index([createdAt])
 }
 
-model CampaignVoter {
-  id          String    @id @default(cuid())
-  
-  campaignId  String
-  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  
-  voterId     String
-  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
-  
-  // Assignment-specific tracking
-  assigned    Boolean   @default(true)
-  assignedAt  DateTime  @default(now())
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  @@unique([campaignId, voterId])
-  @@index([campaignId])
-  @@index([voterId])
-}
+
 
 model ContactLog {
   id          String    @id @default(cuid())
@@ -221,6 +209,12 @@ model ContactLog {
 // ============================================================================
 // SETTINGS (Phase 1)
 // ============================================================================
+
+// ============================================================================
+// SETTINGS & CONFIGURATION
+// ============================================================================
+// Store app-wide settings and campaign configuration
+// Examples: "campaign_id", "feature_flags", "email_provider"
 
 model Setting {
   id        String   @id @default(cuid())
