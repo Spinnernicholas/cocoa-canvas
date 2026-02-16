@@ -70,6 +70,9 @@ model Campaign {
   // Target area (simple text for Phase 1)
   targetArea  String?
   
+  // Relations
+  voters      CampaignVoter[]
+  
   // Metadata
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -131,6 +134,87 @@ model AuditLog {
   
   @@index([userId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// VOTER MANAGEMENT (Phase 2)
+// ============================================================================
+
+model Voter {
+  id                String    @id @default(cuid())
+  
+  // Basic info
+  email             String?   @unique
+  phone             String?   @unique
+  name              String
+  address           String?
+  notes             String?
+  
+  // Contact status
+  contactStatus     String    @default("pending") // pending, attempted, contacted, refused, unreachable, moved
+  lastContactDate   DateTime?
+  lastContactMethod String?   // call, email, door, sms
+  
+  // Campaign assignments
+  campaigns         CampaignVoter[]
+  contactLogs       ContactLog[]
+  
+  // Metadata
+  importedFrom      String?   // Source of import (filename, API, manual)
+  registrationDate  DateTime?
+  votingPreference  String?   // For enhancements in future phases
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([email])
+  @@index([phone])
+  @@index([contactStatus])
+  @@index([createdAt])
+}
+
+model CampaignVoter {
+  id          String    @id @default(cuid())
+  
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  // Assignment-specific tracking
+  assigned    Boolean   @default(true)
+  assignedAt  DateTime  @default(now())
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([campaignId, voterId])
+  @@index([campaignId])
+  @@index([voterId])
+}
+
+model ContactLog {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  // Contact details
+  contactType String    // call, email, door, sms
+  outcome     String?   // contacted, refused, not_home, no_answer, moved, invalid
+  notes       String?
+  
+  // Optional follow-up
+  followUpNeeded Boolean @default(false)
+  followUpDate   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([contactType])
   @@index([createdAt])
 }
 
