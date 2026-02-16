@@ -1,9 +1,11 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface LoginResponse {
+  success?: boolean;
   token?: string;
   user?: {
     id: string;
@@ -20,6 +22,41 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
+
+  // Check if setup is required on mount
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        // Try to login with a test (will fail, but tells us if setup is done)
+        // Actually, let's try the setup endpoint to see if it's available
+        const response = await fetch('/api/v1/auth/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'test@test.com', password: 'test', passwordConfirm: 'test' }),
+        });
+
+        const data = await response.json();
+        
+        // If we get a 400 saying "Setup is already complete", then setup is done
+        // If we get 400 for other reasons or success, setup might be needed
+        if (response.status === 400 && data.error?.includes('already complete')) {
+          setSetupRequired(false);
+        } else {
+          // Setup might be needed or other error
+          setSetupRequired(true);
+        }
+      } catch (err) {
+        // Assume setup is done on error checking
+        setSetupRequired(false);
+      } finally {
+        setCheckingSetup(false);
+      }
+    };
+
+    checkSetup();
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -52,9 +89,9 @@ export default function LoginForm() {
         return;
       }
 
-      // Store token in localStorage (could also use httpOnly cookie via header)
+      // Store token in localStorage
       if (data.token) {
-        localStorage.setItem('token', data.token);
+        localStorage.setItem('authToken', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
       }
 
@@ -65,6 +102,32 @@ export default function LoginForm() {
       setLoading(false);
     }
   };
+
+  if (checkingSetup) {
+    return (
+      <div className="text-center py-4">
+        <div className="inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-600 text-sm mt-2">Checking system status...</p>
+      </div>
+    );
+  }
+
+  if (setupRequired) {
+    return (
+      <div className="text-center py-4 space-y-3">
+        <p className="text-gray-700 font-medium">System Setup Required</p>
+        <p className="text-gray-600 text-sm">
+          This appears to be your first time. Please set up your admin account first.
+        </p>
+        <Link
+          href="/setup"
+          className="inline-block mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
+        >
+          Go to Setup
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
