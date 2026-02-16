@@ -1,4 +1,4 @@
-# Voter File-Centric Architecture
+# Person-Centric Data Architecture (with Voter Type)
 
 **Purpose**: Define how voter files decompose into normalized database models  
 **Date**: February 16, 2026  
@@ -8,13 +8,14 @@
 
 ## Overview: From File to Database
 
-A voter file contains dense records. We normalize into 5 interconnected models:
+A voter file contains dense records. We normalize into core models with **PERSON** as the central entity and **VOTER** as a specialized type:
 
 ### High-Level Model Relationships
 
 ```mermaid
 graph TD
-    V["👤 VOTER<br/>(Person Identity)"]
+    P["👤 PERSON<br/>(Core Identity)"]
+    V["🗳️ VOTER<br/>(Voting Profile)"]
     H["🏠 HOUSEHOLD<br/>(Address Grouping)"]
     B["🏢 BUILDING<br/>(Apartment Complex)"]
     C["📞 CONTACT_INFO<br/>(All Contact Methods)"]
@@ -22,14 +23,16 @@ graph TD
     E["🗳️ ELECTION<br/>(Shared Election Metadata)"]
     VH["📊 VOTE_HISTORY<br/>(Election Participation)"]
     
-    V -->|belongs to| H
+    V -->|specializes| P
+    P -->|belongs to| H
     H -->|may belong to| B
-    V -->|has| C
+    P -->|has| C
     C -->|typed by| L
     V -->|participated in| VH
     VH -->|references| E
     
-    style V fill:#f3e5f5
+    style P fill:#f3e5f5
+    style V fill:#e1bee7
     style H fill:#e8f5e9
     style B fill:#e0f2f1
     style C fill:#fff3e0
@@ -42,17 +45,19 @@ graph TD
 
 ```mermaid
 erDiagram
-    VOTER_FILE ||--|| VOTER : splits_into
+    VOTER_FILE ||--|| PERSON : splits_into
+    VOTER_FILE ||--|| VOTER : creates
     VOTER_FILE ||--|| HOUSEHOLD : creates
     VOTER_FILE ||--o{ CONTACT_INFO : generates
     VOTER_FILE ||--o{ VOTE_HISTORY : contains
     VOTE_HISTORY ||--|| ELECTION : references
 
-    VOTER }o--|| HOUSEHOLD: "belongs_to"
+    VOTER ||--|| PERSON: "specializes"
+    PERSON }o--|| HOUSEHOLD: "belongs_to"
     HOUSEHOLD }o--|| BUILDING: "may_be_in"
-    VOTER ||--o{ CONTACT_INFO: "has"
-    VOTER ||--o{ CONTACT_LOG: "receives"
-    VOTER ||--o{ VOTE_HISTORY: "participates_in"
+    PERSON ||--o{ CONTACT_INFO: "has"
+    PERSON ||--o{ CONTACT_LOG: "receives"
+    VOTER ||--o{ VOTE_HISTORY: "participated_in"
 
     CONTACT_INFO ||--|| LOCATION: "typed_by"
     VOTE_HISTORY ||--o| ELECTION: "references"
@@ -74,24 +79,50 @@ erDiagram
         string ballotPartyAbbr_1
     }
 
-    VOTER {
+    PERSON {
         string id PK
-        string registrationNumber UK
         string firstName
         string lastName
+        string middleName
+        string nameSuffix
         string gender
         datetime birthDate
-        string partyAbbr
-        datetime registrationDate
-        string contactStatus
+        string birthPlace
+        string language
         string householdId FK
+        string notes
+    }
+
+    VOTER {
+        string id PK
+        string personId UK FK
+        string registrationNumber UK
+        string voterFileId
+        string title
+        datetime registrationDate
+        string partyName
+        string partyAbbr
+        string vbmStatus
+        string precinctId
+        string precinctPortion
+        string precinctName
+        string contactStatus
+        datetime lastContactDate
+        string lastContactMethod
+        string importedFrom
+        string importType
+        string importFormat
     }
 
     BUILDING {
         string id PK
         string streetNumber
+        string preDirection
         string streetName
+        string streetSuffix
+        string postDirection
         string city
+        string state
         string zipCode
         string fullAddress UK
         string buildingType
@@ -103,25 +134,43 @@ erDiagram
     HOUSEHOLD {
         string id PK
         string buildingId FK
-        string streetNumber
+        string houseNumber
+        string preDirection
         string streetName
+        string streetSuffix
+        string postDirection
+        string unitAbbr
+        string unitNumber
         string city
+        string state
         string zipCode
         string fullAddress UK
-        int voterCount
+        int personCount
+        int maxVotingScore
         float latitude
         float longitude
     }
 
     CONTACT_INFO {
         string id PK
-        string voterId FK
+        string personId FK
         string locationId FK
+        string houseNumber
+        string preDirection
+        string streetName
+        string streetSuffix
+        string postDirection
+        string unitAbbr
+        string unitNumber
+        string city
+        string state
+        string zipCode
+        string fullAddress
         string phone
         string email
-        string fullAddress
         boolean isPrimary
         boolean isVerified
+        string source
     }
 
     VOTE_HISTORY {
@@ -129,16 +178,22 @@ erDiagram
         string voterId FK
         string electionId FK
         datetime electionDate
+        string ballotPartyName
+        string ballotPartyAbbr
         boolean ballotCounted
         string votingMethod
+        string districtId
+        string subDistrict
+        string districtName
     }
 
     ELECTION {
         string id PK
         datetime electionDate UK
-        string electionAbbr
-        string electionType
+        string electionAbbr UK
         string electionDesc
+        string electionType
+        string jurisdictionCode
     }
 
     LOCATION {
@@ -148,10 +203,12 @@ erDiagram
 
     CONTACT_LOG {
         string id PK
-        string voterId FK
+        string personId FK
         string contactType
         string outcome
-        datetime createdAt
+        string notes
+        boolean followUpNeeded
+        datetime followUpDate
     }
 ```
 
@@ -159,7 +216,122 @@ erDiagram
 
 ## Model Definitions
 
-### 1. **ELECTION** (Shared Lookup)
+### 1. **PERSON** (Core Identity)
+Universal person record. Every human in the system is a PERSON. May also be a VOTER, volunteer, staff member, etc.
+
+```typescript
+model Person {
+  id              String    @id @default(cuid())
+  
+  // Name components
+  title           String?   // Mr, Ms, Dr, etc.
+  firstName       String
+  middleName      String?
+  lastName        String
+  nameSuffix      String?   // Jr, Sr, III, etc.
+  
+  // Demographics
+  gender          String?   // M, F, U, X
+  birthDate       DateTime?
+  birthPlace      String?   // State/Country code
+  language        String?   // Preferred language
+  
+  // Household grouping
+  householdId     String?
+  household       Household? @relation(fields: [householdId], references: [id])
+  
+  // Notes
+  notes           String?
+  
+  // Relations
+  voter           Voter?    // Optional: if this person is registered to vote
+  contactInfo     ContactInfo[]
+  contactLogs     ContactLog[]
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([firstName, lastName])
+  @@index([householdId])
+}
+```
+
+**When Created**: Parsed from voter file record
+
+**Why Separate**:
+- Core identity independent of voter registration status
+- Future: Support volunteers, staff, non-registered contacts
+- Single source of truth for a human being
+- Enables other record types (volunteer, staff, contact) to reference same PERSON
+
+---
+
+### 2. **VOTER** (Voting Profile)
+Specializes PERSON with voter registration data. One-to-one relationship with PERSON.
+
+```typescript
+model Voter {
+  id              String    @id @default(cuid())
+  
+  // Link to core identity
+  personId        String    @unique
+  person          Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  
+  // Registration identity (from voter file)
+  registrationNumber String? @unique  // County's internal voter ID
+  voterFileId        String?          // External voter ID from jurisdiction
+  
+  // Registration info
+  title           String?   // Mr, Ms, Dr, etc. (redundant with Person, but from file)
+  registrationDate DateTime?
+  partyName       String?   // Democratic, Republican, American Independent, etc.
+  partyAbbr       String?   // D, R, AI, G, L, N, U
+  vbmStatus       String?   // Permanent VBM, Conditional Voter Registration, etc.
+  
+  // Precinct (voting location grouping)
+  precinctId      String?
+  precinctPortion String?
+  precinctName    String?
+  
+  // Canvassing status (app-driven, mutable)
+  contactStatus   String    @default("pending") 
+                  // pending, attempted, contacted, refused, unreachable, moved
+  lastContactDate DateTime?
+  lastContactMethod String?   // call, email, door, sms
+  
+  // Import tracking
+  importedFrom    String?   // "contra_costa", "simple_csv", filename
+  importType      String?   // "full" or "incremental"
+  importFormat    String?   // voter file format identifier
+  importFile      String?   // SHA hash of source file (anti-duplication)
+  
+  // Relations
+  voteHistory     VoteHistory[]
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([registrationNumber])
+  @@index([voterFileId])
+  @@index([precinctId])
+  @@index([partyAbbr])
+  @@index([contactStatus])
+}
+```
+
+**When Created**: On voter file import
+
+**Why Separate from PERSON**:
+- Voter registration is specific, mutable, file-driven
+- Demographics (birthDate, gender, name) are immutable (Person)
+- Voter status (party, precinct, contactStatus) are mutable (Voter)
+- Future: Support non-voters (volunteers, staff) as PERSON without VOTER
+
+---
+
+### 3. **ELECTION** (Shared Lookup)
 Immutable record of elections. Created once, referenced by VoteHistory.
 
 ```typescript
@@ -193,8 +365,8 @@ model Election {
 
 ---
 
-### 2. **HOUSEHOLD** (Address Grouping)
-Groups voters at the same residence address together.
+### 4. **HOUSEHOLD** (Address Grouping)
+Groups people at the same residence address together.
 
 ```typescript
 model Household {
@@ -210,15 +382,15 @@ model Household {
   streetName      String
   streetSuffix    String?
   postDirection   String?
-  unitAbbr        String?   // Apt, Unit, Ste, etc. (redundant if building-based)
-  unitNumber      String?   // (redundant if building-based)
+  unitAbbr        String?   // Apt, Unit, Ste, etc.
+  unitNumber      String?
   city            String
   state           String   @default("CA")
   zipCode         String
   fullAddress     String   @unique  // "123 Main St, San Francisco, CA 94102"
   
   // Derived stats
-  voterCount      Int      @default(1)
+  personCount     Int      @default(1)
   maxVotingScore  Int?     // Highest voting frequency in house
   
   // Geolocation
@@ -228,7 +400,7 @@ model Household {
   geocodedAt      DateTime?
   
   // Relations
-  voters          Voter[]
+  people          Person[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -238,11 +410,22 @@ model Household {
   @@index([fullAddress])
   @@index([zipCode])
 }
+```
 
-/**
- * Building (Optional - for apartment complexes and multi-unit buildings)
- * Represents a single building address that contains multiple units/households
- */
+**When Created**: During voter import, grouped by residence address
+
+**Why Separate**:
+- Address is the grouping key
+- One-to-many people per address (family households)
+- Supports precinct work (knock on door once, contact all residents)
+- Enables targeted canvassing (whole household contact strategy)
+
+---
+
+### 5. **BUILDING** (Multi-Unit Buildings)
+Represents a single building address that contains multiple units/households.
+
+```typescript
 model Building {
   id              String   @id @default(cuid())
   
@@ -287,101 +470,16 @@ model Building {
 
 ---
 
-### 3. **VOTER** (Core Person Record)
-Individual voter identity and registration status.
-
-```typescript
-model Voter {
-  id                String    @id @default(cuid())
-  
-  // Primary key in county file
-  registrationNumber String? @unique  // County's internal voter ID
-  voterFileId        String?          // External voter ID from jurisdiction
-  
-  // Name components
-  title             String?   // Mr, Ms, Dr, etc.
-  firstName         String
-  middleName        String?
-  lastName          String
-  nameSuffix        String?   // Jr, Sr, III, etc.
-  
-  // Demographics (from voter file)
-  gender            String?   // M, F, U, X
-  birthDate         DateTime?
-  birthPlace        String?   // State/Country code
-  language          String?   // Preferred language
-  
-  // Voter registration status
-  registrationDate  DateTime?
-  partyName         String?   // Democratic, Republican, American Independent, etc.
-  partyAbbr         String?   // D, R, AI, G, L, N, U
-  vbmStatus         String?   // Permanent VBM, Conditional Voter Registration, etc.
-  
-  // Precinct (voting location grouping)
-  precinctId        String?
-  precinctPortion   String?
-  precinctName      String?
-  
-  // Household relationship
-  householdId       String?
-  household         Household? @relation(fields: [householdId], references: [id])
-  
-  // Canvassing status (app-driven)
-  contactStatus     String    @default("pending") 
-                    // pending, attempted, contacted, refused, unreachable, moved
-  lastContactDate   DateTime?
-  lastContactMethod String?   // call, email, door, sms
-  
-  // Import tracking
-  importedFrom      String?   // "contra_costa", "simple_csv", filename
-  importType        String?   // "full" or "incremental"
-  importFormat      String?   // voter file format identifier
-  importFile        String?   // SHA hash of source file (anti-duplication)
-  importedAt        DateTime?
-  
-  // Notes
-  notes             String?
-  
-  // Relations
-  contactInfo       ContactInfo[]
-  contactLogs       ContactLog[]
-  voteHistory       VoteHistory[]
-  
-  // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  @@index([registrationNumber])
-  @@index([voterFileId])
-  @@index([lastName, firstName])
-  @@index([householdId])
-  @@index([precinctId])
-  @@index([partyAbbr])
-  @@index([contactStatus])
-  @@index([registeredAt])
-}
-```
-
-**When Created**: On voter file import
-
-**Why Separate**:
-- Voter is the entity, everything else references it
-- Single point of truth for person identity
-- Immutable registration data (from county file)
-- Mutable canvassing status (contactStatus, lastContactDate)
-
----
-
-### 4. **CONTACT_INFO** (Multi-Method Contact)
-All ways to reach a voter (address, phone, email).
+### 6. **CONTACT_INFO** (Multi-Method Contact)
+All ways to reach a person (address, phone, email).
 
 ```typescript
 model ContactInfo {
   id          String    @id @default(cuid())
   
-  // Which voter
-  voterId     String
-  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  // Which person
+  personId    String
+  person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
   
   // Location type
   locationId  String    // Foreign reference to Location seed data
@@ -418,26 +516,26 @@ model ContactInfo {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
-  @@index([voterId])
+  @@index([personId])
   @@index([locationId])
   @@index([phone])
   @@index([email])
   @@index([isPrimary])
-  @@unique([voterId, locationId, fullAddress])  // One record per voter per address type
+  @@unique([personId, locationId, fullAddress])  // One record per person per address type
 }
 ```
 
 **When Created**: Parsed from voter file (residence, mailing, phone, email)
 
 **Why Separate**:
-- Multiple contact methods per voter (home, cell, mailing address, email)
+- Multiple contact methods per person (home, cell, mailing address, email)
 - Location-typed (residence for knocking on doors, cell for calls)
 - Verification status (county file is verified, enriched data is not)
 - TCPA compliance (track which numbers have violations)
 
 ---
 
-### 5. **VOTE_HISTORY** (Election Participation)
+### 7. **VOTE_HISTORY** (Election Participation)
 Record of each election a voter participated in.
 
 ```typescript
@@ -492,6 +590,36 @@ model VoteHistory {
 
 ---
 
+### 8. **CONTACT_LOG** (Interaction History)
+Record of all outreach/contact attempts with a person.
+
+```typescript
+model ContactLog {
+  id          String    @id @default(cuid())
+  
+  personId    String
+  person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  
+  // Contact details
+  contactType String    // call, email, door, sms
+  outcome     String?   // contacted, refused, not_home, no_answer, moved, invalid
+  notes       String?
+  
+  // Optional follow-up
+  followUpNeeded Boolean @default(false)
+  followUpDate   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([personId])
+  @@index([contactType])
+  @@index([createdAt])
+}
+```
+
+---
+
 ## Data Flow: File → Database
 
 ### Voter File Record (Abbreviated Example)
@@ -514,49 +642,34 @@ StreetSuffix:       St
 ResidenceCity:      San Francisco
 ResidenceZipCode:   94102
 
-// Mailing (if different)
-MailAddress1:       PO Box 456
-MailCity:           San Francisco
-MailZip:            94102
-
 // Contact
 PhoneNumber:        650-555-0123
 EmailAddress:       jane.smith@example.com
 
-// Election History (5 most recent)
-ElectionDate_1:     11/05/2024    → ElectionAbbr_1: GEN24, BallotCounted_1: Yes
-ElectionDate_2:     08/06/2024    → ElectionAbbr_2: PRI24, BallotCounted_2: No
-ElectionDate_3:     11/07/2022    → ElectionAbbr_3: GEN22, BallotCounted_3: Yes
-ElectionDate_4:     06/07/2022    → ElectionAbbr_4: PRI22, BallotCounted_4: No
-ElectionDate_5:     11/02/2020    → ElectionAbbr_5: GEN20, BallotCounted_5: Yes
+// Elections (5 most recent)
+ElectionDate_1:     11/05/2024 → BallotCounted_1: Yes
+ElectionDate_2:     08/06/2024 → BallotCounted_2: No
 ```
 
 ### Import Process (Step by Step)
 
-#### **Step 1: Parse Voter Identity → VOTER Record**
+#### **Step 1: Parse Core Identity → PERSON Record**
 
-```
-INSERT INTO Voter {
-  registrationNumber: "12345678",
-  voterFileId: "VOTER-001",
+```typescript
+INSERT INTO Person {
   firstName: "Jane",
   lastName: "Smith",
   gender: "F",
   birthDate: 1980-05-15,
-  registrationDate: 2016-10-22,
-  partyAbbr: "D",
-  language: "EN",
-  importedFrom: "contra_costa",
-  importType: "full",
-  contactStatus: "pending"
+  language: "EN"
 }
-→ voter.id = "voter-xyz123"
+→ person.id = "person-xyz123"
 ```
 
 #### **Step 2: Parse Residence → HOUSEHOLD + Link**
 
-```
-// First, find or create household by address
+```typescript
+// Find or create household by address
 UPSERT INTO Household {
   houseNumber: "123",
   streetName: "Main",
@@ -567,142 +680,121 @@ UPSERT INTO Household {
 }
 → household.id = "hh-abc456"
 
-// Link voter to household
-UPDATE Voter SET householdId = "hh-abc456" WHERE id = "voter-xyz123"
-
-// Update household stats
-UPDATE Household SET voterCount = 2 WHERE id = "hh-abc456"
+// Link person to household
+UPDATE Person SET householdId = "hh-abc456" WHERE id = "person-xyz123"
 ```
 
-#### **Step 3: Parse Addresses → CONTACT_INFO Records**
+#### **Step 3: Create VOTER Registration Profile**
 
+```typescript
+INSERT INTO Voter {
+  personId: "person-xyz123",
+  registrationNumber: "12345678",
+  voterFileId: "VOTER-001",
+  registrationDate: 2016-10-22,
+  partyAbbr: "D",
+  language: "EN",
+  importedFrom: "contra_costa",
+  contactStatus: "pending"
+}
+→ voter.id = "voter-def789"
 ```
+
+#### **Step 4: Parse Contact Methods → CONTACT_INFO Records**
+
+```typescript
 // Residence address (primary)
 INSERT INTO ContactInfo {
-  voterId: "voter-xyz123",
+  personId: "person-xyz123",
   locationId: "loc-residence",
-  houseNumber: "123",
-  streetName: "Main",
-  streetSuffix: "St",
-  city: "San Francisco",
-  zipCode: "94102",
   fullAddress: "123 Main St, San Francisco, CA 94102",
-  isPrimary: true,
-  source: "county_file"
-}
-
-// Mailing address (different)
-INSERT INTO ContactInfo {
-  voterId: "voter-xyz123",
-  locationId: "loc-mailing",
-  fullAddress: "PO Box 456, San Francisco, CA 94102",
   isPrimary: true,
   source: "county_file"
 }
 
 // Phone (cell)
 INSERT INTO ContactInfo {
-  voterId: "voter-xyz123",
+  personId: "person-xyz123",
   locationId: "loc-cell",
   phone: "+16505550123",
-  isPrimary: true,
   source: "county_file"
 }
 
 // Email
 INSERT INTO ContactInfo {
-  voterId: "voter-xyz123",
+  personId: "person-xyz123",
   locationId: "loc-email",
   email: "jane.smith@example.com",
-  isPrimary: true,
   source: "county_file"
 }
 ```
 
-#### **Step 4: Parse Elections → ELECTION (Shared) + VOTE_HISTORY**
+#### **Step 5: Parse Elections → VOTE_HISTORY**
 
-```
-// First, ensure Election records exist
+```typescript
+// Create Election (if not exists)
 UPSERT INTO Election {
   electionDate: 2024-11-05,
   electionAbbr: "GEN24",
-  electionDesc: "2024 General Election",
   electionType: "General"
 }
 → election.id = "el-gen24"
 
-UPSERT INTO Election {
-  electionDate: 2024-08-06,
-  electionAbbr: "PRI24",
-  electionType: "Primary"
-}
-→ election.id = "el-pri24"
-
-// Then link voter's participation (5 records per voter)
+// Link voter's participation
 INSERT INTO VoteHistory {
-  voterId: "voter-xyz123",
+  voterId: "voter-def789",
   electionId: "el-gen24",
-  electionDate: 2024-11-05,
   ballotCounted: true,
   votingMethod: "Absentee"
 }
-
-INSERT INTO VoteHistory {
-  voterId: "voter-xyz123",
-  electionId: "el-pri24",
-  electionDate: 2024-08-06,
-  ballotCounted: false
-}
-
-... (3 more for elections 3-5)
 ```
 
 ---
 
 ## Query Examples
 
-### "Who lives in this household?"
+### "All people in this household"
 ```sql
-SELECT v.* FROM Voter v
-JOIN Household h ON v.householdId = h.id
+SELECT p.* FROM Person p
+JOIN Household h ON p.householdId = h.id
 WHERE h.fullAddress = '123 Main St, San Francisco, CA 94102'
 ```
-**Use**: Knock-and-drop strategy; reach whole household
+**Use**: Knock-and-drop strategy; reach all household members
+
+### "Voters with registration in this precinct"
+```sql
+SELECT v.*, p.firstName, p.lastName FROM Voter v
+JOIN Person p ON v.personId = p.id
+WHERE v.precinctId = 'PRECINCT-123'
+```
+**Use**: Precinct targeting, demographic analysis
 
 ### "How reliable is this voter?"
 ```sql
-SELECT COUNT(*) as elections_voted,
+SELECT v.registrationNumber,
+       COUNT(*) as elections_voted,
        ROUND(COUNT(*) * 100.0 / 5, 0) as voting_frequency
 FROM VoteHistory vh
-WHERE vh.voterId = 'voter-xyz123'
+JOIN Voter v ON vh.voterId = v.id
+WHERE v.id = 'voter-def789'
   AND vh.ballotCounted = true
 ```
 **Use**: Score voters by participation (4/5 = reliable)
 
-### "Voters by party in precinct X"
+### "All contact methods for a person"
 ```sql
-SELECT partyAbbr, COUNT(*) as voter_count
-FROM Voter v
-WHERE v.precinctId = 'PRECINCT-123'
-GROUP BY partyAbbr
-```
-**Use**: Precinct targeting, demographic analysis
-
-### "Contact methods we have"
-```sql
-SELECT locationId, 
-       COUNT(DISTINCT voterId) as voter_count,
-       COUNT(CASE WHEN isVerified THEN 1 END) as verified_count
+SELECT locationId, phone, email, fullAddress, isPrimary, isVerified
 FROM ContactInfo
-GROUP BY locationId
+WHERE personId = 'person-xyz123'
+ORDER BY isPrimary DESC, isVerified DESC
 ```
-**Use**: Capacity planning (how many can we call?)
+**Use**: Determine best way to reach person
 
 ### "Voters not yet contacted"
 ```sql
-SELECT v.* FROM Voter v
+SELECT v.*, p.firstName, p.lastName FROM Voter v
+JOIN Person p ON v.personId = p.id
 WHERE v.contactStatus = 'pending'
-  AND v.householdId IS NOT NULL
 LIMIT 100
 ```
 **Use**: Canvassing assignment
@@ -713,11 +805,12 @@ LIMIT 100
 
 - [ ] Location seed data loaded (residence, mailing, cell, email types)
 - [ ] Voter file validated (field count, delimiters, encoding)
-- [ ] Upsert logic: registrationNumber unique, or create new?
+- [ ] Upsert logic: registrationNumber unique for VOTER, or create new?
 - [ ] Household grouping: normalize addresses first (remove punctuation, trim)
 - [ ] De-duplication: Check for duplicate phone/email within household
 - [ ] Election lookup: Fetch or create elections on-the-fly?
 - [ ] Contact info verification: County file = verified, enriched data ≠ verified
+- [ ] Building detection: Identify apartments (unit abbr/number present)
 - [ ] Progress tracking: Log every 100 records
 - [ ] Error handling: Skip bad records, log errors, don't fail hard
 
@@ -727,18 +820,22 @@ LIMIT 100
 
 | Model | Purpose | Source | Mutability |
 |-------|---------|--------|-----------|
+| **Person** | Core human identity | File parsing | Immutable (static demographics) |
+| **Voter** | Voting registration profile | File (core), App (canvassing status) | Mostly immutable (registration) + Mutable (contact status) |
 | **Election** | Shared election metadata | File parsing | Immutable (created once) |
 | **Building** | Multi-unit apartment complex | Voter address (if has unit) | Mostly immutable (totalUnits may change) |
-| **Household** | Address grouping (may be in building) | Voter residence | Mostly immutable (voterCount changes) |
-| **Voter** | Person identity | File (core), App (canvassing status) | Mostly immutable (county) + Mutable (app) |
+| **Household** | Address grouping (may be in building) | Person residence | Mostly immutable (personCount changes) |
 | **ContactInfo** | All contact methods | File + Enrichment | Mutable (verification) |
 | **VoteHistory** | Election participation | File (county history) | Immutable (from file) |
+| **ContactLog** | Interaction history | App (canvassing) | Immutable (audit trail) |
 
 This architecture enables:
-- ✅ Fast voter lookups (by name, address, phone, email)
-- ✅ Apartment-aware grouping (building → households → voters)
+- ✅ Core identity separate from voter registration
+- ✅ Future support for volunteers, staff, non-registered contacts
+- ✅ Fast person/voter lookups (by name, address, phone, email)
+- ✅ Apartment-aware grouping (building → households → people)
 - ✅ Household-based canvassing (whole address contact)
 - ✅ Building-level outreach (common area strategies)
 - ✅ Predictive targeting (voting frequency scores)
 - ✅ Multi-format imports (Contra Costa, Simple CSV, etc.)
-- ✅ Separation of concerns (registration data vs app state)
+- ✅ Clear separation: registration data (immutable) vs app state (mutable)
