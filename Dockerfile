@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Ensure public directory exists
+RUN mkdir -p public
+
 # Generate Prisma client and build Next.js
 RUN npx prisma generate && npm run build
 
@@ -19,9 +22,6 @@ RUN npx prisma generate && npm run build
 FROM node:20-alpine
 
 WORKDIR /app
-
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
 
 # Copy package files from builder
 COPY package.json package-lock.json* yarn.lock* ./
@@ -48,9 +48,6 @@ ENV NEXTAUTH_URL=http://localhost:3000
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["/sbin/dumb-init", "--"]
 
 # Start application
 CMD ["npm", "start"]

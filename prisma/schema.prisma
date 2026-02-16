@@ -60,7 +60,7 @@ model Session {
 model Campaign {
   id          String    @id @default(cuid())
   name        String
-  description String?   @db.Text
+  description String?
   
   // Timeline
   startDate   DateTime
@@ -91,10 +91,10 @@ model Job {
   processedItems Int    @default(0)
   
   // Error tracking
-  errorLog    String?   @db.Text  // JSON array of errors
+  errorLog    String?    // JSON array of errors (stored as text)
   
-  // Job-specific data (stored as JSON for flexibility)
-  data        Json?
+  // Job-specific data (stored as JSON text for flexibility)
+  data        String?
   // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
   
   // Timestamps
@@ -123,7 +123,7 @@ model AuditLog {
   resource    String?   // "user", "campaign", "job", etc.
   resourceId  String?
   
-  details     String?   @db.Text // JSON for context
+  details     String?   // JSON for context (stored as text)
   ipAddress   String?
   userAgent   String?
   
@@ -141,7 +141,7 @@ model AuditLog {
 model Setting {
   id        String   @id @default(cuid())
   key       String   @unique
-  value     String   @db.Text // Can be JSON
+  value     String   // Can be JSON (stored as text)
   
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
