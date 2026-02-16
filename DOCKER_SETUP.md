@@ -38,9 +38,18 @@ cp .env.example .env
 
 ```env
 NODE_ENV=production
-DATABASE_URL=file:./data/cocoa_canvas.db  # or PostgreSQL connection string
+DATABASE_URL=file:./data/cocoa_canvas.db  # SQLite database (relative to prisma/schema.prisma)
 NEXTAUTH_URL=https://your-domain.com
 NEXTAUTH_SECRET=<generate-with: openssl rand -base64 32>
+```
+
+For auto-setup (create admin account automatically):
+
+```env
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=SecurePass123!
+ADMIN_NAME=Administrator
+AUTO_SETUP_ENABLED=true
 ```
 
 ## First Time Setup

@@ -16,7 +16,7 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
     volumes:
       # SQLite database persistence
-      - ./data:/app/data
+      - ./prisma/data:/app/prisma/data
       # Volume for node_modules to avoid conflicts
       - /app/node_modules
     healthcheck:
