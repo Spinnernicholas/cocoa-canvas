@@ -1,0 +1,52 @@
+# Development Docker Compose configuration
+# Use this for local development services (Redis, Postgres, etc.)
+# Run with: npm run docker:dev:up
+
+version: '3.8'
+
+services:
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: cocoa-canvas-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cocoa-dev-network
+
+  # PostgreSQL (optional, for testing)
+  postgres:
+    image: postgres:15-alpine
+    container_name: cocoa-canvas-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cocoa_canvas_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cocoa-dev-network
+    profiles: ["postgres"]
+
+volumes:
+  redis_dev_data:
+  postgres_dev_data:
+
+networks:
+  cocoa-dev-network:
+    driver: bridge

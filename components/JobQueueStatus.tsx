@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface JobStats {
@@ -12,6 +13,7 @@ interface JobStats {
 }
 
 export default function JobQueueStatus() {
+  const router = useRouter();
   const [stats, setStats] = useState<JobStats>({
     total: 0,
     pending: 0,
@@ -31,6 +33,13 @@ export default function JobQueueStatus() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Authentication failed - redirect to login
+            localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
+            router.push('/login');
+            return;
+          }
           setError('Failed to fetch job stats');
           setLoading(false);
           return;

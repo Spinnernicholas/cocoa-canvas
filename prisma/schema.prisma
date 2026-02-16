@@ -30,6 +30,7 @@ model User {
   sessions      Session[]
   auditLogs     AuditLog[]
   jobsCreated   Job[]
+  scheduledJobs ScheduledJob[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -109,8 +110,8 @@ model Job {
   // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
   
   // Timestamps
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
   createdAt   DateTime  @default(now())
   startedAt   DateTime?
   completedAt DateTime?
@@ -118,6 +119,43 @@ model Job {
   @@index([status])
   @@index([type])
   @@index([createdAt])
+}
+
+// ============================================================================
+// SCHEDULED JOBS (Recurring/Cron Jobs)
+// ============================================================================
+
+model ScheduledJob {
+  id          String    @id @default(cuid())
+  
+  // Job identification
+  name        String    @unique  // "daily-voter-sync", "weekly-cleanup", etc.
+  description String?
+  type        String               // "voter_import", "data_cleanup", etc.
+  
+  // Scheduling
+  schedule    String               // Cron expression: "0 2 * * *" (2 AM daily)
+  enabled     Boolean   @default(true)
+  
+  // Execution tracking
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  lastStatus  String?   // "success", "failed", null
+  lastError   String?
+  runCount    Int       @default(0)
+  
+  // Job configuration (stored as JSON)
+  data        String?   // Job-specific parameters
+  
+  // Metadata
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@index([type])
 }
 
 // ============================================================================
@@ -149,39 +187,160 @@ model AuditLog {
 // VOTER MANAGEMENT (Phase 2)
 // ============================================================================
 
+// Location types for contact information
+model Location {
+  id          String        @id @default(cuid())
+  name        String        @unique // "Home", "Work", "Cell", "Mailing", "Residence"
+  description String?
+  
+  // Relations
+  contactInfo ContactInfo[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  @@index([name])
+}
+
+// Contact information (phone, email, address) with location context
+model ContactInfo {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id])
+  
+  // Contact details (at least one should be populated)
+  phone       String?
+  email       String?
+  
+  // Address components
+  houseNumber     String?
+  preDirection    String?   // N, S, E, W
+  streetName      String?
+  streetSuffix    String?   // St, Ave, Ln, etc.
+  postDirection   String?
+  unitAbbr        String?   // Apt, Unit, Ste, etc.
+  unitNumber      String?
+  city            String?
+  state           String?
+  zipCode         String?
+  
+  // Full address (computed or imported)
+  fullAddress String?
+  
+  // Verification status
+  isVerified  Boolean   @default(false)
+  isPrimary   Boolean   @default(false) // Primary contact for this location type
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([locationId])
+  @@index([phone])
+  @@index([email])
+  @@index([isPrimary])
+}
+
 model Voter {
   id                String    @id @default(cuid())
   
-  // Basic info
-  name              String
-  email             String?   @unique
-  phone             String?   @unique
-  address           String?
-  notes             String?
+  // Basic identity
+  registrationNumber String? @unique // From voter file
+  voterFileId        String? // External voter ID from jurisdiction
   
-  // Contact status (all voters implicitly in THE campaign)
+  // Name components
+  title         String?   // Mr, Ms, Dr, etc.
+  firstName     String
+  middleName    String?
+  lastName      String
+  nameSuffix    String?   // Jr, Sr, III, etc.
+  
+  // Demographics
+  gender        String?
+  birthDate     DateTime?
+  birthPlace    String?   // State/Country code
+  language      String?   // Preferred language
+  
+  // Voter registration info
+  registrationDate DateTime?
+  partyName        String?
+  partyAbbr        String?
+  
+  // Vote by mail status
+  vbmStatus        String?   // Permanent VBM, etc.
+  
+  // Precinct information
+  precinctId       String?
+  precinctPortion  String?
+  precinctName     String?
+  
+  // Canvassing/Contact status
   contactStatus     String    @default("pending") // pending, attempted, contacted, refused, unreachable, moved
   lastContactDate   DateTime?
   lastContactMethod String?   // call, email, door, sms
   
-  // Contact history
-  contactLogs       ContactLog[]
+  // Relations
+  contactInfo   ContactInfo[]
+  contactLogs   ContactLog[]
+  voteHistory   VoteHistory[]
   
-  // Metadata
-  importedFrom      String?   // Source of import (filename, API, manual)
-  registrationDate  DateTime?
-  votingPreference  String?   // For future enhancements
+  // Import metadata
+  importedFrom      String?   // Source filename or API
+  importType        String?   // "full", "incremental"
+  importFormat      String?   // "contra_costa", "standard", etc.
   
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  // Notes
+  notes         String?
   
-  @@index([email])
-  @@index([phone])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([registrationNumber])
+  @@index([voterFileId])
+  @@index([lastName, firstName])
   @@index([contactStatus])
+  @@index([precinctId])
+  @@index([partyAbbr])
   @@index([createdAt])
 }
 
-
+// Vote history tracking
+model VoteHistory {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  // Election info
+  electionAbbr    String?
+  electionDesc    String?
+  electionDate    DateTime?
+  electionType    String?   // General, Primary, Special, etc.
+  
+  // Ballot info
+  ballotPartyName String?
+  ballotPartyAbbr String?
+  ballotCounted   Boolean   @default(false)
+  
+  // Voting method
+  votingMethod    String?   // "Absentee", "Polling Place", "Early Voting", etc.
+  
+  // District info (at time of election)
+  districtId      String?
+  subDistrict     String?
+  districtName    String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([electionDate])
+  @@index([electionType])
+}
 
 model ContactLog {
   id          String    @id @default(cuid())
@@ -224,3 +383,4 @@ model Setting {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
+

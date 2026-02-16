@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface Job {
@@ -14,6 +15,7 @@ interface Job {
 }
 
 export default function RecentJobsList() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,6 +29,13 @@ export default function RecentJobsList() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Authentication failed - redirect to login
+            localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
+            router.push('/login');
+            return;
+          }
           setError('Failed to fetch jobs');
           setLoading(false);
           return;

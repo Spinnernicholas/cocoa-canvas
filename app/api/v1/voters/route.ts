@@ -72,18 +72,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, phone, address, notes } = body;
+    const { firstName, lastName, middleName, email, phone, address, city, zipCode, notes } = body;
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+    if (!firstName || !lastName) {
+      return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 });
     }
 
     const voter = await prisma.voter.create({
       data: {
-        name,
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
+        firstName,
+        lastName,
+        middleName: middleName || null,
         notes: notes || null,
         contactStatus: 'pending',
         registrationDate: new Date(),
@@ -98,7 +97,7 @@ export async function POST(request: NextRequest) {
     
     if (error.code === 'P2002') {
       return NextResponse.json(
-        { error: 'Email or phone already exists' },
+        { error: 'Duplicate voter record' },
         { status: 409 }
       );
     }

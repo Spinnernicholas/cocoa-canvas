@@ -1,0 +1,33 @@
+
+> cocoa-canvas@0.1.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 78ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Curious about the SQL queries Prisma ORM generates? Optimize helps you enhance your visibility: https://pris.ly/tip-2-optimize
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.production, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1678.2ms
+  Running TypeScript ...
+Failed to compile.
+
+./app/api/v1/voters/import/route.ts:139:7
+Type error: Argument of type 'ImportJobData' is not assignable to parameter of type 'JobData'.
+  Index signature for type 'string' is missing in type 'ImportJobData'.
+
+[0m [90m 137 |[39m       [32m'voter_import'[39m[33m,[39m
+ [90m 138 |[39m       authResult[33m.[39muser[33m?[39m[33m.[39muserId [33m||[39m [32m''[39m[33m,[39m
+[31m[1m>[22m[39m[90m 139 |[39m       {
+ [90m     |[39m       [31m[1m^[22m[39m
+ [90m 140 |[39m         filePath[33m:[39m tempFilePath[33m,[39m
+ [90m 141 |[39m         format[33m,[39m
+ [90m 142 |[39m         importType[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null

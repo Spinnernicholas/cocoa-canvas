@@ -19,10 +19,21 @@ export async function register() {
       if (dbInitialized) {
         console.log('[Startup] Database initialized successfully');
         
-        // Check if setup is needed and attempt auto-setup
+        // Check if setup is needed
         const setupNeeded = await isSetupNeeded();
+        
+        // Only seed locations during initial setup
         if (setupNeeded) {
-          console.log('[Startup] Setup required, attempting auto-setup...');
+          console.log('[Startup] Initial setup needed, seeding locations...');
+          try {
+            const { seedLocations } = await import('./prisma/seeds/seed-locations');
+            await seedLocations();
+          } catch (error) {
+            console.error('[Startup] Failed to seed locations:', error);
+          }
+          
+          // Attempt auto-setup
+          console.log('[Startup] Attempting auto-setup...');
           const result = await performAutoSetup();
           if (result.completed) {
             console.log('[Startup] Auto-setup completed successfully');
@@ -34,6 +45,43 @@ export async function register() {
         }
       } else {
         console.warn('[Startup] Database initialization failed');
+      }
+
+      // Initialize BullMQ scheduler and workers
+      if (process.env.REDIS_URL) {
+        try {
+          console.log('[Startup] Initializing BullMQ scheduler and workers...');
+          const { initializeScheduler, shutdownScheduler } = await import('@/lib/queue/scheduler');
+          const { startWorkers, stopWorkers } = await import('@/lib/queue/worker');
+
+          // Initialize the scheduler
+          await initializeScheduler();
+
+          // Start the workers
+          await startWorkers();
+
+          console.log('[Startup] BullMQ scheduler and workers initialized successfully');
+
+          // Setup graceful shutdown
+          process.on('SIGTERM', async () => {
+            console.log('[Shutdown] SIGTERM received');
+            await stopWorkers();
+            await shutdownScheduler();
+            process.exit(0);
+          });
+
+          process.on('SIGINT', async () => {
+            console.log('[Shutdown] SIGINT received');
+            await stopWorkers();
+            await shutdownScheduler();
+            process.exit(0);
+          });
+        } catch (error) {
+          console.error('[Startup] Failed to initialize BullMQ:', error);
+          console.log('[Startup] Continuing without Redis features...');
+        }
+      } else {
+        console.warn('[Startup] REDIS_URL not set, BullMQ features disabled');
       }
     } catch (error) {
       console.error('[Startup] Error during initialization:', error);

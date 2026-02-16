@@ -11,6 +11,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-file:./data/cocoa_canvas.db}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       # Auto-setup credentials (optional)
       # Uncomment and set to enable automatic admin user creation
       # ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -22,12 +23,32 @@ services:
       - ./prisma/data:/app/prisma/data
       # Volume for node_modules to avoid conflicts
       - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - cocoa-network
+
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: cocoa-canvas-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - cocoa-network
 
@@ -54,6 +75,7 @@ services:
     profiles: ["postgres"]
 
 volumes:
+  redis_data:
   postgres_data:
 
 networks:

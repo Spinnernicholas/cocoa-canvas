@@ -18,6 +18,14 @@ interface Voter {
   createdAt: string;
 }
 
+interface ImportFormat {
+  id: string;
+  name: string;
+  description: string;
+  supportedExtensions: string[];
+  supportsIncremental: boolean;
+}
+
 export default function VotersPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -36,6 +44,11 @@ export default function VotersPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importFormats, setImportFormats] = useState<ImportFormat[]>([]);
+  const [selectedFormat, setSelectedFormat] = useState<string>('');
+  const [importType, setImportType] = useState<'full' | 'incremental'>('full');
+  const [loadingFormats, setLoadingFormats] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Load user
   useEffect(() => {
@@ -63,6 +76,7 @@ export default function VotersPage() {
     const fetchVoters = async () => {
       try {
         setLoading(true);
+        setError(''); // Clear any previous errors
         const token = localStorage.getItem('authToken');
         
         const params = new URLSearchParams({
@@ -83,7 +97,15 @@ export default function VotersPage() {
         });
 
         if (!response.ok) {
-          setError('Failed to fetch voters');
+          if (response.status === 401) {
+            // Authentication failed - redirect to login
+            localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
+            router.push('/login');
+            return;
+          }
+          const errorData = await response.json().catch(() => ({}));
+          setError(errorData.error || 'Failed to load voters. Please try again.');
           setVoters([]);
           return;
         }
@@ -93,7 +115,7 @@ export default function VotersPage() {
         setTotal(data.total || 0);
       } catch (err) {
         console.error('Error fetching voters:', err);
-        setError('Error loading voters');
+        setError('Network error. Please check your connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -102,13 +124,84 @@ export default function VotersPage() {
     fetchVoters();
   }, [user, page, searchQuery, statusFilter, limit]);
 
+  // Handle drag and drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      // Validate file extension if format is selected
+      if (selectedFormat) {
+        const format = importFormats.find(f => f.id === selectedFormat);
+        if (format) {
+          const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+          if (format.supportedExtensions.includes(ext)) {
+            setImportFile(file);
+          } else {
+            setError(`Invalid file type. Expected: ${format.supportedExtensions.join(', ')}`);
+          }
+        }
+      } else {
+        setImportFile(file);
+      }
+    }
+  };
+
+  // Fetch available import formats when modal opens
+  useEffect(() => {
+    if (showImportModal && importFormats.length === 0) {
+      const fetchFormats = async () => {
+        try {
+          setLoadingFormats(true);
+          const response = await fetch('/api/v1/voters/import');
+          if (response.ok) {
+            const data = await response.json();
+            setImportFormats(data.formats || []);
+            // Set default format to simple_csv
+            if (data.formats && data.formats.length > 0) {
+              const simpleFormat = data.formats.find((f: ImportFormat) => f.id === 'simple_csv');
+              setSelectedFormat(simpleFormat?.id || data.formats[0].id);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching formats:', err);
+        } finally {
+          setLoadingFormats(false);
+        }
+      };
+      fetchFormats();
+    }
+  }, [showImportModal, importFormats.length]);
+
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!importFile) return;
+    if (!importFile || !selectedFormat) return;
 
     setImporting(true);
     const formData = new FormData();
     formData.append('file', importFile);
+    formData.append('format', selectedFormat);
+    formData.append('importType', importType);
 
     try {
       const token = localStorage.getItem('authToken');
@@ -120,15 +213,29 @@ export default function VotersPage() {
 
       const data = await response.json();
       
-      if (response.ok) {
+      if (response.ok || response.status === 202) {
+        // Job created successfully
+        const jobId = data.jobId;
+        console.log('[Import] Job created:', jobId);
+        
+        // Show success message
+        setError('');
         setShowImportModal(false);
         setImportFile(null);
-        setPage(1);
-        // Refresh voters list
+        setImportType('full');
+        
+        // Redirect to job queue page to monitor progress
         setTimeout(() => {
-          window.location.reload();
+          router.push(`/jobs/${jobId}`);
         }, 1000);
       } else {
+        if (response.status === 401) {
+          // Authentication failed - redirect to login
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
         setError(data.error || 'Import failed');
       }
     } catch (err) {
@@ -359,54 +466,153 @@ export default function VotersPage() {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">Import Voters</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">📥 Import Voters</h2>
             
-            <form onSubmit={handleImport}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
-                  CSV File
-                </label>
-                <div className="border-2 border-dashed border-cocoa-300 dark:border-cocoa-600 rounded-lg p-6 text-center cursor-pointer hover:border-cocoa-400 dark:hover:border-cocoa-500 transition-colors">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="file-input"
-                  />
-                  <label htmlFor="file-input" className="cursor-pointer">
-                    <p className="text-cocoa-600 dark:text-cocoa-300">
-                      {importFile ? importFile.name : 'Click or drag CSV file here'}
-                    </p>
-                    <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
-                      Columns: name, email, phone, address (optional)
-                    </p>
+            {loadingFormats ? (
+              <div className="py-8 text-center">
+                <div className="inline-block w-6 h-6 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading formats...</p>
+              </div>
+            ) : (
+              <form onSubmit={handleImport}>
+                {/* Format Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
+                    Import Format
                   </label>
+                  <select
+                    value={selectedFormat}
+                    onChange={(e) => {
+                      setSelectedFormat(e.target.value);
+                      setImportFile(null); // Clear file when format changes
+                    }}
+                    className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                  >
+                    {importFormats.map((format) => (
+                      <option key={format.id} value={format.id}>
+                        {format.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedFormat && (
+                    <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
+                      {importFormats.find(f => f.id === selectedFormat)?.description}
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setImportFile(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!importFile || importing}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-                >
-                  {importing ? 'Importing...' : 'Import'}
-                </button>
-              </div>
-            </form>
+                {/* Import Type */}
+                {selectedFormat && importFormats.find(f => f.id === selectedFormat)?.supportsIncremental && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
+                      Import Type
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="importType"
+                          value="full"
+                          checked={importType === 'full'}
+                          onChange={(e) => setImportType(e.target.value as 'full' | 'incremental')}
+                          className="mr-2"
+                        />
+                        <span className="text-cocoa-700 dark:text-cocoa-300">
+                          <strong>Full Import</strong> - Replace all voter data
+                        </span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="importType"
+                          value="incremental"
+                          checked={importType === 'incremental'}
+                          onChange={(e) => setImportType(e.target.value as 'full' | 'incremental')}
+                          className="mr-2"
+                        />
+                        <span className="text-cocoa-700 dark:text-cocoa-300">
+                          <strong>Incremental</strong> - Update existing voters only
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* File Upload */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
+                    Voter File
+                  </label>
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? 'border-cinnamon-500 bg-cinnamon-50 dark:bg-cinnamon-900/20'
+                        : 'border-cocoa-300 dark:border-cocoa-600 hover:border-cocoa-400 dark:hover:border-cocoa-500'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <input
+                      type="file"
+                      accept={selectedFormat ? importFormats.find(f => f.id === selectedFormat)?.supportedExtensions.join(',') : '*'}
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                      id="file-input"
+                    />
+                    <label 
+                      htmlFor="file-input" 
+                      className="cursor-pointer block"
+                      style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+                    >
+                      <p className="text-cocoa-600 dark:text-cocoa-300">
+                        {importFile ? `📄 ${importFile.name}` : isDragging ? '📥 Drop file here' : '📂 Click or drag file here'}
+                      </p>
+                      {selectedFormat && (
+                        <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
+                          Accepted: {importFormats.find(f => f.id === selectedFormat)?.supportedExtensions.join(', ')}
+                        </p>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* Import Stats */}
+                {importing && (
+                  <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center justify-center">
+                      <div className="inline-block w-5 h-5 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin mr-3"></div>
+                      <span className="text-blue-800 dark:text-blue-300 font-medium">Processing import...</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportFile(null);
+                      setImportType('full');
+                    }}
+                    disabled={importing}
+                    className="flex-1 px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!importFile || !selectedFormat || importing}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                  >
+                    {importing ? 'Importing...' : '📥 Import'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

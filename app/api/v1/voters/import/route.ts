@@ -1,8 +1,55 @@
+/**
+ * Unified Voter File Import API
+ * 
+ * This single endpoint handles all voter file formats using the importer registry.
+ * The format is specified as a field in the request.
+ * 
+ * Imports are processed as background jobs in the queue system.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { writeFile, unlink, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
+import { importerRegistry } from '@/lib/importers';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { auditLog } from '@/lib/audit/logger';
+import { createJob } from '@/lib/queue/runner';
+import { processImportJob, ImportJobData } from '@/lib/importers/job-processor';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/v1/voters/import
+ * Get list of supported formats
+ */
+export async function GET() {
+  try {
+    const formats = importerRegistry.getFormats();
+    
+    return NextResponse.json({
+      success: true,
+      formats,
+      count: formats.length,
+    });
+  } catch (error) {
+    console.error('[Import API] Error fetching formats:', error);
+    return NextResponse.json(
+      { error: 'Failed to retrieve import formats' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/v1/voters/import
+ * Import voter file
+ * 
+ * Body: multipart/form-data
+ *   - file: The voter file to import
+ *   - format: Format identifier (e.g., "contra_costa", "alameda")
+ *   - importType: "full" or "incremental"
+ */
 export async function POST(request: NextRequest) {
   try {
     // Check auth
@@ -12,94 +59,145 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-
+    const file = formData.get('file') as File | null;
+    const format = formData.get('format') as string | null;
+    const importType = (formData.get('importType') as string) || 'full';
+    
+    // Validation
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    if (!file.name.endsWith('.csv')) {
-      return NextResponse.json({ error: 'Only CSV files are allowed' }, { status: 400 });
-    }
-
-    const text = await file.text();
-    const lines = text.trim().split('\n');
-
-    if (lines.length < 2) {
-      return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 });
-    }
-
-    // Parse CSV (simple implementation, assumes no commas in values)
-    const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-    const nameIndex = headers.indexOf('name');
-    const emailIndex = headers.indexOf('email');
-    const phoneIndex = headers.indexOf('phone');
-    const addressIndex = headers.indexOf('address');
-
-    if (nameIndex === -1) {
       return NextResponse.json(
-        { error: 'CSV must have a "name" column' },
+        { error: 'No file provided' },
         { status: 400 }
       );
     }
+    
+    if (!format) {
+      return NextResponse.json(
+        { error: 'No format specified' },
+        { status: 400 }
+      );
+    }
+    
+    if (importType !== 'full' && importType !== 'incremental') {
+      return NextResponse.json(
+        { error: 'Invalid importType. Must be "full" or "incremental"' },
+        { status: 400 }
+      );
+    }
+    
+    // Check if format is supported
+    const importer = importerRegistry.get(format);
+    if (!importer) {
+      return NextResponse.json(
+        { 
+          error: `Unsupported format: ${format}`,
+          supportedFormats: importerRegistry.getFormatIds(),
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Check if incremental is supported
+    if (importType === 'incremental' && !importer.supportsIncremental) {
+      return NextResponse.json(
+        { error: `Format "${format}" does not support incremental imports` },
+        { status: 400 }
+      );
+    }
+    
+    // Validate file extension
+    const fileExtension = path.extname(file.name).toLowerCase();
+    if (!importer.supportedExtensions.includes(fileExtension)) {
+      return NextResponse.json(
+        { 
+          error: `Invalid file extension for format "${format}". Expected: ${importer.supportedExtensions.join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Save file temporarily
+    const uploadDir = path.join(process.cwd(), 'tmp', 'uploads');
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
+    
+    const timestamp = Date.now();
+    const safeFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const tempFilePath = path.join(uploadDir, `${timestamp}_${safeFilename}`);
+    
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    await writeFile(tempFilePath, buffer);
+    
+    console.log(`[Import API] Processing ${format} import: ${file.name} (${buffer.length} bytes)`);
+    
+    // Create job for the import
+    const job = await createJob(
+      'voter_import',
+      authResult.user?.userId || '',
+      {
+        filePath: tempFilePath,
+        format,
+        importType,
+        fileName: file.name,
+        fileSize: buffer.length,
+      } as ImportJobData
+    );
 
-    const voters = [];
-    const errors = [];
-
-    // Parse and create voters
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = line.split(',').map(v => v.trim());
-
-      try {
-        const voter = await prisma.voter.create({
-          data: {
-            name: values[nameIndex],
-            email: emailIndex !== -1 && values[emailIndex] ? values[emailIndex] : null,
-            phone: phoneIndex !== -1 && values[phoneIndex] ? values[phoneIndex] : null,
-            address: addressIndex !== -1 && values[addressIndex] ? values[addressIndex] : null,
-            contactStatus: 'pending',
-            registrationDate: new Date(),
-            importedFrom: file.name,
-          },
-        });
-        voters.push(voter);
-      } catch (error: any) {
-        if (error.code === 'P2002') {
-          errors.push({
-            row: i + 1,
-            name: values[nameIndex],
-            error: 'Duplicate email or phone',
-          });
-        } else {
-          errors.push({
-            row: i + 1,
-            name: values[nameIndex],
-            error: 'Failed to create voter',
-          });
-        }
-      }
+    if (!job) {
+      await unlink(tempFilePath).catch(() => {});
+      return NextResponse.json(
+        { error: 'Failed to create import job' },
+        { status: 500 }
+      );
     }
 
+    // Audit log
     await auditLog(
       authResult.user?.userId || '',
-      'VOTER_IMPORT',
+      'VOTER_IMPORT_QUEUED',
       request,
       'voter',
-      undefined,
-      { imported: voters.length, errors: errors.length, file: file.name }
+      job.id,
+      {
+        format,
+        importType,
+        fileName: file.name,
+        fileSize: buffer.length,
+      }
     );
+
+    // Start processing the job in the background
+    // Don't await this - let it run asynchronously
+    processImportJob(job.id, {
+      filePath: tempFilePath,
+      format,
+      importType,
+      fileName: file.name,
+      fileSize: buffer.length,
+      userId: authResult.user?.userId,
+    }).catch((error) => {
+      console.error(`[Import Job Error] Failed to process job ${job.id}:`, error);
+    });
 
     return NextResponse.json({
       success: true,
-      imported: voters.length,
-      errors,
-      message: `Successfully imported ${voters.length} voters${errors.length > 0 ? ` (${errors.length} errors)` : ''}`,
-    });
+      jobId: job.id,
+      message: `Import job created. Watch job ${job.id} for progress.`,
+      format: importer.formatName,
+      formatId: format,
+      importType,
+    }, { status: 202 }); // 202 Accepted
+    
   } catch (error) {
-    console.error('Error importing voters:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[Import API] Error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Import failed',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }

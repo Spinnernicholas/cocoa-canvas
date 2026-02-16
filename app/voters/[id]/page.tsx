@@ -94,6 +94,13 @@ export default function VoterDetailPage() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Authentication failed - redirect to login
+            localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
+            router.push('/login');
+            return;
+          }
           setError('Failed to load voter');
           return;
         }
@@ -134,6 +141,13 @@ export default function VoterDetailPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Authentication failed - redirect to login
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
         setError('Failed to save voter');
         return;
       }
@@ -162,6 +176,13 @@ export default function VoterDetailPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Authentication failed - redirect to login
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
         setError('Failed to log contact');
         return;
       }
@@ -198,6 +219,13 @@ export default function VoterDetailPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Authentication failed - redirect to login
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
         setError('Failed to delete voter');
         return;
       }
