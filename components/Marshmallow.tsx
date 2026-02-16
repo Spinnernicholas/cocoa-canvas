@@ -1,6 +1,7 @@
 'use client';
 
 import { useTheme } from './ThemeProvider';
+import { useState, useEffect } from 'react';
 
 interface MarshmallowProps {
   className?: string;
@@ -9,8 +10,12 @@ interface MarshmallowProps {
 
 export default function Marshmallow({ className = '', size = 40 }: MarshmallowProps) {
   const { theme } = useTheme();
-  // Random rotation between -15 and 15 degrees for each instance
-  const rotation = Math.random() * 30 - 15;
+  const [rotation, setRotation] = useState(0);
+
+  // Set random rotation after hydration to avoid SSR mismatch
+  useEffect(() => {
+    setRotation(Math.random() * 30 - 15);
+  }, []);
   
   // Dark marshmallows for light theme, light marshmallows for dark theme
   const bodyFill = theme === 'light' ? '#6B5744' : '#E8D5C4';
