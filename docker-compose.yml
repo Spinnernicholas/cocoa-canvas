@@ -14,6 +14,12 @@ services:
       DATABASE_URL: ${DATABASE_URL:-file:./data/cocoa_canvas.db}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      # Auto-setup credentials (optional)
+      # Uncomment and set to enable automatic admin user creation
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME}
+      AUTO_SETUP_ENABLED: ${AUTO_SETUP_ENABLED:-true}
     volumes:
       # SQLite database persistence
       - ./prisma/data:/app/prisma/data

@@ -3,6 +3,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Install required system dependencies for Prisma
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package.json package-lock.json* yarn.lock* ./
 
@@ -22,6 +25,9 @@ RUN npx prisma generate && npm run build
 FROM node:22-alpine
 
 WORKDIR /app
+
+# Install required system dependencies for Prisma
+RUN apk add --no-cache openssl
 
 # Copy package files from builder
 COPY package.json package-lock.json* yarn.lock* ./
