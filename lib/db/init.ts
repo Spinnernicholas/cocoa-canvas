@@ -55,7 +55,7 @@ export async function initializeDatabase(): Promise<{
       console.error('[DB Init] execSync failed, checking if database file exists', execError);
       
       // For SQLite, check if the database file exists
-      const dbUrl = process.env.DATABASE_URL || 'file:./prisma/data/cocoa_canvas.db';
+      const dbUrl = process.env.DATABASE_URL || 'file:./data/cocoa_canvas.db';
       const dbPath = dbUrl.replace('file:', '');
       
       // If database file doesn't exist and we can't run migrations, return error
