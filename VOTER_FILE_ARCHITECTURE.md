@@ -16,14 +16,19 @@ A voter file contains dense records. We normalize into core models with **PERSON
 graph TD
     P["👤 PERSON<br/>(Core Identity)"]
     V["🗳️ VOTER<br/>(Voting Profile)"]
+    PA["🏛️ PARTY<br/>(Political Party)"]
+    PR["🗳️ PRECINCT<br/>(Voting Location)"]
     H["🏠 HOUSEHOLD<br/>(Address Grouping)"]
     B["🏢 BUILDING<br/>(Apartment Complex)"]
     C["📞 CONTACT_INFO<br/>(All Contact Methods)"]
     L["📍 LOCATION<br/>(Contact Type)"]
-    E["🗳️ ELECTION<br/>(Shared Election Metadata)"]
+    E["📅 ELECTION<br/>(Shared Election Metadata)"]
     VH["📊 VOTE_HISTORY<br/>(Election Participation)"]
     
     V -->|specializes| P
+    V -->|affiliated with| PA
+    V -->|votes in| PR
+    VH -->|ballot affiliation| PA
     P -->|belongs to| H
     H -->|may belong to| B
     P -->|has| C
@@ -33,6 +38,7 @@ graph TD
     
     style P fill:#f3e5f5
     style V fill:#e1bee7
+    style PA fill:#fff9c4
     style H fill:#e8f5e9
     style B fill:#e0f2f1
     style C fill:#fff3e0
@@ -41,175 +47,267 @@ graph TD
     style E fill:#f1f8e9
 ```
 
-### Detailed Entity-Relationship Diagram
+---
 
-```mermaid
-erDiagram
-    VOTER_FILE ||--|| PERSON : splits_into
-    VOTER_FILE ||--|| VOTER : creates
-    VOTER_FILE ||--|| HOUSEHOLD : creates
-    VOTER_FILE ||--o{ CONTACT_INFO : generates
-    VOTER_FILE ||--o{ VOTE_HISTORY : contains
-    VOTE_HISTORY ||--|| ELECTION : references
+## Import File Specifications
 
-    VOTER ||--|| PERSON: "specializes"
-    PERSON }o--|| HOUSEHOLD: "belongs_to"
-    HOUSEHOLD }o--|| BUILDING: "may_be_in"
-    PERSON ||--o{ CONTACT_INFO: "has"
-    PERSON ||--o{ CONTACT_LOG: "receives"
-    VOTER ||--o{ VOTE_HISTORY: "participated_in"
+### Contra Costa County Voter File
 
-    CONTACT_INFO ||--|| LOCATION: "typed_by"
-    VOTE_HISTORY ||--o| ELECTION: "references"
+**Format**: TAB-delimited (`.txt`) text file  
+**File Naming**: `0_YYYYMMDD_HHMMSS_Name.txt` (e.g., `0_20230424_092505_SpinnerNicholas.txt`)  
+**Encoding**: UTF-8  
+**Field Count**: 92 columns  
+**Size**: ~600 MB (150K+ voters)  
+**Frequency**: Monthly/quarterly updates from County Registrar  
 
-    VOTER_FILE {
-        string registrationNumber
-        string firstName
-        string lastName
-        string gender
-        datetime birthDate
-        string partyAbbr
-        string houseNumber
-        string streetName
-        string city
-        string zipCode
-        string phone
-        string email
-        datetime electionDate_1
-        string ballotPartyAbbr_1
-    }
+**Column Groups** (92 total):
 
-    PERSON {
-        string id PK
-        string firstName
-        string lastName
-        string middleName
-        string nameSuffix
-        string gender
-        datetime birthDate
-        string birthPlace
-        string language
-        string householdId FK
-        string notes
-    }
+#### Identity & Demographics (1-8)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | RegistrationNumber | String | County registration ID (may be leading padded or empty) |
+| 2 | VoterID | String | Unique voter ID |
+| 3 | VoterTitle | String | Mr, Ms, Dr, Mrs, etc. |
+| 4 | LastName | String | Last name |
+| 5 | FirstName | String | First name |
+| 6 | MiddleName | String | Middle name or initial |
+| 7 | NameSuffix | String | Jr, Sr, III, etc. |
+| 8 | Gender | String | M, F, U, X, or blank |
 
-    VOTER {
-        string id PK
-        string personId UK FK
-        string registrationNumber UK
-        string voterFileId
-        string title
-        datetime registrationDate
-        string partyName
-        string partyAbbr
-        string vbmStatus
-        string precinctId
-        string precinctPortion
-        string precinctName
-        string contactStatus
-        datetime lastContactDate
-        string lastContactMethod
-        string importedFrom
-        string importType
-        string importFormat
-    }
+#### Residence Address (9-17)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 9 | ResidenceCity | String | City |
+| 10 | ResidenceZipCode | String | 5-digit zip |
+| 11 | HouseNumber | String | House/building number |
+| 12 | PreDirection | String | N, S, E, W, NE, etc. |
+| 13 | StreetName | String | Street name |
+| 14 | StreetSuffix | String | St, Ave, Ln, Ct, Blvd, etc. |
+| 15 | PostDirection | String | N, S, E, W, etc. |
+| 16 | UnitAbbr | String | Apt, Unit, Suite, Ste, Apt, etc. |
+| 17 | UnitNumber | String | Unit/apartment number |
 
-    BUILDING {
-        string id PK
-        string streetNumber
-        string preDirection
-        string streetName
-        string streetSuffix
-        string postDirection
-        string city
-        string state
-        string zipCode
-        string fullAddress UK
-        string buildingType
-        int totalUnits
-        float latitude
-        float longitude
-    }
+#### Mailing Address (18-24)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 18 | MailAddress1 | String | Line 1 (full address or street) |
+| 19 | MailAddress2 | String | Line 2 (additional info) |
+| 20 | MailAddress3 | String | Line 3 |
+| 21 | MailAddress4 | String | Line 4 |
+| 22 | MailCity | String | Mailing city |
+| 23 | MailState | String | Mailing state |
+| 24 | MailZip | String | Mailing zip code |
 
-    HOUSEHOLD {
-        string id PK
-        string buildingId FK
-        string houseNumber
-        string preDirection
-        string streetName
-        string streetSuffix
-        string postDirection
-        string unitAbbr
-        string unitNumber
-        string city
-        string state
-        string zipCode
-        string fullAddress UK
-        int personCount
-        int maxVotingScore
-        float latitude
-        float longitude
-    }
+#### Contact & Personal (25-32)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 25 | PhoneNumber | String | Phone in (XXX) format or E.164 |
+| 26 | EmailAddress | String | Email address (may be blank) |
+| 27 | RegistrationDate | Date | MM/DD/YYYY |
+| 28 | BirthDate | Date | MM/DD/YYYY |
+| 29 | BirthPlace | String | State or country code |
+| 30 | PartyName | String | Democratic, Republican, American Independent, etc. |
+| 31 | PartyAbbr | String | DEM, REP, AIP, GRN, LIB, PF, NONE, U |
+| 32 | Language | String | English, Spanish, Chinese, tagalog, etc. |
 
-    CONTACT_INFO {
-        string id PK
-        string personId FK
-        string locationId FK
-        string houseNumber
-        string preDirection
-        string streetName
-        string streetSuffix
-        string postDirection
-        string unitAbbr
-        string unitNumber
-        string city
-        string state
-        string zipCode
-        string fullAddress
-        string phone
-        string email
-        boolean isPrimary
-        boolean isVerified
-        string source
-    }
+#### Registration Status (33-36)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 33 | VBMProgramStatus | String | Perm VBM, Conditional, etc. |
+| 34 | PrecinctID | String | Precinct identifier (e.g., "DANV119") |
+| 35 | PrecinctPortion | String | Portion if precinct split (usually blank) |
+| 36 | PrecinctName | String | Precinct name/description |
 
-    VOTE_HISTORY {
-        string id PK
-        string voterId FK
-        string electionId FK
-        datetime electionDate
-        string ballotPartyName
-        string ballotPartyAbbr
-        boolean ballotCounted
-        string votingMethod
-        string districtId
-        string subDistrict
-        string districtName
-    }
+#### Election 1 Info (37-46)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 37 | ElectionAbbr_1 | String | General22, June0722, Recall21, etc. |
+| 38 | ElectionDate_1 | Date | MM/DD/YYYY |
+| 42 | ElectionDesc_1 | String | "General Election", "Primary Election", etc. |
+| 47 | BallotPartyName_1 | String | Party name on ballot |
+| 52 | BallotPartyAbbr_1 | String | Party abbreviation on ballot |
+| 57 | BallotCounted_1 | Integer | 1 = counted, 0 = not counted |
+| 62 | ElectionType_1 | String | General, Primary, Special, Recall, etc. |
+| 67 | VotingMethodDesc_1 | String | "Voted by Absentee Ballot", "Absentee Issued but not Returned", "Polling Place", etc. |
+| 72 | DistrictID_1 | String | District identifier |
+| 77 | DistrictName_1 | String | District name |
 
-    ELECTION {
-        string id PK
-        datetime electionDate UK
-        string electionAbbr UK
-        string electionDesc
-        string electionType
-        string jurisdictionCode
-    }
+#### Elections 2-5 Info (Same pattern as Election 1)
+| Columns | Pattern | Notes |
+|---------|---------|-------|
+| 38-41 | ElectionAbbr_2-5 | Election abbreviations for elections 2-5 |
+| 48-51 | ElectionDate_2-5 | Election dates for elections 2-5 |
+| 43-46 | ElectionDesc_2-5 | Election descriptions for elections 2-5 |
+| 53-56 | BallotPartyName_2-5 | Ballot party names for elections 2-5 |
+| 58-61 | BallotPartyAbbr_2-5 | Ballot party abbreviations for elections 2-5 |
+| 63-66 | BallotCounted_2-5 | Ballot counted flags for elections 2-5 (1/0) |
+| 68-71 | ElectionType_2-5 | Election types for elections 2-5 |
+| 73-76 | SubDistrict_2-5 | Sub-districts for elections 2-5 |
+| 78-81 | DistrictID_2-5 | District IDs for elections 2-5 |
+| 82-86 | SubDistrict_2-5 | Sub-district names for elections 2-5 |
+| 87-91 | VotingMethodDesc_2-5 | Voting method descriptions for elections 2-5 |
 
-    LOCATION {
-        string id PK
-        string name
-    }
+#### Status (92)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 92 | StatusReason | String | "Active", "Re-registration due to Address change", "Third Party Change of Address (CA In-State)", etc. |
 
-    CONTACT_LOG {
-        string id PK
-        string personId FK
-        string contactType
-        string outcome
-        string notes
-        boolean followUpNeeded
-        datetime followUpDate
-    }
+**Example Record Structure**:
+```
+[RegNum]  [VoterID]  [Title]  [LastName]  [FirstName]  [MiddleName]  [Suffix]  [Gender]  [City]  [Zip]  [HouseNum]  [PreDir]  [StreetName]  [StreetSuffix]  [PostDir]  [UnitAbbr]  [UnitNum]  [MailAddr1]  [MailAddr2]  [MailAddr3]  [MailAddr4]  [MailCity]  [MailState]  [MailZip]  [Phone]  [Email]  [RegDate]  [BirthDate]  [BirthPlace]  [PartyName]  [PartyAbbr]  [Language]  [VBMStatus]  [PrecinctID]  [PrecinctPortion]  [PrecinctName]  [ElectionAbbr_1-5]  [ElectionDate_1-5]  [ElectionDesc_1-5]  [BallotPartyName_1-5]  [BallotPartyAbbr_1-5]  [BallotCounted_1-5]  [ElectionType_1-5]  [VotingMethodDesc_1-5]  [DistrictID_1-5]  [SubDistrict_1-5]  [DistrictName_1-5]  [StatusReason]
+```
+
+*(Note: See [lib/importers/contra-costa.ts](lib/importers/contra-costa.ts) for example data processing)*
+
+**Key Characteristics**:
+- TAB-delimited (not pipe)
+- 92 fields per record
+- 5 separate elections per voter (up to 30+ year history available in some files)
+- Structured mailing address (4 lines + city/state/zip separate)
+- Both PartyName (full) and PartyAbbr (code) provided
+- VBMProgramStatus indicates permanent vs conditional mail-in
+- BallotCounted is 1 (voted) or 0 (not counted)
+- StatusReason field tracks voter account status changes
+- All fields present in header; missing data = empty string
+- Field spacing: columns are tab-separated; individual fields may have internal padding/spaces
+
+---
+
+### Simple CSV Import Format
+
+**Format**: CSV with headers (comma-delimited)  
+**Encoding**: UTF-8  
+**Use Case**: Grassroots imports, partner data, test datasets  
+**Required Fields**: FirstName, LastName only
+
+**Column Structure**:
+
+#### Required (1-2)
+| Field | Type | Notes |
+|-------|------|-------|
+| FirstName | String | First name |
+| LastName | String | Last name |
+
+#### Optional Columns (3-6)
+| Field | Type | Notes |
+|-------|------|-------|
+| ExternalID | String | Unique voter ID from external system |
+| BirthDate | Date | MM/DD/YYYY or YYYY-MM-DD format |
+| Gender | String | M, F, U, X, or blank |
+| PartyAbbr | String | D, R, AIP, G, L, PF, U, NONE, or blank |
+
+#### Residence Section (7-10, all optional)
+| Field | Type | Notes |
+|-------|------|-------|
+| ResidenceAddress | String | Full street address (e.g., "123 Main St, Apt 12B") |
+| ResidenceCity | String | City |
+| ResidenceState | String | State code (defaults to CA if omitted) |
+| ResidenceZip | String | 5-digit zip code |
+
+#### Contact Information Section (11-22, all optional)
+| Field | Type | Notes |
+|-------|------|-------|
+| HomePhone | String | Primary phone (10-digit or E.164 format) |
+| HomeEmail | String | Primary email address |
+| HomeAddress | String | Mailing address (if different from residence) |
+| HomeCity | String | Mailing city |
+| HomeState | String | Mailing state |
+| HomeZip | String | Mailing zip code |
+| WorkPhone | String | Work phone (10-digit or E.164 format) |
+| WorkEmail | String | Work email address |
+| WorkAddress | String | Work street address |
+| WorkCity | String | Work city |
+| WorkState | String | Work state |
+| WorkZip | String | Work zip code |
+| CellPhone | String | Cell/mobile phone |
+| OtherPhone | String | Other phone number |
+
+#### Election Participation Section (23-32, all optional)
+| Field | Type | Notes |
+|-------|------|-------|
+| Election1Participated | Boolean | 1/0, true/false, Y/N for first election |
+| Election2Participated | Boolean | Same for second election |
+| Election3Participated | Boolean | Same for third election |
+| Election4Participated | Boolean | Same for fourth election |
+| Election5Participated | Boolean | Same for fifth election |
+| Election1Date | Date | Optional: election date for reference (MM/DD/YYYY) |
+| Election2Date | Date | Optional: election date for reference |
+| Election3Date | Date | Optional: election date for reference |
+| Election4Date | Date | Optional: election date for reference |
+| Election5Date | Date | Optional: election date for reference |
+
+**Example File Structure**:
+```csv
+FirstName,LastName,ExternalID,BirthDate,Gender,PartyAbbr,ResidenceAddress,ResidenceCity,ResidenceState,ResidenceZip,HomePhone,HomeEmail,HomeAddress,HomeCity,HomeState,HomeZip,WorkPhone,WorkEmail,WorkAddress,WorkCity,WorkState,WorkZip,CellPhone,OtherPhone,Election1Participated,Election2Participated,Election3Participated,Election4Participated,Election5Participated,Election1Date,Election2Date,Election3Date,Election4Date,Election5Date
+[FirstName],[LastName],,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+[FirstName],[LastName],[ExternalID],[BirthDate],[Gender],[PartyAbbr],[Address],[City],[State],[Zip],[HomePhone],[HomeEmail],,,,,[WorkPhone],[WorkEmail],,,,,[CellPhone],,1,0,1,,,,11/05/2024,06/07/2022,,,
+[FirstName],[LastName],,,,[PartyAbbr],[Street],[City],,,[Phone],,,,,,,,,,,,,,,,,,,,,,,,
+```
+
+*(Note: See [tmp/simple_import_sample.csv](tmp/simple_import_sample.csv) for sample structure)*
+
+**Key Characteristics**:
+- Header row required (validates format)
+- Comma delimiter (with quoted values containing commas)
+- Only FirstName, LastName are required
+- All other fields optional (can be omitted from header or left blank)
+- Flexible date formats (parser detects MM/DD/YYYY or YYYY-MM-DD)
+- Phone formats normalized to E.164 during import
+- Contact info: home/work phone, email, and addresses can be separate columns
+- Election participation: Boolean flags (1/0, Y/N, true/false all accepted)
+- Smaller files (10-10K records typical)
+- Flexible: include only the columns your data has
+
+---
+
+## External IDs
+
+**Concept**: An external ID is an identifier from an external system (county voter files, partner databases, etc.) that uniquely identifies a record in that system. External IDs enable:
+
+- **Deduplication**: Matching records across imports (same voter imported twice = detect duplicate)
+- **Updates**: Re-importing data to update existing records
+- **Traceability**: Knowing which external system a record came from
+- **Reconciliation**: Comparing local database state with upstream source
+
+**Usage in Voter Files**:
+
+| System | External ID Field | Example |
+|--------|-------------------|---------|
+| Contra Costa County | `VoterID` | `2160301` |
+| Simple CSV | `RegistrationNumber` | `00003101` |
+
+**How It Works**:
+
+1. During import, extract the external ID from the source file
+2. Check if a VOTER record with this external ID already exists
+3. If **exists**: Update existing record (address, party, contact status)
+4. If **not exists**: Create new VOTER + PERSON record
+5. Store the external ID + source system for future imports
+
+**Example: Contra Costa Re-import**
+
+```
+First import (May 2023):
+- VoterID: 2160301 → Create Voter (id: voter-xyz)
+- Store externalId: "2160301", importedFrom: "contra_costa"
+
+Second import (June 2023):
+- VoterID: 2160301 → Found existing Voter (id: voter-xyz)
+- Update: address, party, contactStatus only
+- Keep: createdAt, unchanged demographics
+```
+
+**Schema Pattern**:
+
+```typescript
+// Every importable entity has:
+externalId       String?   // ID from external system (e.g., VoterID)
+externalSource   String?   // System name ("contra_costa", "simple_csv")
+importedFrom     String?   // Source file name or system identifier
+importFile       String?   // SHA hash of source file (anti-duplication)
+
+// Uniqueness constraint:
+@@unique([externalId, externalSource])  // Same ID, different source = different record
 ```
 
 ---
@@ -278,21 +376,22 @@ model Voter {
   personId        String    @unique
   person          Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
   
-  // Registration identity (from voter file)
-  registrationNumber String? @unique  // County's internal voter ID
-  voterFileId        String?          // External voter ID from jurisdiction
+  // External identity (from voter file)
+  externalId      String?   // VoterID from county file / RegistrationNumber from import
+  externalSource  String?   // "contra_costa", "simple_csv", etc. (qualifies externalId)
+  registrationNumber String? // County's internal voter ID (may differ from externalId)
   
   // Registration info
   title           String?   // Mr, Ms, Dr, etc. (redundant with Person, but from file)
   registrationDate DateTime?
-  partyName       String?   // Democratic, Republican, American Independent, etc.
-  partyAbbr       String?   // D, R, AI, G, L, N, U
+  partyId         String?
+  party           Party?    @relation(fields: [partyId], references: [id])
   vbmStatus       String?   // Permanent VBM, Conditional Voter Registration, etc.
   
   // Precinct (voting location grouping)
   precinctId      String?
-  precinctPortion String?
-  precinctName    String?
+  precinct        Precinct? @relation(fields: [precinctId], references: [id])
+  precinctPortion String?   // Which portion of precinct (if split)
   
   // Canvassing status (app-driven, mutable)
   contactStatus   String    @default("pending") 
@@ -301,7 +400,7 @@ model Voter {
   lastContactMethod String?   // call, email, door, sms
   
   // Import tracking
-  importedFrom    String?   // "contra_costa", "simple_csv", filename
+  importedFrom    String?   // Source file name, path, or timestamp
   importType      String?   // "full" or "incremental"
   importFormat    String?   // voter file format identifier
   importFile      String?   // SHA hash of source file (anti-duplication)
@@ -313,20 +412,30 @@ model Voter {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
+  @@unique([externalId, externalSource])
+  @@index([externalId])
   @@index([registrationNumber])
-  @@index([voterFileId])
   @@index([precinctId])
-  @@index([partyAbbr])
   @@index([contactStatus])
 }
 ```
 
-**When Created**: On voter file import
+**When Created**: On voter file import. External ID (`externalId` + `externalSource`) is used to detect duplicates across imports.
+
+**External ID Mapping**:
+- **Contra Costa County**: `externalId = VoterID`, `externalSource = "contra_costa"`
+- **Simple CSV**: `externalId = RegistrationNumber`, `externalSource = "simple_csv"`
+
+**How It Works**:
+- First import: Create new VOTER with externalId, externalSource
+- Second import: Lookup `@@unique([externalId, externalSource])`, find existing VOTER, update mutable fields only
+- Result: Re-importing same file → idempotent updates, no duplicate records
 
 **Why Separate from PERSON**:
 - Voter registration is specific, mutable, file-driven
 - Demographics (birthDate, gender, name) are immutable (Person)
 - Voter status (party, precinct, contactStatus) are mutable (Voter)
+- External ID enables deduplication across multiple imports
 - Future: Support non-voters (volunteers, staff) as PERSON without VOTER
 
 ---
@@ -365,7 +474,80 @@ model Election {
 
 ---
 
-### 4. **HOUSEHOLD** (Address Grouping)
+### 4. **PARTY** (Political Party)
+Normalized political party data. Created once, referenced by VOTER and VOTE_HISTORY.
+
+```typescript
+model Party {
+  id              String   @id @default(cuid())
+  
+  // Party identity
+  name            String   @unique  // "Democratic", "Republican", "American Independent", etc.
+  abbr            String   @unique  // "D", "R", "AI", "G", "L", "N", "U"
+  
+  // Metadata
+  description     String?           // Full party name or description
+  color           String?           // Hex color for UI display (e.g., "#0015bc" for Democratic)
+  
+  // Relations
+  voters          Voter[]
+  voteHistory     VoteHistory[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([abbr])
+}
+```
+
+**When Created**: On first voter import that references a party
+
+**Why Separate**:
+- Normalize party data (avoid "D" vs "DEM" vs "Democratic" inconsistencies)
+- Enable party-based queries and analysis across voters
+- Support UI color-coding by party affiliation
+- Share party metadata across all voters and election history
+- Future: Add party metadata (platform, candidates, etc.)
+
+---
+
+### 5. **PRECINCT** (Voting Location)
+Normalized voting precinct data. Precincts are geographic boundaries for voting locations.
+
+```typescript
+model Precinct {
+  id              String   @id @default(cuid())
+  
+  // Precinct identity
+  number          String   @unique  // "0001", "0042", etc.
+  name            String?           // Optional descriptive name
+  
+  // Metadata
+  description     String?
+  pollingPlace    String?           // Location of polling place
+  
+  // Relations
+  voters          Voter[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([number])
+}
+```
+
+**When Created**: On first voter import that references a precinct
+
+**Why Separate**:
+- Normalize precinct data (avoid "001" vs "1" vs "Precinct 1" inconsistencies)
+- Enable precinct-based queries and canvassing strategies
+- Support geographic analysis (which precincts are priority)
+- Share precinct metadata across all voters in that location
+- Future: Add polling place location, election day rules, etc.
+
+---
+
+### 6. **HOUSEHOLD** (Address Grouping)
 Groups people at the same residence address together.
 
 ```typescript
@@ -422,7 +604,7 @@ model Household {
 
 ---
 
-### 5. **BUILDING** (Multi-Unit Buildings)
+### 7. **BUILDING** (Multi-Unit Buildings)
 Represents a single building address that contains multiple units/households.
 
 ```typescript
@@ -470,8 +652,8 @@ model Building {
 
 ---
 
-### 6. **CONTACT_INFO** (Multi-Method Contact)
-All ways to reach a person (address, phone, email).
+### 8. **CONTACT_INFO** (Multi-Method Contact)
+All ways to reach a person: phones, emails, addresses. Locations are customizable (Home, Work, Cell, etc.).
 
 ```typescript
 model ContactInfo {
@@ -481,12 +663,12 @@ model ContactInfo {
   personId    String
   person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
   
-  // Location type
-  locationId  String    // Foreign reference to Location seed data
+  // Contact location/type (customizable seed data)
+  locationId  String
   location    Location  @relation(fields: [locationId], references: [id])
-  // Values: "residence", "mailing", "cell", "email_primary", "email_secondary", "work"
+  // Examples: "Home", "Work", "Cell", "Home Email", "Work Address", "Mailing Address"
   
-  // Address components (for physical addresses)
+  // Address components (for address-type locations)
   houseNumber     String?
   preDirection    String?   // N, S, E, W
   streetName      String?
@@ -497,21 +679,21 @@ model ContactInfo {
   city            String?
   state           String?   @default("CA")
   zipCode         String?
-  fullAddress     String?   // Computed or imported
+  fullAddress     String?   // Computed/normalized address
   
-  // Digital contact
+  // Contact digital fields (for phone/email-type locations)
   phone           String?   // E.164 format: +1-650-253-0000
   email           String?   // Normalized lowercase
   
   // Verification / Priority
+  isPrimary       Boolean   @default(false)   // Primary method for this location type
   isVerified      Boolean   @default(false)   // Verified as working
-  isPrimary       Boolean   @default(false)   // Primary method for this type
-  isCurrently     Boolean   @default(true)    // Still valid (not "moved")
+  isCurrently     Boolean   @default(true)    // Still valid (not "moved" or "no longer works")
   
   // Tracking
-  source          String?   // "county_file", "enrichment", "user_entry"
+  source          String?   // "county_file", "csv_import", "user_entry", "enrichment"
   verifiedAt      DateTime?
-  violationCount  Int       @default(0)       // Violations if shared (TCPA)
+  violationCount  Int       @default(0)       // Violations if shared (TCPA calls)
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -521,52 +703,64 @@ model ContactInfo {
   @@index([phone])
   @@index([email])
   @@index([isPrimary])
-  @@unique([personId, locationId, fullAddress])  // One record per person per address type
+  @@index([isCurrently])
+  @@unique([personId, locationId])  // One record per person per location type
 }
 ```
 
-**When Created**: Parsed from voter file (residence, mailing, phone, email)
+**When Created**: 
+- From voter file: residence address, phone, email, mailing address parsed into CONTACT_INFO records
+- From Simple CSV: Home/Work phone, email, address; Cell phone; Other phone parsed into records
+- From user input: Any custom location type can be added
+
+**How It Works**:
+- Location defines the available types (customizable)
+- One CONTACT_INFO record per person per location type
+- Import creates records for each location type with data from CSV/file
+- Query example: Find all Home phones: `CONTACT_INFO WHERE locationId="home_phone"`
+- User can add custom location type (e.g., "Telegram", "WhatsApp") via Location seed update
 
 **Why Separate**:
-- Multiple contact methods per person (home, cell, mailing address, email)
-- Location-typed (residence for knocking on doors, cell for calls)
-- Verification status (county file is verified, enriched data is not)
-- TCPA compliance (track which numbers have violations)
+- Multiple contact methods per person (home, cell, work, mailing address, email)
+- Location typing enables smart routing (cell for calls, address for door knocking, email for digital)
+- isPrimary allows preference (preferred phone per person)
+- Verification status tracks data reliability (county file vs. enrichment)
+- TCPA compliance: violationCount tracks problematic numbers
+- Fully customizable: new location types don't require schema migration
 
 ---
 
-### 7. **VOTE_HISTORY** (Election Participation)
+### 9. **VOTE_HISTORY** (Election Participation)
 Record of each election a voter participated in.
 
 ```typescript
 model VoteHistory {
   id          String    @id @default(cuid())
   
-  // Which voter cast ballot
+  // Which voter
   voterId     String
   voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
   
-  // Which election
+  // Election reference
   electionId  String?
   election    Election? @relation(fields: [electionId], references: [id])
   
   // Fallback if election not yet created (from raw file)
-  electionAbbr    String?
-  electionDesc    String?
-  electionDate    DateTime?
-  electionType    String?   // General, Primary, Special, etc.
+  electionDate    DateTime?       // Election date (e.g., 2024-11-05)
+  electionAbbr    String?         // Abbreviation (e.g., "GEN24", "PRI22")
+  electionDesc    String?         // Description (e.g., "General Election")
+  electionType    String?         // General, Primary, Special, Recall, etc.
+  
+  // Participation
+  participated    Boolean         // Did this voter participate in this election?
+  votingMethod    String?         // "Absentee", "Polling Place", "Early Voting", "Provisional", etc.
   
   // Ballot info
-  ballotPartyName String?   // Party on ballot (may differ from registration)
-  ballotPartyAbbr String?
-  ballotCounted   Boolean   @default(false)
-  
-  // Voting method
-  votingMethod    String?   // "Absentee", "Polling Place", "Early Voting", "Provisional"
+  ballotParty     String?         // Party on ballot (abbreviation, may differ from registration)
+  ballotPartyName String?         // Full party name on ballot
   
   // District context (at time of election)
   districtId      String?
-  subDistrict     String?
   districtName    String?
   
   // Timestamps
@@ -575,22 +769,76 @@ model VoteHistory {
   @@unique([voterId, electionDate])
   @@index([voterId])
   @@index([electionDate])
-  @@index([ballotCounted])
+  @@index([participated])
   @@index([votingMethod])
 }
 ```
 
-**When Created**: Parsed from voter file (5 most recent elections per Contra Costa record)
+**When Created**: 
+- From voter file: 5 most recent elections per Contra Costa record
+- From Simple CSV: Election1Participated through Election5Participated flags + optional dates
 
 **Why Separate**:
 - Voter can have 1-N elections (up to 30+ year history in county files)
-- Immutable history (from county file, never changes)
+- Immutable history (from county file import, never changes after import)
 - Enables targeting: "Voted 4 of 5 elections" = reliable voter
 - Key canvassing metric: Predictive of turnout
 
 ---
 
-### 8. **CONTACT_LOG** (Interaction History)
+### 10. **LOCATION** (Customizable Contact Types)
+Seed data defining available contact/location types for CONTACT_INFO.
+
+```typescript
+model Location {
+  id              String    @id @default(cuid())
+  
+  // Location type
+  name            String    @unique  // "Home", "Work", "Cell", "Home Email", "Work Address", etc.
+  category        String?            // "phone", "email", "address", "digital" (optional, for grouping)
+  
+  // Metadata
+  description     String?            // User-facing description
+  isActive        Boolean   @default(true)
+  
+  // Relations
+  contactInfo     ContactInfo[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([name])
+  @@index([category])
+}
+```
+
+**When Created**: On system setup. Default types include: Home, Work, Cell, Home Email, Work Email, Personal Email, Work Address, Mailing Address, etc.
+
+**Why Separate**:
+- Allows users to customize available contact types (like CiviCRM field sets)
+- Supports new location types without schema changes
+- Clear separation: available types (Location) vs. actual contact data (ContactInfo)
+- Enables filtering/querying by contact type category
+
+**Default Seed Data**:
+```typescript
+[
+  { name: "Home", category: "phone" },
+  { name: "Work", category: "phone" },
+  { name: "Cell", category: "phone" },
+  { name: "Other Phone", category: "phone" },
+  { name: "Home Email", category: "email" },
+  { name: "Work Email", category: "email" },
+  { name: "Personal Email", category: "email" },
+  { name: "Residence", category: "address" },
+  { name: "Mailing Address", category: "address" },
+  { name: "Work Address", category: "address" },
+]
+```
+
+---
+
+### 11. **CONTACT_LOG** (Interaction History)
 Record of all outreach/contact attempts with a person.
 
 ```typescript
@@ -601,8 +849,8 @@ model ContactLog {
   person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
   
   // Contact details
-  contactType String    // call, email, door, sms
-  outcome     String?   // contacted, refused, not_home, no_answer, moved, invalid
+  method      String    // "call", "email", "door_knock", "sms", "mail", etc.
+  outcome     String?   // "reached", "refused", "not_home", "no_answer", "moved", "invalid", "pending"
   notes       String?
   
   // Optional follow-up
@@ -613,7 +861,8 @@ model ContactLog {
   updatedAt   DateTime  @updatedAt
   
   @@index([personId])
-  @@index([contactType])
+  @@index([method])
+  @@index([outcome])
   @@index([createdAt])
 }
 ```

@@ -260,134 +260,238 @@ async function processVoterRecord(
   locations: { residenceLocationId: string; mailingLocationId: string; cellLocationId: string }
 ) {
   
-  const registrationNumber = normalize(record.RegistrationNumber);
   const voterFileId = normalize(record.VoterID);
+  const firstName = normalize(record.FirstName) || 'Unknown';
+  const lastName = normalize(record.LastName) || 'Unknown';
   
   if (!voterFileId) {
     throw new Error('Missing VoterID');
   }
   
-  // Check if voter exists
-  const existingVoter = importType === 'incremental' && registrationNumber
-    ? await prisma.voter.findUnique({ where: { registrationNumber } })
-    : null;
+  // Step 1: Check if voter exists by external ID for deduplication
+  let voter = await prisma.voter.findUnique({ 
+    where: { 
+      externalId_externalSource: {
+        externalId: voterFileId,
+        externalSource: 'contra_costa'
+      }
+    },
+    include: { person: true }
+  });
   
-  if (importType === 'incremental' && !existingVoter) {
-    // Skip new voters in incremental import
+  // Step 2: If incremental import and voter doesn't exist, skip
+  if (importType === 'incremental' && !voter) {
     return;
   }
   
-  // Prepare voter data
+  // Step 3: Create or find Person record
+  let person = voter?.person;
+  
+  if (!person) {
+    // Create new Person record
+    person = await prisma.person.create({
+      data: {
+        firstName,
+        lastName,
+        gender: normalize(record.Gender),
+        birthDate: parseDate(record.BirthDate),
+        birthPlace: normalize(record.BirthPlace),
+        title: normalize(record.VoterTitle),
+        middleName: normalize(record.MiddleName),
+        nameSuffix: normalize(record.NameSuffix),
+        language: normalize(record.Language),
+      },
+    });
+  } else if (importType === 'full') {
+    // Update existing person in full import
+    person = await prisma.person.update({
+      where: { id: person.id },
+      data: {
+        firstName,
+        lastName,
+        gender: normalize(record.Gender),
+        birthDate: parseDate(record.BirthDate) || person.birthDate,
+        birthPlace: normalize(record.BirthPlace) || person.birthPlace,
+        title: normalize(record.VoterTitle) || person.title,
+        middleName: normalize(record.MiddleName) || person.middleName,
+        nameSuffix: normalize(record.NameSuffix) || person.nameSuffix,
+        language: normalize(record.Language) || person.language,
+      },
+    });
+  }
+  
+  // Step 4: Prepare voter data
+  // Look up Party by abbreviation
+  const partyAbbr = normalize(record.PartyAbbr);
+  let partyId: string | null = null;
+  
+  if (partyAbbr) {
+    const party = await prisma.party.findUnique({
+      where: { abbr: partyAbbr },
+      select: { id: true }
+    });
+    partyId = party?.id || null;
+  }
+  
+  // Look up Precinct by ID
+  const precinctNum = normalize(record.PrecinctID);
+  let precinctId: string | null = null;
+  
+  if (precinctNum) {
+    const precinct = await prisma.precinct.findUnique({
+      where: { number: precinctNum },
+      select: { id: true }
+    });
+    precinctId = precinct?.id || null;
+  }
+  
   const voterData = {
-    registrationNumber,
-    voterFileId,
-    title: normalize(record.VoterTitle),
-    firstName: normalize(record.FirstName) || 'Unknown',
-    middleName: normalize(record.MiddleName),
-    lastName: normalize(record.LastName) || 'Unknown',
-    nameSuffix: normalize(record.NameSuffix),
-    gender: normalize(record.Gender),
-    birthDate: parseDate(record.BirthDate),
-    birthPlace: normalize(record.BirthPlace),
-    language: normalize(record.Language),
+    personId: person.id,
+    externalId: voterFileId,
+    externalSource: 'contra_costa',
+    registrationNumber: normalize(record.RegistrationNumber),
     registrationDate: parseDate(record.RegistrationDate),
-    partyName: normalize(record.PartyName),
-    partyAbbr: normalize(record.PartyAbbr),
+    partyId,
     vbmStatus: normalize(record.VBMProgramStatus),
-    precinctId: normalize(record.PrecinctID),
+    precinctId,
     precinctPortion: normalize(record.PrecinctPortion),
-    precinctName: normalize(record.PrecinctName),
+    contactStatus: 'pending' as const,
     importedFrom: 'contra_costa',
     importType,
     importFormat: 'contra_costa',
   };
   
-  // Upsert voter
-  const voter = await prisma.voter.upsert({
-    where: registrationNumber ? { registrationNumber } : { id: 'never-match' },
-    update: voterData,
-    create: voterData,
-  });
-  
-  // Clear existing contact info if full import
-  if (importType === 'full') {
-    await prisma.contactInfo.deleteMany({ where: { voterId: voter.id } });
-    await prisma.voteHistory.deleteMany({ where: { voterId: voter.id } });
+  // Step 5: Create or update Voter
+  if (voter) {
+    // Update existing voter
+    voter = await prisma.voter.update({
+      where: { id: voter.id },
+      data: voterData,
+    });
+    
+    // Clear contact info and vote history if full import
+    if (importType === 'full') {
+      await prisma.contactInfo.deleteMany({ where: { personId: person.id } });
+      await prisma.voteHistory.deleteMany({ where: { voterId: voter.id } });
+    }
+  } else {
+    // Create new voter
+    voter = await prisma.voter.create({
+      data: voterData,
+    });
   }
   
-  // Add residence address
+  // Step 6: Add residence address as ContactInfo (linked to Person)
   const resAddress = buildResidenceAddress(record);
   if (resAddress) {
     await prisma.contactInfo.create({
       data: {
-        voterId: voter.id,
+        personId: person.id,
         locationId: locations.residenceLocationId,
         ...resAddress,
         isPrimary: true,
         isVerified: true,
+        source: 'contra_costa',
       },
     });
   }
   
-  // Add mailing address (if different)
+  // Step 7: Add mailing address (if different from residence)
   const mailAddress = buildMailingAddress(record);
   if (mailAddress && mailAddress.fullAddress !== resAddress?.fullAddress) {
     await prisma.contactInfo.create({
       data: {
-        voterId: voter.id,
+        personId: person.id,
         locationId: locations.mailingLocationId,
         ...mailAddress,
         isPrimary: false,
         isVerified: true,
+        source: 'contra_costa',
       },
     });
   }
   
-  // Add phone number
+  // Step 8: Add phone number
   const phone = normalize(record.PhoneNumber);
   if (phone) {
     await prisma.contactInfo.create({
       data: {
-        voterId: voter.id,
+        personId: person.id,
         locationId: locations.cellLocationId,
         phone,
         isPrimary: true,
         isVerified: false,
+        source: 'contra_costa',
       },
     });
   }
   
-  // Add email
+  // Step 9: Add email
   const email = normalize(record.EmailAddress);
   if (email) {
+    // Find or use a default location for email
     await prisma.contactInfo.create({
       data: {
-        voterId: voter.id,
-        locationId: locations.residenceLocationId, // Assume residence
+        personId: person.id,
+        locationId: locations.residenceLocationId, // Use residence as default for email
         email,
-        isPrimary: true,
+        isPrimary: false,
         isVerified: false,
+        source: 'contra_costa',
       },
     });
   }
   
-  // Import vote history (5 most recent elections)
+  // Step 10: Import vote history (5 most recent elections)
   for (let i = 1; i <= 5; i++) {
     const electionDate = parseDate(record[`ElectionDate_${i}` as keyof ContraCostaVoterRecord]);
     if (electionDate) {
+      // Look up or create Election
+      let election = await prisma.election.findUnique({
+        where: { date_abbr: {
+          date: electionDate,
+          abbr: normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN'
+        }},
+        select: { id: true }
+      });
+      
+      if (!election) {
+        election = await prisma.election.create({
+          data: {
+            date: electionDate,
+            abbr: normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN',
+            description: normalize(record[`ElectionDesc_${i}` as keyof ContraCostaVoterRecord]),
+            type: normalize(record[`ElectionType_${i}` as keyof ContraCostaVoterRecord]),
+          },
+        });
+      }
+      
+      // Look up ballot party by abbreviation
+      const ballotPartyAbbr = normalize(record[`BallotPartyAbbr_${i}` as keyof ContraCostaVoterRecord]);
+      let ballotPartyId: string | null = null;
+      
+      if (ballotPartyAbbr) {
+        const ballotParty = await prisma.party.findUnique({
+          where: { abbr: ballotPartyAbbr },
+          select: { id: true }
+        });
+        ballotPartyId = ballotParty?.id || null;
+      }
+      
+      // Create VoteHistory record
       await prisma.voteHistory.create({
         data: {
           voterId: voter.id,
+          electionId: election.id,
+          electionDate: electionDate,
           electionAbbr: normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]),
           electionDesc: normalize(record[`ElectionDesc_${i}` as keyof ContraCostaVoterRecord]),
-          electionDate,
           electionType: normalize(record[`ElectionType_${i}` as keyof ContraCostaVoterRecord]),
-          ballotPartyName: normalize(record[`BallotPartyName_${i}` as keyof ContraCostaVoterRecord]),
-          ballotPartyAbbr: normalize(record[`BallotPartyAbbr_${i}` as keyof ContraCostaVoterRecord]),
-          ballotCounted: record[`BallotCounted_${i}` as keyof ContraCostaVoterRecord] === '1',
+          participated: record[`BallotCounted_${i}` as keyof ContraCostaVoterRecord] === '1',
           votingMethod: normalize(record[`VotingMethodDesc_${i}` as keyof ContraCostaVoterRecord]),
+          ballotPartyId,
+          ballotPartyName: normalize(record[`BallotPartyName_${i}` as keyof ContraCostaVoterRecord]),
           districtId: normalize(record[`DistrictID_${i}` as keyof ContraCostaVoterRecord]),
-          subDistrict: normalize(record[`SubDistrict_${i}` as keyof ContraCostaVoterRecord]),
           districtName: normalize(record[`DistrictName_${i}` as keyof ContraCostaVoterRecord]),
         },
       });

@@ -18,6 +18,9 @@ export async function GET(
     const voter = await prisma.voter.findUnique({
       where: { id },
       include: {
+        person: true,
+        party: true,
+        precinct: true,
         contactLogs: {
           orderBy: { createdAt: 'desc' },
         },
@@ -50,28 +53,41 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, email, phone, address, notes, contactStatus } = body;
+    const { firstName, lastName, middleName, notes, contactStatus } = body;
 
     // Check if voter exists
     const existingVoter = await prisma.voter.findUnique({
       where: { id },
+      include: { person: true },
     });
 
     if (!existingVoter) {
       return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
     }
 
+    // Update Person if name fields provided
+    if (firstName || lastName || middleName !== undefined || notes !== undefined) {
+      await prisma.person.update({
+        where: { id: existingVoter.personId },
+        data: {
+          ...(firstName && { firstName }),
+          ...(lastName && { lastName }),
+          ...(middleName !== undefined && { middleName: middleName || null }),
+          ...(notes !== undefined && { notes: notes || null }),
+        },
+      });
+    }
+
+    // Update Voter
     const voter = await prisma.voter.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(email !== undefined && { email: email || null }),
-        ...(phone !== undefined && { phone: phone || null }),
-        ...(address !== undefined && { address: address || null }),
-        ...(notes !== undefined && { notes: notes || null }),
         ...(contactStatus && { contactStatus }),
       },
       include: {
+        person: true,
+        party: true,
+        precinct: true,
         contactLogs: {
           orderBy: { createdAt: 'desc' },
         },

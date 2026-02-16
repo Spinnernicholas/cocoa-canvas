@@ -21,22 +21,26 @@ export async function GET(request: NextRequest) {
     const where: any = {};
     
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
-      ];
+      where.person = {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+        ],
+      };
     }
 
     if (status && status !== 'all') {
       where.contactStatus = status;
     }
 
-    // Get voters
+    // Get voters with person data
     const [voters, total] = await Promise.all([
       prisma.voter.findMany({
         where,
         include: {
+          person: true,
+          party: true,
+          precinct: true,
           contactLogs: {
             orderBy: { createdAt: 'desc' },
             take: 1,
@@ -78,14 +82,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 });
     }
 
-    const voter = await prisma.voter.create({
+    // Create Person first
+    const person = await prisma.person.create({
       data: {
         firstName,
         lastName,
         middleName: middleName || null,
         notes: notes || null,
+      },
+    });
+
+    // Create Voter linked to Person
+    const voter = await prisma.voter.create({
+      data: {
+        personId: person.id,
         contactStatus: 'pending',
         registrationDate: new Date(),
+      },
+      include: {
+        person: true,
       },
     });
 

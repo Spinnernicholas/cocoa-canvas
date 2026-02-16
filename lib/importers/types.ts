@@ -31,9 +31,11 @@ export interface VoterImportOptions {
 }
 
 export interface ParsedVoterRecord {
-  // Identity
+  // External ID for deduplication (e.g., county VoterID)
   externalId?: string;
-  externalVoterId?: string;
+  externalSource?: string;  // Source identifier (e.g., 'contra_costa', 'simple_csv')
+  
+  // Identity
   title?: string;
   firstName: string;
   middleName?: string;

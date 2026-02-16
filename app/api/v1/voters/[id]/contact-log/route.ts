@@ -16,26 +16,29 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { contactType, outcome, notes, followUpNeeded, followUpDate } = body;
+    const { contactType, method, outcome, notes, followUpNeeded, followUpDate } = body;
 
-    if (!contactType) {
-      return NextResponse.json({ error: 'Contact type is required' }, { status: 400 });
+    const contactMethod = method || contactType; // Support both field names for backwards compatibility
+
+    if (!contactMethod) {
+      return NextResponse.json({ error: 'Contact method is required' }, { status: 400 });
     }
 
     // Check if voter exists
     const voter = await prisma.voter.findUnique({
       where: { id },
+      include: { person: true },
     });
 
     if (!voter) {
       return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
     }
 
-    // Create contact log
+    // Create contact log (linked to Person)
     const contactLog = await prisma.contactLog.create({
       data: {
-        voterId: id,
-        contactType,
+        personId: voter.personId,
+        method: contactMethod,
         outcome: outcome || null,
         notes: notes || null,
         followUpNeeded: followUpNeeded || false,
@@ -48,7 +51,7 @@ export async function POST(
       where: { id },
       data: {
         lastContactDate: new Date(),
-        lastContactMethod: contactType,
+        lastContactMethod: contactMethod,
       },
     });
 

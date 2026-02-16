@@ -53,8 +53,8 @@ export class SimpleCsvImporter implements VoterImporter {
     
     // Get or create location types
     const locations = await prisma.location.findMany();
-    let residenceLocation = locations.find(lt => lt.name === 'residence');
-    let cellLocation = locations.find(lt => lt.name === 'cell');
+    let residenceLocation = locations.find(lt => lt.name === 'Residence');
+    let cellLocation = locations.find(lt => lt.name === 'Cell');
     
     if (!residenceLocation || !cellLocation) {
       return {
@@ -110,11 +110,19 @@ export class SimpleCsvImporter implements VoterImporter {
           const state = normalize(record.state || record.State) || 'CA';
           const zipCode = normalize(record.zip || record.Zip);
           
-          // Create voter
-          const voter = await prisma.voter.create({
+          // Step 1: Create Person record
+          const person = await prisma.person.create({
             data: {
               firstName,
               lastName,
+            },
+          });
+          
+          // Step 2: Create Voter linked to Person
+          const voter = await prisma.voter.create({
+            data: {
+              personId: person.id,
+              externalSource: 'simple_csv',
               contactStatus: 'pending',
               registrationDate: new Date(),
               importedFrom: 'simple_csv',
@@ -123,11 +131,11 @@ export class SimpleCsvImporter implements VoterImporter {
             },
           });
           
-          // Create address contact info
+          // Step 3: Create address contact info (linked to Person)
           if (address && city && zipCode) {
             await prisma.contactInfo.create({
               data: {
-                voterId: voter.id,
+                personId: person.id,
                 locationId: residenceLocation.id,
                 fullAddress: `${address}, ${city}, ${state} ${zipCode}`,
                 streetName: address,
@@ -136,32 +144,35 @@ export class SimpleCsvImporter implements VoterImporter {
                 zipCode,
                 isPrimary: true,
                 isVerified: false,
+                source: 'simple_csv',
               },
             });
           }
           
-          // Create phone contact info
+          // Step 4: Create phone contact info (linked to Person)
           if (phone) {
             await prisma.contactInfo.create({
               data: {
-                voterId: voter.id,
+                personId: person.id,
                 locationId: cellLocation.id,
                 phone,
                 isPrimary: true,
                 isVerified: false,
+                source: 'simple_csv',
               },
             });
           }
           
-          // Create email contact info
+          // Step 5: Create email contact info (linked to Person)
           if (email) {
             await prisma.contactInfo.create({
               data: {
-                voterId: voter.id,
+                personId: person.id,
                 locationId: residenceLocation.id,
                 email,
-                isPrimary: true,
+                isPrimary: false,
                 isVerified: false,
+                source: 'simple_csv',
               },
             });
           }

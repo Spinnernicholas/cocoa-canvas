@@ -1,0 +1,386 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTHENTICATION (Phase 1)
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  isActive      Boolean   @default(true)
+  
+  // Session/login tracking
+  lastLogin     DateTime?
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+  
+  // Relations
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  jobsCreated   Job[]
+  scheduledJobs ScheduledJob[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// CAMPAIGN (Single Campaign Per Deployment)
+// ============================================================================
+// Only ONE campaign record exists per deployment (single political race).
+// Campaign metadata is stored here. For multi-race support, deploy multiple instances.
+
+model Campaign {
+  id          String    @id @default(cuid())
+  
+  // Single campaign metadata
+  name        String    // e.g., "Jane Smith for Mayor 2026"
+  description String?
+  
+  // Timeline
+  startDate   DateTime
+  endDate     DateTime
+  status      String    @default("planning") // planning, active, paused, completed
+  
+  // Target area (jurisdiction)
+  targetArea  String?   // e.g., "San Francisco County"
+  
+  // Configuration
+  color       String    @default("#6B4423") // Campaign brand color
+  logoUrl     String?
+  
+  // Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Enforce single record via unique constraint
+  @@unique([id])
+}
+
+// ============================================================================
+// JOB QUEUE (Phase 1 - Generic async job tracking)
+// ============================================================================
+
+model Job {
+  id          String    @id @default(cuid())
+  
+  // Job metadata
+  type        String    // "import_voters", "geocode", "export", etc.
+  status      String    @default("pending") // pending, processing, completed, failed
+  
+  // Progress
+  totalItems  Int       @default(0)
+  processedItems Int    @default(0)
+  
+  // Error tracking
+  errorLog    String?    // JSON array of errors (stored as text)
+  
+  // Job-specific data (stored as JSON text for flexibility)
+  data        String?
+  // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
+  
+  // Timestamps
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SCHEDULED JOBS (Recurring/Cron Jobs)
+// ============================================================================
+
+model ScheduledJob {
+  id          String    @id @default(cuid())
+  
+  // Job identification
+  name        String    @unique  // "daily-voter-sync", "weekly-cleanup", etc.
+  description String?
+  type        String               // "voter_import", "data_cleanup", etc.
+  
+  // Scheduling
+  schedule    String               // Cron expression: "0 2 * * *" (2 AM daily)
+  enabled     Boolean   @default(true)
+  
+  // Execution tracking
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  lastStatus  String?   // "success", "failed", null
+  lastError   String?
+  runCount    Int       @default(0)
+  
+  // Job configuration (stored as JSON)
+  data        String?   // Job-specific parameters
+  
+  // Metadata
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@index([type])
+}
+
+// ============================================================================
+// AUDIT LOGGING (Phase 1)
+// ============================================================================
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  action      String    // "login", "logout", "view_dashboard", "create_campaign", etc.
+  resource    String?   // "user", "campaign", "job", etc.
+  resourceId  String?
+  
+  details     String?   // JSON for context (stored as text)
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// VOTER MANAGEMENT (Phase 2)
+// ============================================================================
+
+// Location types for contact information
+model Location {
+  id          String        @id @default(cuid())
+  name        String        @unique // "Home", "Work", "Cell", "Mailing", "Residence"
+  description String?
+  
+  // Relations
+  contactInfo ContactInfo[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  @@index([name])
+}
+
+// Contact information (phone, email, address) with location context
+model ContactInfo {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id])
+  
+  // Contact details (at least one should be populated)
+  phone       String?
+  email       String?
+  
+  // Address components
+  houseNumber     String?
+  preDirection    String?   // N, S, E, W
+  streetName      String?
+  streetSuffix    String?   // St, Ave, Ln, etc.
+  postDirection   String?
+  unitAbbr        String?   // Apt, Unit, Ste, etc.
+  unitNumber      String?
+  city            String?
+  state           String?
+  zipCode         String?
+  
+  // Full address (computed or imported)
+  fullAddress String?
+  
+  // Verification status
+  isVerified  Boolean   @default(false)
+  isPrimary   Boolean   @default(false) // Primary contact for this location type
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([locationId])
+  @@index([phone])
+  @@index([email])
+  @@index([isPrimary])
+}
+
+model Voter {
+  id                String    @id @default(cuid())
+  
+  // Basic identity
+  registrationNumber String? @unique // From voter file
+  voterFileId        String? // External voter ID from jurisdiction
+  
+  // Name components
+  title         String?   // Mr, Ms, Dr, etc.
+  firstName     String
+  middleName    String?
+  lastName      String
+  nameSuffix    String?   // Jr, Sr, III, etc.
+  
+  // Demographics
+  gender        String?
+  birthDate     DateTime?
+  birthPlace    String?   // State/Country code
+  language      String?   // Preferred language
+  
+  // Voter registration info
+  registrationDate DateTime?
+  partyName        String?
+  partyAbbr        String?
+  
+  // Vote by mail status
+  vbmStatus        String?   // Permanent VBM, etc.
+  
+  // Precinct information
+  precinctId       String?
+  precinctPortion  String?
+  precinctName     String?
+  
+  // Canvassing/Contact status
+  contactStatus     String    @default("pending") // pending, attempted, contacted, refused, unreachable, moved
+  lastContactDate   DateTime?
+  lastContactMethod String?   // call, email, door, sms
+  
+  // Relations
+  contactInfo   ContactInfo[]
+  contactLogs   ContactLog[]
+  voteHistory   VoteHistory[]
+  
+  // Import metadata
+  importedFrom      String?   // Source filename or API
+  importType        String?   // "full", "incremental"
+  importFormat      String?   // "contra_costa", "standard", etc.
+  
+  // Notes
+  notes         String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([registrationNumber])
+  @@index([voterFileId])
+  @@index([lastName, firstName])
+  @@index([contactStatus])
+  @@index([precinctId])
+  @@index([partyAbbr])
+  @@index([createdAt])
+}
+
+// Vote history tracking
+model VoteHistory {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  // Election info
+  electionAbbr    String?
+  electionDesc    String?
+  electionDate    DateTime?
+  electionType    String?   // General, Primary, Special, etc.
+  
+  // Ballot info
+  ballotPartyName String?
+  ballotPartyAbbr String?
+  ballotCounted   Boolean   @default(false)
+  
+  // Voting method
+  votingMethod    String?   // "Absentee", "Polling Place", "Early Voting", etc.
+  
+  // District info (at time of election)
+  districtId      String?
+  subDistrict     String?
+  districtName    String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([electionDate])
+  @@index([electionType])
+}
+
+model ContactLog {
+  id          String    @id @default(cuid())
+  
+  voterId     String
+  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  
+  // Contact details
+  contactType String    // call, email, door, sms
+  outcome     String?   // contacted, refused, not_home, no_answer, moved, invalid
+  notes       String?
+  
+  // Optional follow-up
+  followUpNeeded Boolean @default(false)
+  followUpDate   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([voterId])
+  @@index([contactType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SETTINGS (Phase 1)
+// ============================================================================
+
+// ============================================================================
+// SETTINGS & CONFIGURATION
+// ============================================================================
+// Store app-wide settings and campaign configuration
+// Examples: "campaign_id", "feature_flags", "email_provider"
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // Can be JSON (stored as text)
+  
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+

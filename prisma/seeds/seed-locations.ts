@@ -1,11 +1,12 @@
 /**
- * Seed script to initialize Location types
+ * Seed script to initialize Location types and Party types
  * 
  * Run with: npx ts-node prisma/seeds/seed-locations.ts
  * Or call `seedLocations()` from the application
  */
 
 import { PrismaClient } from '@prisma/client';
+import { seedParties } from './seed-parties.ts';
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,7 @@ export const LOCATION_TYPES = {
 } as const;
 
 export async function seedLocations(verbose = true) {
+  const prisma = new PrismaClient();
   if (verbose) {
     console.log('[Seed] Initializing Location types...');
   }
@@ -69,10 +71,17 @@ export async function seedLocations(verbose = true) {
     console.log(`[Seed] Total location types: ${count}`);
   }
   
+  // Also seed parties
+  if (verbose) {
+    console.log('');
+  }
+  await seedParties(verbose);
+  
   return locations;
 }
 
 async function main() {
+  const prisma = new PrismaClient();
   try {
     await seedLocations();
   } catch (error) {
@@ -83,5 +92,7 @@ async function main() {
   }
 }
 
-// Run directly
-main();
+// Only run directly if this file is the main module
+if (process.argv[1]?.endsWith('seed-locations.ts')) {
+  main();
+}
