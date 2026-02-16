@@ -14,26 +14,17 @@ A voter file contains dense records. We normalize into 5 interconnected models:
 
 ```mermaid
 graph TD
-    VF["📄 VOTER FILE<br/>(Input)"]
     V["👤 VOTER<br/>(Person Identity)"]
     H["🏠 HOUSEHOLD<br/>(Address Grouping)"]
     C["📞 CONTACT_INFO<br/>(All Contact Methods)"]
     E["🗳️ ELECTION<br/>(Shared Election Metadata)"]
     VH["📊 VOTE_HISTORY<br/>(Election Participation)"]
     
-    VF -->|creates| V
-    VF -->|groups by| H
-    VF -->|extracts| C
-    VF -->|parses| VH
-    
     V -->|belongs to| H
     V -->|has| C
     V -->|participated in| VH
-    
     VH -->|references| E
-    E -->|1 election, many voters| VH
     
-    style VF fill:#e1f5ff
     style V fill:#f3e5f5
     style H fill:#e8f5e9
     style C fill:#fff3e0
