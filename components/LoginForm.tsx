@@ -106,8 +106,8 @@ export default function LoginForm() {
   if (checkingSetup) {
     return (
       <div className="text-center py-4">
-        <div className="inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-600 text-sm mt-2">Checking system status...</p>
+        <div className="inline-block w-5 h-5 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-cocoa-600 dark:text-cocoa-300 text-sm mt-2">Checking system status...</p>
       </div>
     );
   }
@@ -115,13 +115,13 @@ export default function LoginForm() {
   if (setupRequired) {
     return (
       <div className="text-center py-4 space-y-3">
-        <p className="text-gray-700 font-medium">System Setup Required</p>
-        <p className="text-gray-600 text-sm">
+        <p className="text-cocoa-700 dark:text-cocoa-200 font-medium">System Setup Required</p>
+        <p className="text-cocoa-600 dark:text-cocoa-300 text-sm">
           This appears to be your first time. Please set up your admin account first.
         </p>
         <Link
           href="/setup"
-          className="inline-block mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
+          className="inline-block mt-4 px-4 py-2 bg-cocoa-600 hover:bg-cocoa-700 dark:bg-cinnamon-600 dark:hover:bg-cinnamon-700 text-white font-medium rounded-lg transition"
         >
           Go to Setup
         </Link>
@@ -133,7 +133,7 @@ export default function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Email Input */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="email" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
           Email
         </label>
         <input
@@ -143,14 +143,14 @@ export default function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           disabled={loading}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-50 disabled:text-gray-500"
+          className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-lg focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent outline-none transition disabled:bg-cocoa-100 dark:disabled:bg-cocoa-800 disabled:text-cocoa-500 dark:disabled:text-cocoa-500"
           required
         />
       </div>
 
       {/* Password Input */}
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="password" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
           Password
         </label>
         <input
@@ -160,14 +160,14 @@ export default function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
           disabled={loading}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-50 disabled:text-gray-500"
+          className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-lg focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent outline-none transition disabled:bg-cocoa-100 dark:disabled:bg-cocoa-800 disabled:text-cocoa-500 dark:disabled:text-cocoa-500"
           required
         />
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-3 bg-cinnamon-100 dark:bg-cinnamon-900/30 border border-cinnamon-200 dark:border-cinnamon-800 rounded-lg text-cinnamon-800 dark:text-cinnamon-300 text-sm">
           {error}
         </div>
       )}
@@ -176,8 +176,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition disabled:bg-blue-400 disabled:cursor-not-allowed"
-      >
+        className="w-full py-2 bg-cocoa-600 hover:bg-cocoa-700 dark:bg-cinnamon-600 dark:hover:bg-cinnamon-700 text-white font-medium rounded-lg transition disabled:bg-cocoa-400 dark:disabled:bg-cocoa-700 disabled:cursor-not-allowed">
         {loading ? (
           <span className="flex items-center justify-center gap-2">
             <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

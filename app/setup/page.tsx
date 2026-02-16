@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
+import Marshmallow from '@/components/Marshmallow';
 
 export default function SetupPage() {
   const router = useRouter();
@@ -78,27 +80,48 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800 px-4 relative overflow-hidden">
+      {/* Decorative Marshmallows */}
+      <div className="hidden dark:block fixed top-16 left-[8%] opacity-40 animate-bounce" style={{ animationDuration: '3.2s' }}>
+        <Marshmallow size={46} />
+      </div>
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-bounce" style={{ animationDuration: '4.2s', animationDelay: '1.2s' }}>
+        <Marshmallow size={36} />
+      </div>
+      <div className="hidden dark:block fixed bottom-[30%] left-[15%] opacity-40 animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.8s' }}>
+        <Marshmallow size={48} />
+      </div>
+      <div className="hidden dark:block fixed bottom-24 right-[12%] opacity-40 animate-bounce" style={{ animationDuration: '3.6s', animationDelay: '1.8s' }}>
+        <Marshmallow size={38} />
+      </div>
+      
+      {/* Theme Toggle - Positioned at top right */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
+      
+      <div className="w-full max-w-md relative z-10">
+        <div className="bg-cream-50 dark:bg-cocoa-800 rounded-lg shadow-lg p-8 border border-cocoa-200 dark:border-cocoa-700">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl mb-2">🍫</h1>
-            <h2 className="text-2xl font-bold text-gray-900">Cocoa Canvas</h2>
-            <p className="text-gray-600 text-sm mt-2">Initial Setup Required</p>
+            <Link href="/" className="inline-block">
+              <h1 className="text-4xl mb-2">🍫</h1>
+            </Link>
+            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cocoa-600 to-cinnamon-600 dark:from-cocoa-400 dark:to-cinnamon-400">Cocoa Canvas</h2>
+            <p className="text-cocoa-600 dark:text-cocoa-300 text-sm mt-2">Initial Setup Required</p>
           </div>
 
           {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
-            <p className="text-sm text-blue-900">
+          <div className="bg-cocoa-100 dark:bg-cocoa-900/40 border border-cocoa-300 dark:border-cocoa-700 rounded-md p-4 mb-6">
+            <p className="text-sm text-cocoa-800 dark:text-cocoa-200">
               Create an admin account to get started. This is your first and only setup step.
             </p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div className="bg-cinnamon-100 dark:bg-cinnamon-900/30 border border-cinnamon-300 dark:border-cinnamon-800 rounded-md p-3 mb-4">
+              <p className="text-cinnamon-800 dark:text-cinnamon-300 text-sm">{error}</p>
             </div>
           )}
 
@@ -106,7 +129,7 @@ export default function SetupPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
                 Email Address
               </label>
               <input
@@ -117,13 +140,13 @@ export default function SetupPage() {
                 onChange={handleChange}
                 placeholder="admin@example.com"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-md focus:outline-none focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent"
               />
             </div>
 
             {/* Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
                 Full Name (Optional)
               </label>
               <input
@@ -133,13 +156,13 @@ export default function SetupPage() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Your Name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-md focus:outline-none focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
                 Password
               </label>
               <input
@@ -150,15 +173,15 @@ export default function SetupPage() {
                 onChange={handleChange}
                 placeholder="Enter password (min 8 characters)"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-md focus:outline-none focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent"
               />
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="passwordConfirm" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="passwordConfirm" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
                 Confirm Password
-              </label>
+                </label>
               <input
                 type="password"
                 id="passwordConfirm"
@@ -167,7 +190,7 @@ export default function SetupPage() {
                 onChange={handleChange}
                 placeholder="Re-enter password"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 bg-cream-50 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-100 rounded-md focus:outline-none focus:ring-2 focus:ring-cocoa-500 dark:focus:ring-cinnamon-500 focus:border-transparent"
               />
             </div>
 
@@ -175,7 +198,7 @@ export default function SetupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+              className="w-full bg-cocoa-600 hover:bg-cocoa-700 dark:bg-cinnamon-600 dark:hover:bg-cinnamon-700 disabled:bg-cocoa-400 dark:disabled:bg-cocoa-700 text-white font-semibold py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
             >
               {loading ? (
                 <>
@@ -208,31 +231,29 @@ export default function SetupPage() {
           </form>
 
           {/* Footer */}
-          <p className="text-center text-xs text-gray-500 mt-6">
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
             Already have an account?{' '}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/login" className="text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 font-medium">
               Sign in
             </Link>
           </p>
 
           {/* Support Links */}
-          <div className="border-t border-gray-200 mt-6 pt-4">
-            <p className="text-center text-xs text-gray-600 mb-3">Need help?</p>
+          <div className="border-t border-cocoa-200 dark:border-cocoa-700 mt-6 pt-4">
+            <p className="text-center text-xs text-cocoa-600 dark:text-cocoa-300 mb-3">Need help?</p>
             <div className="flex flex-col gap-2">
               <a
                 href="https://github.com/Spinnernicholas/cocoa-canvas"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-700 text-center"
-              >
+                className="text-xs text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 text-center">
                 📖 View Documentation
               </a>
               <a
                 href="https://github.com/Spinnernicholas/cocoa-canvas/issues"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-700 text-center"
-              >
+                className="text-xs text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 text-center">
                 🐛 Report Issue
               </a>
             </div>

@@ -1,18 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   
   // Environment variables
   env: {
     // Add any client-side environment variables here
-  },
-
-  // API routes
-  api: {
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
   },
 
   // Headers for security

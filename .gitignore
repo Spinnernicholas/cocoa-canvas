@@ -41,6 +41,10 @@ Thumbs.db
 data/cocoa_canvas.db
 data/cocoa_canvas.db-shm
 data/cocoa_canvas.db-wal
+prisma/data/
+prisma/*.db
+prisma/*.db-shm
+prisma/*.db-wal
 
 # Prisma
 prisma/migrations
