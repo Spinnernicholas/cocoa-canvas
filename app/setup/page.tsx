@@ -1,13 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import Marshmallow from '@/components/Marshmallow';
 
+interface SetupStatus {
+  setupNeeded: boolean;
+  autoSetupAvailable: boolean;
+}
+
 export default function SetupPage() {
   const router = useRouter();
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -16,6 +22,49 @@ export default function SetupPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState('');
+
+  // Check setup status on mount
+  useEffect(() => {
+    const checkSetupStatus = async () => {
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        
+        const setupNeeded = data.setup?.needed ?? true;
+        const autoSetupCompleted = data.setup?.autoSetupCompleted ?? false;
+
+        // If setup was already completed (including via auto-setup), redirect
+        if (!setupNeeded || autoSetupCompleted) {
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+          return;
+        }
+
+        // Check if auto-setup is available
+        const statusResponse = await fetch('/api/v1/auth/auto-setup');
+        const statusData = await statusResponse.json();
+        
+        setSetupStatus({
+          setupNeeded: true,
+          autoSetupAvailable: statusData.completed === false && statusResponse.ok,
+        });
+
+        if (statusData.completed === false && statusData.message?.includes('configured')) {
+          setInfo('Auto-setup is available. If you have set the admin environment variables, the system will automatically create the admin account.');
+        }
+      } catch (err) {
+        console.error('[Setup Status Check Error]', err);
+        setSetupStatus({
+          setupNeeded: true,
+          autoSetupAvailable: false,
+        });
+      }
+    };
+
+    checkSetupStatus();
+  }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -79,6 +128,34 @@ export default function SetupPage() {
     }
   };
 
+  // Show loading state while checking status
+  if (setupStatus === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🍫</div>
+          <p className="text-cocoa-600 dark:text-cocoa-300">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If setup is not needed, show redirect message
+  if (!setupStatus.setupNeeded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800 px-4">
+        <div className="max-w-md bg-cream-50 dark:bg-cocoa-800 rounded-lg shadow-lg p-8 border border-cocoa-200 dark:border-cocoa-700 text-center">
+          <div className="text-4xl mb-4">✅</div>
+          <h2 className="text-2xl font-bold text-cocoa-600 dark:text-cocoa-300 mb-4">Setup Complete</h2>
+          <p className="text-cocoa-600 dark:text-cocoa-300 mb-6">
+            Your application has been initialized successfully!
+          </p>
+          <p className="text-sm text-cocoa-500 dark:text-cocoa-400">Redirecting you to login...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800 px-4 relative overflow-hidden">
       {/* Decorative Marshmallows */}
@@ -117,6 +194,13 @@ export default function SetupPage() {
               Create an admin account to get started. This is your first and only setup step.
             </p>
           </div>
+
+          {/* Info Message */}
+          {info && (
+            <div className="bg-cocoa-50 dark:bg-cocoa-900/40 border border-cocoa-300 dark:border-cocoa-600 rounded-md p-3 mb-4">
+              <p className="text-cocoa-700 dark:text-cocoa-300 text-sm">{info}</p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -181,7 +265,7 @@ export default function SetupPage() {
             <div>
               <label htmlFor="passwordConfirm" className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-200 mb-1">
                 Confirm Password
-                </label>
+              </label>
               <input
                 type="password"
                 id="passwordConfirm"

@@ -26,12 +26,19 @@ npm run dev
 ```
 Visit http://localhost:3000
 
-**Production Deployment:**
+**Production Deployment (with Auto-Setup):**
 ```bash
 docker-compose up -d
 ```
 
-See [DOCKER_SETUP.md](DOCKER_SETUP.md) for production Docker configuration.
+The app automatically creates an admin user if you provide environment variables:
+```bash
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=SecurePass123!
+ADMIN_NAME=Administrator
+```
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for production configuration and [AUTO_SETUP.md](AUTO_SETUP.md) for detailed auto-setup documentation.
 
 ## 🏗️ Stack
 
