@@ -17,11 +17,23 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 ## 🚀 Quick Start
 
+**New to the project?** Start here: [**QUICK_START.md**](QUICK_START.md) (5 minutes to running app)
+
+**Already familiar with Docker?** Use the helper scripts:
+
+**Development** (with hot reload):
 ```bash
-docker-compose up
+./run.ps1 dev        # Windows PowerShell
+./run.sh dev         # Mac/Linux
 ```
 
-Visit `http://localhost:3000`, create an admin account, and start managing campaigns.
+**Production** (optimized build):
+```bash
+./run.ps1 prod       # Windows PowerShell
+./run.sh prod        # Mac/Linux
+```
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed Docker configuration.
 
 ## 🏗️ Stack
 
