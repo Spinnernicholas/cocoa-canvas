@@ -1,5 +1,10 @@
+version: '3.8'
+
+# Production Docker Compose configuration
+# For development, use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
 services:
-  # Main Next.js application
+  # Main Next.js application (Production)
   web:
     build: .
     ports:

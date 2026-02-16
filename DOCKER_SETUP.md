@@ -1,6 +1,6 @@
 # Docker Setup Guide
 
-This guide explains how to run Cocoa Canvas using Docker.
+This guide explains how to run Cocoa Canvas using Docker in **development** or **production** mode.
 
 ## Prerequisites
 
@@ -9,45 +9,87 @@ This guide explains how to run Cocoa Canvas using Docker.
 
 ## Quick Start
 
-### 1. Environment Setup
+### Development Mode (Recommended for local development)
 
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set `NEXTAUTH_SECRET`:
+**With helper script:**
 
 ```bash
-# Generate a secure secret
-openssl rand -base64 32
+# Linux/macOS
+./run.sh dev
+
+# Windows PowerShell
+./run.ps1 dev
 ```
 
-Add the output to `.env`:
+**Or manually:**
 
-```
-NEXTAUTH_SECRET=your-generated-secret-here
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-### 2. Run with Docker Compose
+Features:
+- Hot reload (changes reflect instantly)
+- Source maps for debugging
+- Development logging
+- SQLite database
+
+Visit: `http://localhost:3000`
+
+### Production Mode
+
+**With helper script:**
+
+```bash
+# Linux/macOS
+./run.sh prod
+
+# Windows PowerShell
+./run.ps1 prod
+```
+
+**Or manually:**
 
 ```bash
 docker-compose up
 ```
 
-On first run:
-1. Docker builds the image
-2. Prisma generates the client
-3. Database migrations run automatically
-4. App starts on `http://localhost:3000`
+Features:
+- Optimized production build
+- Minimal dependencies
+- PostgreSQL support
+- Compressed assets
 
-### 3. Create Admin Account
+Visit: `http://localhost:3000`
 
-Visit `http://localhost:3000` and complete the setup wizard:
-- Create admin email and password
-- Set up initial campaign
-- Done!
+## Environment Setup
+
+Choose your environment file based on mode:
+
+### Development
+```bash
+cp .env.development .env
+```
+
+Environment variables:
+- `NODE_ENV=development`
+- `DATABASE_URL=file:./data/cocoa_canvas.db` (SQLite)
+- `NEXTAUTH_SECRET=dev-secret-only-for-development-not-secure`
+
+### Production
+```bash
+cp .env.production .env
+```
+
+**Important**: Before running in production, update `.env`:
+- `NEXTAUTH_URL=https://your-domain.com`
+- `NEXTAUTH_SECRET=<generate-with: `openssl rand -base64 32`>`
+- `DATABASE_URL=postgresql://user:pass@postgres:5432/cocoa_canvas`
+
+## First Time Setup
+
+1. **Start the app** (dev or prod mode above)
+2. **Create Admin Account**: Visit `http://localhost:3000` and complete the setup wizard
+3. **Create Campaign**: Set up your first campaign with dates and target area
 
 ## Stopping
 
