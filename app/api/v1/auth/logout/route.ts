@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractToken, validateProtectedRoute } from '@/lib/middleware/auth';
 import { invalidateSession } from '@/lib/auth/session';
+import { auditLog } from '@/lib/audit/logger';
 
 /**
  * POST /api/v1/auth/logout
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (token) {
       await invalidateSession(token);
     }
+
+    // Log logout
+    await auditLog(validation.user!.userId, 'logout', request, 'user', validation.user!.userId);
 
     return NextResponse.json(
       {

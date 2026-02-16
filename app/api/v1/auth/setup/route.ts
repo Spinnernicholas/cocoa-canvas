@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword, validatePasswordStrength } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 import { createSession } from '@/lib/auth/session';
+import { auditLog } from '@/lib/audit/logger';
 
 interface SetupRequest {
   email: string;
@@ -170,6 +171,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<SetupResp
         key: 'setup_completed_at',
         value: new Date().toISOString(),
       },
+    });
+
+    // Log setup completion
+    await auditLog(user.id, 'setup', request, 'user', user.id, {
+      email: user.email,
+      setupMethod: 'manual_setup_wizard',
     });
 
     const response: SetupResponse = {

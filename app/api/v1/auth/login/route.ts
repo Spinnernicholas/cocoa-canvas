@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 import { createSession } from '@/lib/auth/session';
+import { auditLog } from '@/lib/audit/logger';
 import { LoginRequest, LoginResponse } from '@/lib/auth/types';
 
 /**
@@ -127,6 +128,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         lastLogin: new Date(),
       },
     });
+
+    // Log successful login
+    await auditLog(user.id, 'login', request, 'user', user.id);
 
     const response: LoginResponse = {
       success: true,

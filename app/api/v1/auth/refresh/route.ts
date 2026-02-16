@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractToken, validateProtectedRoute } from '@/lib/middleware/auth';
 import { generateToken } from '@/lib/auth/jwt';
 import { createSession, invalidateSession } from '@/lib/auth/session';
+import { auditLog } from '@/lib/audit/logger';
 
 interface RefreshResponse {
   success: boolean;
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<RefreshRe
 
     // Optionally invalidate old token (can be changed to allow concurrent sessions)
     await invalidateSession(oldToken);
+
+    // Log token refresh
+    await auditLog(user.userId, 'refresh_token', request, 'user', user.userId);
 
     return NextResponse.json(
       {

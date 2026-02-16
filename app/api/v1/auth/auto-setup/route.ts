@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { performAutoSetup } from '@/lib/auth/auto-setup';
+import { auditLog } from '@/lib/audit/logger';
 
 interface AutoSetupResponse {
   success: boolean;
@@ -32,6 +33,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<AutoSetup
     const userAgent = request.headers.get('user-agent') || undefined;
 
     const result = await performAutoSetup(ipAddress, userAgent);
+
+    // Log auto-setup completion if successful
+    if (result.completed && result.user) {
+      await auditLog(result.user.id, 'auto_setup', request, 'user', result.user.id, {
+        email: result.user.email,
+        setupMethod: 'auto_setup_environment_variables',
+      });
+    }
 
     const statusCode = result.completed ? 200 : 400;
     const success = result.completed;
