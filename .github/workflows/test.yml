@@ -1,0 +1,46 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cocoa-canvas/**'
+      - '.github/workflows/test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [22]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - name: Install dependencies
+        working-directory: ./cocoa-canvas
+        run: npm ci
+      
+      - name: Run linter
+        working-directory: ./cocoa-canvas
+        run: npm run lint
+      
+      - name: Run tests with coverage
+        working-directory: ./cocoa-canvas
+        run: npm run test:ci
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./cocoa-canvas/coverage/coverage-final.json
+          flags: unittests
+          name: cocoa-canvas-coverage
