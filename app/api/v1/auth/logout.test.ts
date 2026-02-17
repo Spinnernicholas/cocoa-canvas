@@ -2,6 +2,8 @@ import type { Mock } from 'vitest';
 import { POST } from '@/app/api/v1/auth/logout/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { auditLog } from '@/lib/audit/logger';
+import { extractToken, validateProtectedRoute } from '@/lib/middleware/auth';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -43,9 +45,7 @@ describe('POST /api/v1/auth/logout', () => {
   });
 
   it('should logout user successfully', async () => {
-    // Mock successful validation
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: {
         userId: 'user123',
@@ -64,8 +64,7 @@ describe('POST /api/v1/auth/logout', () => {
   });
 
   it('should reject unauthenticated requests', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: false,
       response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
     });
@@ -77,8 +76,7 @@ describe('POST /api/v1/auth/logout', () => {
   });
 
   it('should handle session deletion', async () => {
-    const { validateProtectedRoute, extractToken } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: {
         userId: 'user123',
@@ -87,7 +85,7 @@ describe('POST /api/v1/auth/logout', () => {
       response: null,
     });
 
-    extractToken.mockReturnValue('fake-token');
+    vi.mocked(extractToken).mockReturnValue('fake-token');
     (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
 
     const request = mockRequest('fake-token');
@@ -98,10 +96,7 @@ describe('POST /api/v1/auth/logout', () => {
   });
 
   it('should create audit log on logout', async () => {
-    const { validateProtectedRoute, extractToken } = require('@/lib/middleware/auth');
-    const { auditLog } = require('@/lib/audit/logger');
-
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: {
         userId: 'user123',
@@ -110,13 +105,13 @@ describe('POST /api/v1/auth/logout', () => {
       response: null,
     });
 
-    extractToken.mockReturnValue('fake-token');
+    vi.mocked(extractToken).mockReturnValue('fake-token');
     (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
 
     const request = mockRequest('fake-token');
     await POST(request);
 
-    expect(auditLog).toHaveBeenCalledWith(
+    expect(vi.mocked(auditLog)).toHaveBeenCalledWith(
       'user123',
       'logout',
       expect.any(Object),

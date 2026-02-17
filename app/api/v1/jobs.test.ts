@@ -1,20 +1,14 @@
-import type { Mock } from 'vitest';
 import { GET, POST } from '@/app/api/v1/jobs/route';
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    job: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      count: vi.fn(),
-    },
-  },
-}));
+import { validateProtectedRoute } from '@/lib/middleware/auth';
+import { createJob, getJobProgress, getJobs } from '@/lib/queue/runner';
 
 vi.mock('@/lib/middleware/auth');
+vi.mock('@/lib/queue/runner', () => ({
+  createJob: vi.fn(),
+  getJobProgress: vi.fn(),
+  getJobs: vi.fn(),
+}));
 vi.mock('@/lib/audit/logger', () => ({
   auditLog: vi.fn(),
 }));
@@ -47,7 +41,7 @@ describe('GET /api/v1/jobs', () => {
         status: 'pending',
         totalItems: 0,
         processedItems: 0,
-        errorLog: null,
+        errorLog: '[]',
         data: '{}',
         createdById: 'user123',
         createdAt: new Date(),
@@ -57,7 +51,8 @@ describe('GET /api/v1/jobs', () => {
       },
     ];
 
-    (prisma.job.findMany as Mock).mockResolvedValue(mockJobs);
+    vi.mocked(getJobs).mockResolvedValue(mockJobs);
+    vi.mocked(getJobProgress).mockReturnValue(0);
 
     const request = mockRequest('GET');
     const response = await GET(request);
@@ -69,54 +64,54 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('should filter jobs by status', async () => {
-    (prisma.job.findMany as Mock).mockResolvedValue([]);
+    vi.mocked(getJobs).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'status=pending');
     await GET(request);
 
-    expect(prisma.job.findMany).toHaveBeenCalledWith(
+    expect(getJobs).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: 'pending' }),
+        status: 'pending',
       })
     );
   });
 
   it('should filter jobs by type', async () => {
-    (prisma.job.findMany as Mock).mockResolvedValue([]);
+    vi.mocked(getJobs).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'type=import_voters');
     await GET(request);
 
-    expect(prisma.job.findMany).toHaveBeenCalledWith(
+    expect(getJobs).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ type: 'import_voters' }),
+        type: 'import_voters',
       })
     );
   });
 
   it('should handle pagination', async () => {
-    (prisma.job.findMany as Mock).mockResolvedValue([]);
+    vi.mocked(getJobs).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'limit=10&offset=20');
     await GET(request);
 
-    expect(prisma.job.findMany).toHaveBeenCalledWith(
+    expect(getJobs).toHaveBeenCalledWith(
       expect.objectContaining({
-        take: 10,
-        skip: 20,
+        limit: 10,
+        offset: 20,
       })
     );
   });
 
   it('should cap limit at 200', async () => {
-    (prisma.job.findMany as Mock).mockResolvedValue([]);
+    vi.mocked(getJobs).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'limit=500');
     await GET(request);
 
-    expect(prisma.job.findMany).toHaveBeenCalledWith(
+    expect(getJobs).toHaveBeenCalledWith(
       expect.objectContaining({
-        take: 200,
+        limit: 200,
       })
     );
   });
@@ -128,8 +123,7 @@ describe('POST /api/v1/jobs', () => {
   });
 
   it('should create a new job', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: { userId: 'user123' },
       response: null,
@@ -150,7 +144,8 @@ describe('POST /api/v1/jobs', () => {
       createdBy: { id: 'user123', email: 'user@example.com', name: 'User' },
     };
 
-    (prisma.job.create as Mock).mockResolvedValue(mockJob);
+    vi.mocked(createJob).mockResolvedValue(mockJob);
+    vi.mocked(getJobProgress).mockReturnValue(0);
 
     const req = new NextRequest('http://localhost:3000/api/v1/jobs', {
       method: 'POST',
@@ -173,8 +168,7 @@ describe('POST /api/v1/jobs', () => {
   });
 
   it('should reject unauthenticated requests', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: false,
       response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
     });
@@ -193,8 +187,7 @@ describe('POST /api/v1/jobs', () => {
   });
 
   it('should reject missing job type', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: { userId: 'user123' },
       response: null,
@@ -213,12 +206,11 @@ describe('POST /api/v1/jobs', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain('type');
+    expect(data.error).toBe('Job type is required');
   });
 
   it('should reject invalid JSON', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: { userId: 'user123' },
       response: null,
@@ -237,17 +229,17 @@ describe('POST /api/v1/jobs', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
   });
 
   it('should handle creation errors', async () => {
-    const { validateProtectedRoute } = require('@/lib/middleware/auth');
-    validateProtectedRoute.mockResolvedValue({
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: true,
       user: { userId: 'user123' },
       response: null,
     });
 
-    (prisma.job.create as Mock).mockRejectedValue(new Error('DB error'));
+    vi.mocked(createJob).mockResolvedValue(null);
 
     const req = new NextRequest('http://localhost:3000/api/v1/jobs', {
       method: 'POST',

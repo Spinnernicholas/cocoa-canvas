@@ -2,6 +2,8 @@ import type { Mock } from 'vitest';
 import { POST } from '@/app/api/v1/auth/login/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateToken } from '@/lib/auth/jwt';
+import { verifyPassword } from '@/lib/auth/password';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -63,12 +65,10 @@ describe('POST /api/v1/auth/login', () => {
     });
 
     // Mock the password verification
-    const { verifyPassword } = require('@/lib/auth/password');
-    verifyPassword.mockResolvedValue(true);
+    vi.mocked(verifyPassword).mockResolvedValue(true);
 
     // Mock token generation
-    const { generateToken } = require('@/lib/auth/jwt');
-    generateToken.mockReturnValue('fake-jwt-token');
+    vi.mocked(generateToken).mockReturnValue('fake-jwt-token');
 
     const request = mockRequest({
       email: 'user@example.com',
@@ -114,8 +114,7 @@ describe('POST /api/v1/auth/login', () => {
     (prisma.user.update as Mock).mockResolvedValue(mockUser);
 
     // Mock failed password verification
-    const { verifyPassword } = require('@/lib/auth/password');
-    verifyPassword.mockResolvedValue(false);
+    vi.mocked(verifyPassword).mockResolvedValue(false);
 
     const request = mockRequest({
       email: 'user@example.com',
@@ -211,8 +210,7 @@ describe('POST /api/v1/auth/login', () => {
       loginAttempts: 4,
     });
 
-    const { verifyPassword } = require('@/lib/auth/password');
-    verifyPassword.mockResolvedValue(false);
+    vi.mocked(verifyPassword).mockResolvedValue(false);
 
     const request = mockRequest({
       email: 'user@example.com',

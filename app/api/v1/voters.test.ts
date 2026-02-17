@@ -4,7 +4,7 @@ import { POST as createVoter, GET as listVoters } from '@/app/api/v1/voters/rout
 import { GET as getVoter, PUT as updateVoter, DELETE as deleteVoter } from '@/app/api/v1/voters/[id]/route';
 import { POST as logContact } from '@/app/api/v1/voters/[id]/contact-log/route';
 import { prisma } from '@/lib/prisma';
-import { generateToken } from '@/lib/auth/jwt';
+import { validateProtectedRoute } from '@/lib/middleware/auth';
 
 // Mock prisma
 vi.mock('@/lib/prisma', () => ({
@@ -14,6 +14,10 @@ vi.mock('@/lib/prisma', () => ({
     },
     session: {
       findUnique: vi.fn(),
+    },
+    person: {
+      create: vi.fn(),
+      update: vi.fn(),
     },
     voter: {
       create: vi.fn(),
@@ -34,62 +38,52 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+vi.mock('@/lib/middleware/auth');
+
 describe('Voter API Endpoints (Integration)', () => {
   let validToken: string;
   let userId = 'test-user-123';
 
   beforeAll(async () => {
-    validToken = await generateToken({
-      userId,
-      email: 'test@example.com',
-      role: 'admin',
-    });
+    validToken = 'fake-token';
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (prisma.user.findUnique as Mock).mockResolvedValue({
-      id: userId,
-      email: 'test@example.com',
-      role: 'admin',
-    });
-    (prisma.session.findUnique as Mock).mockResolvedValue({
-      id: 'session-123',
-      userId,
-      token: validToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
+      isValid: true,
+      user: { userId, email: 'test@example.com', role: 'admin' },
+      response: null,
     });
   });
 
   describe('POST /api/v1/voters', () => {
     it('should create a new voter with valid data', async () => {
+      const person = {
+        id: 'person-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        middleName: null,
+        notes: null,
+      };
       const newVoter = {
         id: 'voter-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '555-1234',
-        address: '123 Main St',
-        notes: null,
-        contactStatus: 'pending',
         registrationDate: new Date(),
-        lastContactDate: null,
-        lastContactMethod: null,
-        votingPreference: null,
-        importedFrom: null,
+        personId: person.id,
         createdAt: new Date(),
         updatedAt: new Date(),
+        person,
       };
 
+      (prisma.person.create as Mock).mockResolvedValue(person);
       (prisma.voter.create as Mock).mockResolvedValue(newVoter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${validToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'John Doe',
-          email: 'john@example.com',
-          phone: '555-1234',
-          address: '123 Main St',
+          firstName: 'John',
+          lastName: 'Doe',
         }),
       });
 
@@ -97,31 +91,34 @@ describe('Voter API Endpoints (Integration)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(201);
-      expect(data.name).toBe('John Doe');
-      expect(data.email).toBe('john@example.com');
+      expect(data.person.firstName).toBe('John');
+      expect(data.person.lastName).toBe('Doe');
     });
 
     it('should return 400 if name is missing', async () => {
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${validToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'test@example.com' }),
+        body: JSON.stringify({ firstName: 'John' }),
       });
 
       const response = await createVoter(request);
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Name is required');
+      expect(data.error).toBe('First name and last name are required');
     });
 
     it('should return 401 if not authenticated', async () => {
-      (prisma.session.findUnique as Mock).mockResolvedValue(null);
+      vi.mocked(validateProtectedRoute).mockResolvedValue({
+        isValid: false,
+        response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
+      });
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'John Doe' }),
+        body: JSON.stringify({ firstName: 'John', lastName: 'Doe' }),
       });
 
       const response = await createVoter(request);
@@ -135,20 +132,14 @@ describe('Voter API Endpoints (Integration)', () => {
       const voters = [
         {
           id: 'voter-1',
-          name: 'John Doe',
-          email: 'john@example.com',
-          phone: '555-1234',
-          address: '123 Main St',
-          contactStatus: 'pending',
-          lastContactDate: null,
-          lastContactMethod: null,
+          person: {
+            id: 'person-1',
+            firstName: 'John',
+            lastName: 'Doe',
+          },
           createdAt: new Date(),
           updatedAt: new Date(),
-          notes: null,
           registrationDate: null,
-          votingPreference: null,
-          importedFrom: null,
-          contactLogs: [],
         },
       ];
 
@@ -175,20 +166,14 @@ describe('Voter API Endpoints (Integration)', () => {
       const voters = [
         {
           id: 'voter-1',
-          name: 'John Doe',
-          email: 'john@example.com',
-          phone: null,
-          address: null,
-          contactStatus: 'pending',
-          lastContactDate: null,
-          lastContactMethod: null,
+          person: {
+            id: 'person-1',
+            firstName: 'John',
+            lastName: 'Doe',
+          },
           createdAt: new Date(),
           updatedAt: new Date(),
-          notes: null,
           registrationDate: null,
-          votingPreference: null,
-          importedFrom: null,
-          contactLogs: [],
         },
       ];
 
@@ -212,17 +197,13 @@ describe('Voter API Endpoints (Integration)', () => {
     it('should retrieve a single voter with contact logs', async () => {
       const voter = {
         id: 'voter-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '555-1234',
-        address: '123 Main St',
-        notes: 'Notes here',
-        contactStatus: 'pending',
-        lastContactDate: null,
-        lastContactMethod: null,
+        person: {
+          id: 'person-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          notes: 'Notes here',
+        },
         registrationDate: new Date(),
-        votingPreference: null,
-        importedFrom: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         contactLogs: [
@@ -251,7 +232,7 @@ describe('Voter API Endpoints (Integration)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.name).toBe('John Doe');
+      expect(data.person.firstName).toBe('John');
       expect(data.contactLogs).toHaveLength(1);
     });
 
@@ -273,35 +254,39 @@ describe('Voter API Endpoints (Integration)', () => {
     it('should update voter details', async () => {
       const updatedVoter = {
         id: 'voter-1',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        phone: '555-5678',
-        address: '456 Oak St',
-        notes: 'Updated notes',
-        contactStatus: 'contacted',
-        lastContactDate: null,
-        lastContactMethod: null,
+        person: {
+          id: 'person-1',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          notes: 'Updated notes',
+        },
         registrationDate: new Date(),
-        votingPreference: null,
-        importedFrom: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        contactLogs: [],
       };
 
-      (prisma.voter.findUnique as Mock).mockResolvedValue(updatedVoter);
-      (prisma.voter.update as Mock).mockResolvedValue(updatedVoter);
+      const existingVoter = {
+        id: 'voter-1',
+        personId: 'person-1',
+        person: {
+          id: 'person-1',
+          firstName: 'John',
+          lastName: 'Doe',
+        },
+      };
+
+      (prisma.voter.findUnique as Mock)
+        .mockResolvedValueOnce(existingVoter)
+        .mockResolvedValueOnce(updatedVoter);
+      (prisma.person.update as Mock).mockResolvedValue(updatedVoter.person);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1'), {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${validToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Jane Doe',
-          email: 'jane@example.com',
-          phone: '555-5678',
-          address: '456 Oak St',
+          firstName: 'Jane',
+          lastName: 'Doe',
           notes: 'Updated notes',
-          contactStatus: 'contacted',
         }),
       });
 
@@ -309,7 +294,7 @@ describe('Voter API Endpoints (Integration)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.name).toBe('Jane Doe');
+      expect(data.person.firstName).toBe('Jane');
     });
   });
 
@@ -317,22 +302,13 @@ describe('Voter API Endpoints (Integration)', () => {
     it('should delete a voter and related records', async () => {
       const voter = {
         id: 'voter-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '555-1234',
-        address: '123 Main St',
-        notes: null,
-        contactStatus: 'pending',
-        lastContactDate: null,
-        lastContactMethod: null,
         registrationDate: new Date(),
-        votingPreference: null,
-        importedFrom: null,
+        personId: 'person-1',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      (prisma.voter.findUnique as Mock).mockResolvedValue(voter);
+      (prisma.voter.findUnique as Mock).mockResolvedValue({ personId: voter.personId });
       (prisma.contactLog.deleteMany as Mock).mockResolvedValue({ count: 0 });
       (prisma.voter.delete as Mock).mockResolvedValue(voter);
 
@@ -355,17 +331,8 @@ describe('Voter API Endpoints (Integration)', () => {
     it('should create a new contact log', async () => {
       const voter = {
         id: 'voter-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '555-1234',
-        address: '123 Main St',
-        notes: null,
-        contactStatus: 'pending',
-        lastContactDate: null,
-        lastContactMethod: null,
         registrationDate: new Date(),
-        votingPreference: null,
-        importedFrom: null,
+        personId: 'person-1',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -373,7 +340,7 @@ describe('Voter API Endpoints (Integration)', () => {
       const contactLog = {
         id: 'log-1',
         voterId: 'voter-1',
-        contactType: 'call',
+        method: 'call',
         outcome: 'contacted',
         notes: 'Had a good conversation',
         followUpNeeded: true,
@@ -382,7 +349,7 @@ describe('Voter API Endpoints (Integration)', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.voter.findUnique as Mock).mockResolvedValue(voter);
+      (prisma.voter.findUnique as Mock).mockResolvedValue({ person: { id: 'person-1' }, personId: 'person-1' });
       (prisma.contactLog.create as Mock).mockResolvedValue(contactLog);
       (prisma.voter.update as Mock).mockResolvedValue({ ...voter, lastContactDate: new Date() });
 
@@ -402,7 +369,7 @@ describe('Voter API Endpoints (Integration)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(201);
-      expect(data.contactType).toBe('call');
+      expect(data.method).toBe('call');
       expect(data.outcome).toBe('contacted');
     });
 
@@ -417,7 +384,7 @@ describe('Voter API Endpoints (Integration)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Contact type is required');
+      expect(data.error).toBe('Contact method is required');
     });
   });
 });
