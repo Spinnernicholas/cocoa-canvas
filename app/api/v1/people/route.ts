@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     const search = searchParams.get('search');
     const filter = searchParams.get('filter'); // 'all', 'voters', 'volunteers', 'donors'
-    const status = searchParams.get('status');
 
     // Build where clause
     const where: any = {};
@@ -42,9 +41,7 @@ export async function GET(request: NextRequest) {
       prisma.person.findMany({
         where,
         include: {
-          voter: status && status !== 'all' 
-            ? { where: { contactStatus: status }, include: { party: true, precinct: true } }
-            : { include: { party: true, precinct: true } },
+          voter: { include: { party: true, precinct: true } },
           volunteer: true,
           donor: true,
           contactInfo: {
@@ -64,16 +61,11 @@ export async function GET(request: NextRequest) {
       prisma.person.count({ where }),
     ]);
 
-    // Filter out people without voters if status filter is applied
-    const filteredPeople = status && status !== 'all'
-      ? people.filter(person => person.voter !== null)
-      : people;
-
     await auditLog(authResult.user?.userId || '', 'PEOPLE_LIST', request);
 
     return NextResponse.json({
-      people: filteredPeople,
-      total: status && status !== 'all' ? filteredPeople.length : total,
+      people,
+      total,
       limit,
       offset,
     });
