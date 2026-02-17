@@ -26,20 +26,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
       
       - name: Install dependencies
-        working-directory: ./cocoa-canvas
-        run: npm ci
+        run: cd cocoa-canvas && npm ci
       
       - name: Generate Prisma client
-        working-directory: ./cocoa-canvas
-        run: npm run prisma:generate
+        run: cd cocoa-canvas && npm run prisma:generate
       
       - name: Run linter
-        working-directory: ./cocoa-canvas
-        run: npm run lint
+        run: cd cocoa-canvas && npm run lint
       
       - name: Run tests with coverage
-        working-directory: ./cocoa-canvas
-        run: npm run test:ci
+        run: cd cocoa-canvas && npm run test:ci
       
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
