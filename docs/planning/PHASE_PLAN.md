@@ -6,7 +6,7 @@ Cocoa Canvas is built in 4 phases, each deployable and functional independently.
 
 **Core Principles**:
 - Non-destructive operations (no hard deletes, audit everything)
-- Incremental DB schema (Phase 1 ≠ full schema from DATABASE_SCHEMA.md)
+- Incremental DB schema (Phase 1 != full schema in the master schema doc)
 - Fully functional at each phase (not just scaffolding)
 - Clear "Definition of Done" for each phase
 
@@ -20,239 +20,11 @@ Cocoa Canvas is built in 4 phases, each deployable and functional independently.
 - Initial setup wizard (campaign/race info)
 - Job queue foundation for imports
 
-### Features to Build
+### Database Schema (Phase 1 + Phase 2)
 
-#### 1. Docker & Local Development
-```
-✓ Dockerfile with Next.js
-✓ docker-compose.yml (with PostgreSQL alt)
-✓ .env.example with all needed vars
-✓ One-command startup: docker-compose up
-✓ SQLite database auto-initialized
-✓ Health check endpoints
-```
+See the master schema reference for the current person-centric voter model and import metadata:
 
-#### 2. Authentication System
-```
-✓ User model in database
-✓ Local email/password auth (bcrypt hashing)
-✓ Session management (JWT tokens, 30min expiry)
-✓ Login page (simple form)
-✓ Logout functionality
-✓ Session persistence (secure cookie)
-✓ No OAuth yet (keep simple)
-```
-
-#### 3. Setup Wizard
-```
-✓ First-time admin account creation
-  - Email & password
-  - Admin name
-✓ Campaign/Race basic info
-  - Campaign name
-  - Start/end dates
-  - Target area (free text or precincts)
-  - (Survey templates deferred to Phase 2)
-```
-
-#### 4. Job Queue Foundation
-```
-✓ Simple job model (enqueued, processing, completed, failed)
-✓ Basic job runner (process jobs sequentially)
-✓ No complex orchestration - just DB + polling
-✓ Support for: import jobs, geocoding jobs (future)
-✓ Job status tracking with error logs
-```
-
-#### 5. Admin Dashboard (Minimal)
-```
-✓ After login: show dashboard
-✓ Display:
-  - Current campaign info
-  - Job queue status
-  - Import jobs list
-  - Quick links (settings, import data)
-```
-
-### Database Schema (Phase 1 Only)
-
-```prisma
-// prisma/schema.prisma - PHASE 1
-
-datasource db {
-  provider = "sqlite"  // Can switch to postgres in .env
-  url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-// ============================================================================
-// AUTHENTICATION
-// ============================================================================
-
-model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  passwordHash  String
-  isActive      Boolean   @default(true)
-  
-  // Session/login tracking
-  lastLogin     DateTime?
-  loginAttempts Int       @default(0)
-  lockedUntil   DateTime?
-  
-  // Relations
-  sessions      Session[]
-  auditLogs     AuditLog[]
-  jobsCreated   Job[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  @@index([email])
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  token     String   @unique
-  expiresAt DateTime
-  ipAddress String?
-  userAgent String?
-  
-  createdAt DateTime @default(now())
-  
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-// ============================================================================
-// CAMPAIGNS (Single-tenant, Cocoa County only in MVP)
-// ============================================================================
-
-model Campaign {
-  id          String    @id @default(cuid())
-  name        String    // e.g., "2024 Fall GOTV"
-  description String?   @db.Text
-  
-  // Timeline
-  startDate   DateTime
-  endDate     DateTime
-  status      String    @default("planning") // planning, active, paused, completed
-  
-  // Target area (simple text for Phase 1)
-  targetArea  String?   // "Precincts 01-12" or "Pleasanton zip 94588"
-  
-  // Metadata
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-// ============================================================================
-// JOB QUEUE (Generic async job tracking, used for imports in Phase 2+)
-// ============================================================================
-
-model Job {
-  id          String    @id @default(cuid())
-  
-  // Job metadata
-  type        String    // "import_voters", "geocode", "export", etc.
-  status      String    @default("pending") // pending, processing, completed, failed
-  
-  // Progress
-  totalItems  Int       @default(0)
-  processedItems Int    @default(0)
-  
-  // Error tracking
-  errorLog    String?   @db.Text  // JSON array of errors
-  
-  // Job-specific data (stored as JSON for flexibility)
-  data        Json?
-  // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
-  
-  // Timestamps
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
-  createdAt   DateTime  @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  
-  @@index([status])
-  @@index([type])
-  @@index([createdAt])
-}
-
-// ============================================================================
-// AUDIT LOGGING
-// ============================================================================
-
-model AuditLog {
-  id          String    @id @default(cuid())
-  
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  
-  action      String    // "login", "logout", "view_dashboard", "create_campaign", etc.
-  resource    String?   // "user", "campaign", "job", etc.
-  resourceId  String?
-  
-  details     String?   @db.Text // JSON for context
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime  @default(now())
-  
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-// ============================================================================
-// SETTINGS
-// ============================================================================
-
-model Setting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String   @db.Text // Can be JSON
-  
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-}
-```
-
-### API Endpoints (Phase 1)
-
-```
-Authentication:
-  POST   /api/v1/auth/setup           - Create admin account (one-time)
-  POST   /api/v1/auth/login           - Login
-  POST   /api/v1/auth/logout          - Logout
-  POST   /api/v1/auth/refresh         - Refresh token
-
-Setup Wizard:
-  POST   /api/v1/setup/campaign       - Create initial campaign
-
-Dashboard:
-  GET    /api/v1/dashboard            - Get dashboard data
-  GET    /api/v1/dashboard/jobs       - List recent jobs
-
-Jobs:
-  GET    /api/v1/jobs                 - List all jobs
-  GET    /api/v1/jobs/:id             - Get job status
-  GET    /api/v1/jobs/:id/progress    - Poll job progress
-```
-
-### UI Components (Phase 1)
-
-```
-Pages:
-  /login                  - Login form
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
   /setup                  - Admin setup wizard
   /dashboard              - Main dashboard (after login)
   
@@ -372,115 +144,9 @@ Data persistence:
 
 ### Database Schema (Phase 1 + Phase 2)
 
-```prisma
-// ADD to schema.prisma
+Schema details are maintained in the master reference:
 
-// ============================================================================
-// VOTER DATA
-// ============================================================================
-
-model Voter {
-  id            String    @id @default(cuid())
-  
-  // Voter identification
-  voterId       String?   @unique  // County voter ID
-  firstName     String
-  lastName      String
-  middleName    String?
-  suffix        String?
-  
-  // Address
-  address       String
-  city          String
-  state         String    @default("CA")
-  zip           String
-  phone         String?
-  email         String?
-  
-  // Registration info
-  status        String?   // active, inactive, removed
-  partyAffiliation String?
-  registrationDate DateTime?
-  
-  // Household grouping (link to other voters at same address, Phase 4)
-  householdGroupId String?
-  
-  // Import tracking (non-destructive)
-  sourceImportId String?
-  sourceImportJob Job? @relation(fields: [sourceImportId], references: [id])
-  
-  // Metadata
-  geocoded      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  @@index([lastName, firstName])
-  @@index([address, city, zip])
-  @@index([partyAffiliation])
-  @@index([status])
-}
-
-model ImportJob {
-  id            String    @id @default(cuid())
-  
-  title         String    // "Feb 2025 Voter File Import"
-  dataType      String    // "voter_file"
-  county        String    // "Contra Costa"
-  
-  // File info
-  fileName      String
-  fileHash      String    @unique  // Prevent re-import
-  fileSize      BigInt?
-  
-  // Results
-  status        String    @default("pending") // pending, processing, completed, failed, rolled_back
-  recordsProcessed Int    @default(0)
-  recordsInserted Int     @default(0)
-  recordsUpdated Int      @default(0)
-  recordsFailed Int       @default(0)
-  
-  // Error tracking
-  errorLog      String?   @db.Text  // JSON array
-  validationRules String?
-  
-  // Field mapping (for future phase)
-  fieldMapping  String?   @db.Text  // JSON
-  
-  // Relations
-  voters        Voter[]
-  createdById   String
-  createdBy     User      @relation(fields: [createdById], references: [id])
-  
-  // Timestamps
-  createdAt     DateTime  @default(now())
-  startedAt     DateTime?
-  completedAt   DateTime?
-  
-  @@index([status])
-  @@index([dataType])
-}
-
-// ============================================================================
-// VOTER NOTES (for Phase 2)
-// ============================================================================
-
-model VoterNote {
-  id          String    @id @default(cuid())
-  voterId     String
-  voter       Voter     @relation(fields: [voterId], references: [id], onDelete: Cascade)
-  
-  content     String    @db.Text
-  type        String?   // "contact", "followup", "note"
-  
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
-  
-  createdAt   DateTime  @default(now())
-  
-  @@index([voterId])
-  @@index([createdById])
-}
-```
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ### API Endpoints (Phase 2)
 
@@ -573,83 +239,9 @@ Components:
 
 ### Database Schema (Phase 1 + 2 + 3)
 
-```prisma
-// ADD to schema.prisma
+Planned geospatial models are tracked in planning but are not in the current schema. Use the master schema as the source of truth:
 
-// ============================================================================
-// GEOGRAPHIC DATA
-// ============================================================================
-
-model GeoJsonFeature {
-  id          String    @id @default(cuid())
-  
-  // Feature identification
-  name        String    // e.g., "Precinct 01-12"
-  featureType String    // "precinct", "parcel", "neighborhood"
-  
-  // Geometry (stored as GeoJSON text)
-  geometry    String    @db.Text // WKT or GeoJSON
-  geometryType String // "Polygon", "Point", "MultiPolygon"
-  
-  // Centroid (for quick queries)
-  centroidLat Float?
-  centroidLon Float?
-  
-  // Properties from GeoJSON
-  properties  String?   @db.Text  // JSON
-  
-  // Import tracking
-  importJobId String?
-  importJob   ImportJob? @relation(fields: [importJobId], references: [id])
-  
-  createdAt   DateTime  @default(now())
-  
-  @@index([featureType])
-  @@index([name])
-}
-
-model GeocodingJob {
-  id          String    @id @default(cuid())
-  
-  status      String    @default("pending") // pending, processing, completed
-  
-  // Scope
-  voterCount  Int
-  votersProcessed Int @default(0)
-  votersGeocoded Int @default(0)
-  votersFailed Int @default(0)
-  
-  // Fallback source
-  useParcelCentroid Boolean @default(true)
-  
-  // Error tracking
-  errorLog    String?   @db.Text
-  
-  // Timestamps
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
-  createdAt   DateTime  @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  
-  @@index([status])
-}
-
-// ADD to Voter model:
-model Voter {
-  // ... existing fields ...
-  
-  // Spatial data
-  latitude    Float?
-  longitude   Float?
-  geocodedAt  DateTime?
-  precinct    String?  // Link to precinct name/ID
-  parcelId    String?  // Link to parcel GeoJSON feature
-  
-  // Add relations:
-  parcel      GeoJsonFeature? @relation(fields: [parcelId], references: [id])
-}
-```
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ### API Endpoints (Phase 3)
 
@@ -713,40 +305,9 @@ Geographic:
 
 ### Database Schema (Final MVP)
 
-```prisma
-// ADD to schema.prisma
+Household and address grouping exist in the current schema. See the master schema for details:
 
-model Household {
-  id          String    @id @default(cuid())
-  
-  // Address
-  address     String
-  city        String
-  zip         String
-  
-  // Residents
-  voters      Voter[]
-  
-  // Spatial
-  latitude    Float?
-  longitude   Float?
-  centroidLat Float?
-  centroidLon Float?
-  
-  createdAt   DateTime  @default(now())
-  
-  @@unique([address, city, zip])
-  @@index([address])
-}
-
-// ADD to Voter model:
-model Voter {
-  // ... existing fields ...
-  
-  householdId String?
-  household   Household? @relation(fields: [householdId], references: [id])
-}
-```
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ### API Endpoints (Phase 4)
 
@@ -1002,7 +563,8 @@ mkdir -p prisma lib/db lib/auth lib/job app/api app/components
 npm install @prisma/client
 npx prisma init
 
-# Update schema.prisma with Phase 1 schema (see above)
+# Update schema.prisma using the master schema reference
+# See docs/developer/DATABASE_SCHEMA_MASTER.md
 # Configure DATABASE_URL in .env.local
 
 # Run migrations

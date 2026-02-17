@@ -22,7 +22,7 @@ The job queue system in cocoa-canvas is **working correctly**. All core features
 ## Architecture Overview
 
 ### Database Model
-The `Job` table in [prisma/schema.prisma](prisma/schema.prisma) provides:
+The `Job` table in [Master Database Schema](DATABASE_SCHEMA_MASTER.md) provides:
 - **Core Fields**: id, type, status, data
 - **Progress Tracking**: totalItems, processedItems
 - **Error Management**: errorLog (JSON array of errors)

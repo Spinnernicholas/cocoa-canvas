@@ -12,7 +12,7 @@ All core functionality implemented, tested, and working. See below for completed
 
 - [x] Docker Compose setup (SQLite dev, PostgreSQL prod)
 - [x] Next.js 14 + TypeScript scaffolding
-- [x] Prisma ORM with Phase 1 schema (6 tables)
+- [x] Prisma ORM with core Phase 1 schema (see [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md))
 - [x] Health check endpoint (`GET /api/health`)
 - [x] Dev/prod mode support
 - [x] Quick start documentation

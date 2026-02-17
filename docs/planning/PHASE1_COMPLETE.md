@@ -149,7 +149,7 @@ See [PHASE2_PLAN.md](PHASE2_PLAN.md) for detailed Phase 2 specifications.
 - `components/LoginForm.tsx` - Login form
 
 ### Database
-- `prisma/schema.prisma` - Database schema
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 - `lib/prisma.ts` - Prisma client singleton
 
 ### Tests
@@ -214,7 +214,7 @@ npx prisma studio
 - [Phase 2 Plan](PHASE2_PLAN.md) (Next)
 - [Phase 3 Plan](PHASE3_PLAN.md) (Future)
 - [API Documentation](API_PLAN.md)
-- [Database Schema](DATABASE_SCHEMA.md)
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ---
 

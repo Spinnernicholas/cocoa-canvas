@@ -10,46 +10,9 @@ Phase 2 successfully implements a complete voter management system with database
 
 ## Database Schema
 
-### New Models Added
+Schema details are maintained in the master reference:
 
-#### Voter Model
-- **Fields**: 15 total
-  - `id` (String, PK)
-  - `name` (String, indexed)
-  - `email` (String, unique, indexed)
-  - `phone` (String, unique, indexed)
-  - `address` (String, optional)
-  - `notes` (String, optional)
-  - `contactStatus` (String, indexed) - pending|attempted|contacted|refused|unreachable|moved
-  - `lastContactDate` (DateTime, optional)
-  - `lastContactMethod` (String, optional) - call|email|door|sms
-  - `registrationDate` (DateTime, optional)
-  - `votingPreference` (String, optional)
-  - `importedFrom` (String, optional) - source tracking
-  - `createdAt`, `updatedAt` (DateTime)
-- **Relations**: contactLogs, campaigns (via CampaignVoter)
-
-#### ContactLog Model
-- **Fields**: 8 total
-  - `id` (String, PK)
-  - `voterId` (String, FK, indexed)
-  - `contactType` (String) - call|email|door|sms
-  - `outcome` (String, optional) - contacted|refused|not_home|no_answer|moved|invalid
-  - `notes` (String, optional)
-  - `followUpNeeded` (Boolean)
-  - `followUpDate` (DateTime, optional)
-  - `createdAt`, `updatedAt` (DateTime)
-- **Relations**: voter
-
-#### CampaignVoter Model
-- **Fields**: Junction table for many-to-many relationship
-  - `id` (String, PK)
-  - `campaignId` (String, FK, indexed)
-  - `voterId` (String, FK, indexed)
-  - `assigned` (Boolean)
-  - `assignedAt` (DateTime)
-  - Unique constraint on [campaignId, voterId]
-- **Relations**: campaign, voter
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ## API Endpoints (7 Total)
 
@@ -216,7 +179,7 @@ Phase 2 successfully implements a complete voter management system with database
 - `app/api/v1/voters.test.ts` - Test suite
 
 ### Modified Files (1)
-- `prisma/schema.prisma` - Added Voter, CampaignVoter, ContactLog models
+- See [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md) for schema details
 
 ## Performance Metrics
 

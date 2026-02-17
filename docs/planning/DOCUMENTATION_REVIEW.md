@@ -41,18 +41,18 @@
 | PROJECT_PLAN | "NextAuth or similar" | Medium (mentions OAuth) |
 | AUTH_SECURITY_PLAN | "NextAuth.js v5" (detailed) | High (LDAP, MFA, OAuth) |
 | PHASE_PLAN Phase 1 | "Local email/password auth" | Low (just bcrypt) |
-| DATABASE_SCHEMA | Full User/Role/Permission/Session | High |
+| Master Database Schema | User/Session/Audit only | Low |
 
 **Issue**: 
 - AUTH_SECURITY_PLAN describes production-ready multi-auth system
 - PHASE_PLAN shows minimal Phase 1 auth (just login/logout)
-- DATABASE_SCHEMA has full User model (but PHASE_PLAN Phase 1 schema is simpler)
+- Master Database Schema reflects the current models (no RBAC yet)
 
 **Recommendation**:
 - ✓ Keep AUTH_SECURITY_PLAN as the "full vision"
 - ✓ PHASE_PLAN Phase 1 is correct (minimal auth)
 - ⚠️ Add note to AUTH_SECURITY_PLAN: "Phase 1 starts with local auth, OAuth/MFA added in Phase 2+"
-- ✓ Clarify DATABASE_SCHEMA.md that this is the "end-state schema," not Phase 1
+- ✓ Schema references consolidated in the master schema doc
 
 ---
 
@@ -62,30 +62,17 @@
 |----------|------------|
 | PHASE_PLAN Phase 1 | `Job` (general queue) |
 | PHASE_PLAN Phase 2 | `ImportJob` (voter imports) |
-| DATABASE_SCHEMA | `Job` + `ImportJob` (separate) |
+| Master Database Schema | Current job models |
 | API_PLAN | `/api/v1/imports/:jobId` |
 
 **Issue**: 
 - PHASE_PLAN Phase 1 has generic `Job` model for all job types
 - PHASE_PLAN Phase 2 suddenly uses `ImportJob` instead
-- DATABASE_SCHEMA has both (confusing)
+- Master Database Schema is the source of truth for job models
 
 **Recommendation**:
-- Consolidate: Use single `ImportJob` from Phase 2 onwards
-- Phase 1 `Job` can be renamed to `AsyncJob` or just simplified away (use ImportJob from start)
-- Update DATABASE_SCHEMA to remove generic `Job`, keep `ImportJob` only
-- Makes API clearer: `/api/v1/imports/:jobId` → single concept
-
-**Proposed**: 
-```prisma
-// Phase 1 & beyond: Just ImportJob
-model ImportJob {
-  id        String @id @default(cuid())
-  type      String // "voter_file", "geojson", "processed_data"
-  status    String // "pending", "processing", "completed", "failed"
-  // ... rest of fields
-}
-```
+- Keep PHASE_PLAN aligned with the master schema doc for job model naming
+- Use API_PLAN to define endpoint naming and avoid model drift
 
 ---
 
@@ -95,7 +82,7 @@ model ImportJob {
 |----------|------------|-------|
 | DATA_INGESTION_PLAN | 20+ fields (full model) | Phase 2? |
 | PHASE_PLAN Phase 2 Schema | 15 fields (simpler) | Phase 2 |
-| DATABASE_SCHEMA | 30+ fields (complete) | Full schema |
+| Master Database Schema | Current voter fields | Full schema |
 
 **Issue**: 
 - Different docs show different field counts
@@ -107,122 +94,17 @@ model ImportJob {
   - **Phase 3**: Add latitude, longitude, geocoded, precinct, parcelId
   - **Phase 4**: Add householdId
 - Create "Voter Model Evolution" section in PHASE_PLAN
-- Keep DATABASE_SCHEMA as reference (end-state)
+- Use the master schema doc as the reference for current fields
 
 ---
 
-### 5. **RBAC TIMING UNCLEAR**
+### 5. **Schema Consolidation Status**
 
-| Document | When RBAC? | Complexity |
-|----------|-----------|-----------|
-| PROJECT_PLAN | Not mentioned | - |
-| AUTH_SECURITY_PLAN | Phase 1+ (5 roles: admin, manager, canvasser, viewer, auditor) | High |
-| PHASE_PLAN Phase 1 | Just "admin account" | Low |
-| DATABASE_SCHEMA | Full Role/Permission models | High |
+Schema definitions are now centralized in the master schema document:
 
-**Issue**: 
-- AUTH_SECURITY_PLAN suggests RBAC from the start
-- PHASE_PLAN Phase 1 only has one admin
-- Not clear when to introduce manager/canvasser/viewer roles
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
-**Recommendation**:
-- **Phase 1**: Single admin user (no RBAC needed yet)
-- **Phase 2**: Add canvassers + manager role when imports happen
-- **Phase 3+**: Add viewer/auditor roles for data analysis
-- Update AUTH_SECURITY_PLAN with phase timeline
-- Update DATABASE_SCHEMA: RBAC models optional until Phase 2
-
----
-
-### 6. **CAMPAIGN & SURVEY FEATURES TIMING**
-
-| Document | Campaign Info | Survey Template? |
-|----------|--------------|-----------------|
-| PHASE_PLAN Phase 1 | Setup wizard creates campaign | Mentions "survey template selection" |
-| PHASE_PLAN Phase 2 | Voter import phase | No survey work mentioned |
-| PHASE_PLAN Phase 4 | Mentions canvassing responses | Implies surveys exist |
-| DATABASE_SCHEMA | CampaignSurvey, SurveyQuestion models | Full survey system |
-| API_PLAN | Campaign API + survey endpoints | Assumes surveys exist |
-
-**Issue**: 
-- PHASE_PLAN Phase 1 mentions "survey template selection" but surveys aren't built
-- No clear phase for when surveys are implemented
-- DATABASE_SCHEMA shows survey system but PHASE_PLAN doesn't indicate when it's built
-
-**Recommendation**:
-- **Phase 1**: Create campaign with basic info (name, dates, area), NO surveys yet
-- **Phase 2**: Add survey template selection + basic survey creation
-- **Phase 4 (MVP)**: Canvassing with survey responses
-- Remove "survey template selection" from PHASE_PLAN Phase 1 wizard
-- Add survey creation to PHASE_PLAN Phase 2 or add Phase 2.5
-
----
-
-### 7. **ORGANIZATION MODEL - SCOPE UNCLEAR**
-
-| Document | Organization Model | When? |
-|----------|------------------|-------|
-| DATABASE_SCHEMA | Yes (for multi-tenancy) | Not specified |
-| PHASE_PLAN Phase 1 | Yes (admin creates org in setup wizard) | Phase 1 |
-| AUTH_SECURITY_PLAN | Mentions organizationId for future multi-tenancy | Not MVP |
-| PROJECT_PLAN | "Built by and for the Cocoa County community" | Single org implied |
-
-**Issue**: 
-- Is this a multi-tenant SaaS (multiple orgs) or single-tenant (Cocoa County only)?
-- PHASE_PLAN Phase 1 creates Organization but not used elsewhere
-- AUTH_SECURITY_PLAN treats multi-tenancy as "future"
-
-**Recommendation**:
-- **For MVP (Phase 4)**: Single tenant (Cocoa County), remove Organization model
-- **Future (Phase 5+)**: Add multi-tenancy with Organization model
-- Simplify PHASE_PLAN Phase 1 setup wizard: just admin email/password, skip organization name
-- Update DATABASE_SCHEMA to note Organization is optional/future
-
----
-
-### 8. **TEAM MODEL - PURPOSE UNCLEAR**
-
-| Document | Team Model | Used For? |
-|----------|-----------|-----------|
-| DATABASE_SCHEMA | Yes (Team with teamLead + members) | Organizing canvassers |
-| PHASE_PLAN | Not mentioned in any phase | - |
-| AUTH_SECURITY_PLAN | Not mentioned | - |
-| API_PLAN | Not mentioned | - |
-
-**Issue**: 
-- Team model exists in schema but not planned in phases
-- Not clear if teams are Phase 1, 2, or later
-
-**Recommendation**:
-- Either: Add Team management to PHASE_PLAN (suggest Phase 2)
-- Or: Remove from DATABASE_SCHEMA for MVP (Phase 4), add in Phase 5
-- For MVP: Simple 1:1 canvasser→voter assignment, no team concept
-- Update all docs to clarify scope
-
----
-
-### 9. **IMPORT MODEL SEPARATION CONFUSION**
-
-Looking at PHASE_PLAN and DATABASE_SCHEMA, there are two different approaches to tracking imports:
-
-**PHASE_PLAN Phase 1**: Generic `Job` model for all async work
-```prisma
-model Job {
-  type  String // "import_voters", "geocode", etc.
-}
-```
-
-**PHASE_PLAN Phase 2 onwards**: Specific `ImportJob` model
-```prisma
-model ImportJob {
-  dataType String // "voter_file", "geojson"
-}
-```
-
-**Recommendation**:
-- Use `ImportJob` from Phase 1 for consistency
-- Later phases add `GeocodingJob` if needed, not generic `Job`
-- Single concept: all jobs are typed imports/operations
+Any future model changes should be documented there first, and then referenced by planning docs.
 
 ---
 
@@ -255,7 +137,7 @@ model ImportJob {
 | Document | Phase 1 Setup Wizard Does | Reality |
 |----------|--------------------------|---------|
 | PHASE_PLAN | Create admin, org name, campaign, survey template | Too much for Phase 1 |
-| DATABASE_SCHEMA | - | Campaign model exists in Phase 1 |
+| Master Database Schema | - | Campaign model exists in Phase 1 |
 | API_PLAN | POST /setup/campaign | Implies campaign setup exists |
 
 **Issue**: 
@@ -300,7 +182,7 @@ model ImportJob {
 
 ### 2. Voter ID Field Naming
 - DATA_INGESTION_PLAN: `voterId` 
-- DATABASE_SCHEMA: `voterId`
+- Master Database Schema: `voterId`
 - API_PLAN: `voter_id` (in JSON)
 
 **Effect**: Low - standard JSON snake_case vs DB camelCase
@@ -391,12 +273,9 @@ model ImportJob {
 - [ ] Clarify RBAC timeline (Phase 1: admin only, Phase 2: add roles)
 - [ ] Add "Schema Stratification" showing which tables per phase
 
-### DATABASE_SCHEMA.md
-- [ ] Add comment above each model: "Available in Phase X"
-- [ ] Remove Organization model (or mark as Phase 5+)
-- [ ] Remove Team model (or mark as Phase 5+)
-- [ ] Consolidate Job models (remove generic Job, keep ImportJob)
-- [ ] Add note: "This is end-state schema. See PHASE_PLAN for incremental phases."
+### Master Database Schema
+- [ ] Keep the master schema doc updated when Prisma models change
+- [ ] Add phase timing notes only when models are introduced
 
 ### API_PLAN.md
 - [ ] Add phase markers to each endpoint section
@@ -418,46 +297,23 @@ model ImportJob {
 
 Before implementing, confirm these decisions:
 
-1. **Single-tenant or Multi-tenant?**
-   - Recommendation: Single (Cocoa County) for MVP, multi-tenant Phase 5+
-   - Affects: Organization model, setup wizard, database structure
-
-2. **Teams in MVP?**
-   - Recommendation: No teams, just canvasser→voter assignment for Phase 4, add teams Phase 5+
-   - Affects: DATABASE_SCHEMA, Phase 1 features
-
-3. **Surveys in Phase 1 or 2?**
+1. **Surveys in Phase 1 or 2?**
    - Recommendation: Phase 2 (simplified) + Phase 4 (full with responses)
    - Affects: Setup wizard, campaign features
 
-4. **RBAC complexity?**
+2. **RBAC complexity?**
    - Recommendation: Phase 1 = admin only, Phase 2+ add roles
    - Affects: Auth implementation, API protection
-
-5. **Job model name?**
-   - Recommendation: Always "ImportJob" (not generic "Job")
-   - Affects: DATABASE_SCHEMA, API_PLAN, PHASE_PLAN
 
 ---
 
 ## Consolidated Recommendations
 
-### Go With These 5 Changes:
+### Go With These Changes:
 
-1. **Consolidate Job model**: Use `ImportJob` from Phase 1
-2. **Simplify Phase 1 setup wizard**: Remove surveys, organizations
-3. **Move map to Phase 4**: Update PROJECT_PLAN
-4. **Add phase annotations everywhere**: Mark all features/models/endpoints by phase
-5. **Single-tenant for MVP**: Remove multi-org support from Phase 1-4
-
-### Updated Scope:
-
-| Phase | Duration | DB Tables | MVP? |
-|-------|----------|-----------|------|
-| 1 | 2 weeks | 7 (User, Session, Campaign, ImportJob, AuditLog) | No |
-| 2 | 2 weeks | +3 (Voter, VoterNote, ImportJob tracking) | No |
-| 3 | 2 weeks | +2 (GeoJsonFeature, GeocodingJob) | No |
-| 4 (MVP) | 2 weeks | +1 (Household) | **Yes** |
+1. **Move map to Phase 4**: Update PROJECT_PLAN
+2. **Add phase annotations everywhere**: Mark all features and endpoints by phase
+3. **Keep schema references centralized**: Use the master schema document
 
 ---
 

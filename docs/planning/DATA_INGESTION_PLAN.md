@@ -114,140 +114,9 @@ volunteer_interest  → custom_field:volunteer_interest
 
 ## Database Schema for Data Ingestion
 
-```prisma
-// Core voter data
-model Voter {
-  id              String    @id @default(cuid())
-  
-  // from raw county file
-  voterId         String?   @unique  // County voter ID
-  firstName       String
-  lastName        String
-  address         String
-  addressAlt      String?
-  city            String
-  state           String   @default("CA")
-  zip             String
-  
-  // Voter registration info
-  registrationDate DateTime?
-  status          String?   // active, inactive, removed
-  party           String?   // party affiliation
-  county          String    // Contra Costa, etc.
-  precinct        String?
-  district        String?
-  
-  // Spatial data (if geocoded)
-  latitude        Float?
-  longitude       Float?
-  
-  // Custom fields (from processed data imports)
-  customFields    Json?     // { engagement_score: 8, volunteer: true, ... }
-  
-  // Relations
-  assignments     Assignment[]
-  canvassResponses CanvassResponse[]
-  
-  // Audit
-  source          String?   // which import file
-  sourceVersion   Int       @default(1)  // track updates
-  lastUpdated     DateTime  @updatedAt
-  createdAt       DateTime  @default(now())
-  
-  @@index([voterId])
-  @@index([lastName, firstName])
-  @@index([address, city, zip])
-  @@index([precinct])
-  @@index([county])
-  @@fulltext([lastName, firstName, address])  // for search
-}
+Schema details for imports are maintained in the master reference:
 
-model ImportJob {
-  id              String    @id @default(cuid())
-  
-  // Job metadata
-  title           String    // User-friendly name
-  dataType        String    // voter_file, processed_data, geojson
-  county          String?   // Contra Costa, San Mateo, etc.
-  fileName        String
-  fileHash        String    @unique  // Prevent re-import of same file
-  
-  // Import details
-  status          String    // pending, processing, completed, failed, rolled_back
-  recordsProcessed Int      @default(0)
-  recordsInserted Int       @default(0)
-  recordsUpdated  Int       @default(0)
-  recordsSkipped  Int       @default(0)
-  recordsFailed   Int       @default(0)
-  
-  // Errors
-  errorLog        Json?     // { errors: [{ row, field, message }, ...] }
-  validationRule  String?   // Validation profile used
-  
-  // Field mapping (for processed data)
-  fieldMapping    Json?     // { file_column: voter_field, ... }
-  
-  // Relations
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  
-  // Audit
-  createdAt       DateTime  @default(now())
-  completedAt     DateTime?
-  
-  @@index([userId])
-  @@index([status])
-  @@index([dataType])
-}
-
-model GeoJsonFeature {
-  id              String    @id @default(cuid())
-  
-  // Feature data
-  name            String    // Feature name (precinct 01, parcel ABC123, etc.)
-  featureType     String    // precinct, parcel, neighborhood, district
-  geometry        String    @db.Text  // GeoJSON geometry as JSON
-  properties      Json      // All GeoJSON @properties
-  
-  // Spatial indexing (if using PostGIS)
-  // spatialIndex   Geometry? @db.Geometry("Point", 4326)?
-  
-  // Related records
-  precinct        String?   // Normalized precinct ID if available
-  
-  // Metadata
-  importJobId     String
-  importJob       ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime  @default(now())
-  
-  @@index([featureType])
-  @@index([precinct])
-  @@index([importJobId])
-}
-
-model ImportMapping {
-  id              String    @id @default(cuid())
-  
-  // Template for reusable mappings
-  name            String    // "Contra Costa Voter File", "Our Custom CSV", etc.
-  dataType        String    // voter_file, csv, geojson
-  source          String?   // "contra_costa", "custom_org", etc.
-  
-  // Mapping configuration
-  mapping         Json      // { fileName: { headers: [...], fields: {...}, ... } }
-  
-  // Validation rules
-  requiredFields  String[]  // Fields that must be present
-  fieldTypes      Json?     // { first_name: "string", dob: "date", ... }
-  defaultValues   Json?     // { state: "CA", status: "active" }
-  
-  // Usage
-  createdBy       String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-```
+- [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 ---
 
@@ -776,7 +645,7 @@ components/FieldMappingStep.tsx
 components/PreviewStep.tsx
 
 # 4. Wire up database schema
-prisma/schema.prisma (ImportJob, GeoJsonFeature, ImportMapping)
+See [Master Database Schema](../developer/DATABASE_SCHEMA_MASTER.md)
 
 # 5. Manual testing with sample file
 ```

@@ -235,7 +235,7 @@ Cocoa County/cocoa-canvas/
 **PHASE_PLAN.md is the implementation authority.**
 
 All other planning documents serve as reference:
-- **DATABASE_SCHEMA.md**: End-state schema (see PHASE_PLAN for incremental phases)
+- **Master Database Schema**: Developer schema reference (see [DATABASE_SCHEMA_MASTER.md](../developer/DATABASE_SCHEMA_MASTER.md))
 - **API_PLAN.md**: Full API design (see PHASE_PLAN for which endpoints per phase)
 - **AUTH_SECURITY_PLAN.md**: Full vision (Phase 1 starts minimal, OAuth/MFA/LDAP in later phases)
 - **DATA_INGESTION_PLAN.md**: Design reference (Phase 2 starts with voter files)

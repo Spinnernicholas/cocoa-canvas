@@ -5,36 +5,11 @@ Implemented comprehensive voter data management with support for different file 
 
 ## Database Schema Changes
 
-### Models Updated/Added
+Schema definitions are centralized in the master reference:
 
-1. **Voter Model** (Enhanced)
-   - External identifiers: `externalId`, `externalVoterId`
-   - Name components: `title`, `firstName`, `middleName`, `lastName`, `nameSuffix`
-   - Demographics: `gender`, `birthDate`, `birthPlace`
-   - Registration info: `registrationDate`, `partyAffiliation`, `partyAbbreviation`, `language`
-   - Voting status: `vbmStatus`, `statusReason`
-   - Geographic: `precinctId`, `precinctName`
-   - Import metadata: `importSource`, `importType`, `importFormat`, `importedAt`
+- [Master Database Schema](DATABASE_SCHEMA_MASTER.md)
 
-2. **Location Model** (New)
-   - Standardized location types for contact information
-   - Seeded with: Home, Work, Cell, Mailing, Residence
-   - Allows for flexible contact organization
-
-3. **ContactInfo Model** (New)
-   - Links contact details to voters with location context
-   - Supports addresses, phone numbers, and emails
-   - Address components: `houseNumber`, `preDirection`, `streetName`, `streetSuffix`, `postDirection`, `unitAbbr`, `unitNumber`, `city`, `state`, `zipCode`
-   - Phone: `phone`, `phoneType`
-   - Email: `email`
-   - Verification: `isVerified`, `isPrimary`
-
-4. **VoteHistory Model** (New)
-   - Tracks election participation
-   - Election details: `electionAbbr`, `electionDesc`, `electionDate`, `electionType`
-   - Ballot info: `ballotPartyName`, `ballotPartyAbbr`, `ballotCounted`
-   - Voting method: `votingMethod`
-   - District info: `districtId`, `subDistrict`, `districtName`
+This importer targets the person-centric model (`Person` + `Voter`) and normalized contact tables (`Address`, `Phone`, `Email`) with lookup tables for `Party` and `Precinct`.
 
 ## File Format Support
 
@@ -205,7 +180,7 @@ Build Status: ✅ Successful
 
 ## Documentation
 
-- README updated with new schema
+- Master Database Schema updated
 - Python analysis scripts documented
 - Seed scripts include inline documentation
 - This implementation summary
