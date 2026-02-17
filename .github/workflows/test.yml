@@ -29,6 +29,10 @@ jobs:
         working-directory: ./cocoa-canvas
         run: npm ci
       
+      - name: Generate Prisma client
+        working-directory: ./cocoa-canvas
+        run: npm run prisma:generate
+      
       - name: Run linter
         working-directory: ./cocoa-canvas
         run: npm run lint
