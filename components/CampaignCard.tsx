@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 interface CampaignCardProps {
   name?: string;
   startDate?: string;
@@ -79,9 +81,9 @@ export default function CampaignCard({
       </div>
 
       <div className="mt-4 pt-4 border-t border-cocoa-200 dark:border-cocoa-700">
-        <button className="text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 text-sm font-medium transition-colors">
+        <Link href="/campaign" className="text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 text-sm font-medium transition-colors">
           Manage Campaign →
-        </button>
+        </Link>
       </div>
     </div>
   );
