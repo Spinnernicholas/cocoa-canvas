@@ -350,6 +350,6 @@ When deploying a new instance for a new campaign:
 
 ## References
 
-- [PHASE2_COMPLETE.md](../PHASE2_COMPLETE.md) - Voter management system
+- [PHASE2_COMPLETE.md](../planning/PHASE2_COMPLETE.md) - Voter management system
 - [Database Schema](../prisma/schema.prisma) - Full Prisma schema
-- [Setup Documentation](../AUTO_SETUP.md) - Initial deployment
+- [Setup Documentation](../admin/AUTO_SETUP.md) - Initial deployment

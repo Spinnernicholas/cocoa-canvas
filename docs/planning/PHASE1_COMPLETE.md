@@ -208,13 +208,13 @@ npx prisma studio
 
 ## 📝 Documentation
 
-- [Quick Start Guide](QUICK_START.md)
-- [Docker Setup](DOCKER_SETUP.md)
+- [Quick Start Guide](../QUICK_START.md)
+- [Docker Setup](../admin/DOCKER_SETUP.md)
 - [Phase 1 Checklist](PHASE1_CHECKLIST.md) (✅ Complete)
 - [Phase 2 Plan](PHASE2_PLAN.md) (Next)
 - [Phase 3 Plan](PHASE3_PLAN.md) (Future)
-- [API Documentation](planning/API_PLAN.md)
-- [Database Schema](planning/DATABASE_SCHEMA.md)
+- [API Documentation](API_PLAN.md)
+- [Database Schema](DATABASE_SCHEMA.md)
 
 ---
 

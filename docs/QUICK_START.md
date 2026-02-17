@@ -112,12 +112,12 @@ npm install
 ## 🚀 Next Steps
 
 - Read [planning/PHASE_PLAN.md](planning/PHASE_PLAN.md) to understand what comes next
-- Check [DOCKER_SETUP.md](DOCKER_SETUP.md) for production deployment with Docker
+- Check [admin/DOCKER_SETUP.md](admin/DOCKER_SETUP.md) for production deployment with Docker
 - Start implementing Phase 1 features! See [planning/API_PLAN.md](planning/API_PLAN.md)
 
 ## 🐳 Production Deployment
 
-For production, use Docker. See [DOCKER_SETUP.md](DOCKER_SETUP.md) for details:
+For production, use Docker. See [admin/DOCKER_SETUP.md](admin/DOCKER_SETUP.md) for details:
 
 ```bash
 docker-compose up -d
@@ -126,7 +126,7 @@ docker-compose up -d
 ## 💬 Need Help?
 
 - Check existing GitHub issues
-- Look at the planning docs in the `planning/` folder
+- Look at the planning docs in the `docs/planning/` folder
 - Ask in discussions (coming soon)
 
 ---

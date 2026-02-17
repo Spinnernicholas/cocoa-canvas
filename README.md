@@ -17,7 +17,7 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 ## 🚀 Quick Start
 
-**New to the project?** Start here: [**QUICK_START.md**](QUICK_START.md) (5 minutes to running locally)
+**New to the project?** Start here: [**QUICK_START.md**](docs/QUICK_START.md) (5 minutes to running locally)
 
 **Local Development:**
 ```bash
@@ -38,7 +38,7 @@ ADMIN_PASSWORD=SecurePass123!
 ADMIN_NAME=Administrator
 ```
 
-See [DOCKER_SETUP.md](DOCKER_SETUP.md) for production configuration and [AUTO_SETUP.md](AUTO_SETUP.md) for detailed auto-setup documentation.
+See [DOCKER_SETUP.md](docs/admin/DOCKER_SETUP.md) for production configuration and [AUTO_SETUP.md](docs/admin/AUTO_SETUP.md) for detailed auto-setup documentation.
 
 ## 🏗️ Stack
 
@@ -59,15 +59,15 @@ Cocoa Canvas is built in 4 phases over 8 weeks to MVP:
 
 ## 📚 Documentation
 
-All planning and architectural documentation lives in the [`planning/`](planning/) directory:
+All planning and architectural documentation lives in the [`docs/planning/`](docs/planning/) directory:
 
-- **[PROJECT_PLAN.md](planning/PROJECT_PLAN.md)** - Vision, tech stack, deployment scenarios
-- **[PHASE_PLAN.md](planning/PHASE_PLAN.md)** - Detailed 4-phase implementation roadmap (START HERE)
-- **[DATABASE_SCHEMA.md](planning/DATABASE_SCHEMA.md)** - Complete Prisma schema design
-- **[API_PLAN.md](planning/API_PLAN.md)** - REST API specification (50+ endpoints)
-- **[AUTH_SECURITY_PLAN.md](planning/AUTH_SECURITY_PLAN.md)** - Authentication & security design
-- **[DATA_INGESTION_PLAN.md](planning/DATA_INGESTION_PLAN.md)** - Data import strategy
-- **[MAP_DISPLAY_PLAN.md](planning/MAP_DISPLAY_PLAN.md)** - Interactive mapping features
+- **[PROJECT_PLAN.md](docs/planning/PROJECT_PLAN.md)** - Vision, tech stack, deployment scenarios
+- **[PHASE_PLAN.md](docs/planning/PHASE_PLAN.md)** - Detailed 4-phase implementation roadmap (START HERE)
+- **[DATABASE_SCHEMA.md](docs/planning/DATABASE_SCHEMA.md)** - Complete Prisma schema design
+- **[API_PLAN.md](docs/planning/API_PLAN.md)** - REST API specification (50+ endpoints)
+- **[AUTH_SECURITY_PLAN.md](docs/planning/AUTH_SECURITY_PLAN.md)** - Authentication & security design
+- **[DATA_INGESTION_PLAN.md](docs/planning/DATA_INGESTION_PLAN.md)** - Data import strategy
+- **[MAP_DISPLAY_PLAN.md](docs/planning/MAP_DISPLAY_PLAN.md)** - Interactive mapping features
 
 ## 🔒 Non-Destructive by Design
 
@@ -90,4 +90,4 @@ See the planning documentation or open an issue.
 
 ---
 
-**Ready to build?** Start with [PHASE_PLAN.md](planning/PHASE_PLAN.md) for the implementation roadmap.
+**Ready to build?** Start with [PHASE_PLAN.md](docs/planning/PHASE_PLAN.md) for the implementation roadmap.

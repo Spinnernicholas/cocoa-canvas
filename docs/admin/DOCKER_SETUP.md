@@ -2,7 +2,7 @@
 
 This guide explains how to run Cocoa Canvas using Docker for **production deployments**.
 
-**For local development**, see [QUICK_START.md](QUICK_START.md) - just run `npm run dev`.
+**For local development**, see [QUICK_START.md](../QUICK_START.md) - just run `npm run dev`.
 
 ## Prerequisites
 
@@ -234,7 +234,7 @@ After Docker setup is working:
 1. Implement authentication endpoints (`POST /api/v1/auth/login`, etc.)
 2. Build setup wizard UI
 3. Create dashboard
-4. See `planning/PHASE_PLAN.md` for detailed Phase 1 implementation
+4. See [PHASE_PLAN.md](../planning/PHASE_PLAN.md) for detailed Phase 1 implementation
 
 ## References
 
