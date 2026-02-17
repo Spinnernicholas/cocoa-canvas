@@ -53,6 +53,18 @@ export default function Header({ userName }: HeaderProps) {
               📊 Dashboard
             </Link>
             <Link
+              href="/campaign"
+              className="px-3 py-2 text-sm font-medium text-cocoa-700 dark:text-cocoa-300 hover:text-cocoa-900 dark:hover:text-cinnamon-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded-lg transition-colors"
+            >
+              🎯 Campaign
+            </Link>
+            <Link
+              href="/campaign/map"
+              className="px-3 py-2 text-sm font-medium text-cocoa-700 dark:text-cocoa-300 hover:text-cocoa-900 dark:hover:text-cinnamon-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded-lg transition-colors"
+            >
+              🗺️ Map
+            </Link>
+            <Link
               href="/people"
               className="px-3 py-2 text-sm font-medium text-cocoa-700 dark:text-cocoa-300 hover:text-cocoa-900 dark:hover:text-cinnamon-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded-lg transition-colors"
             >
