@@ -251,6 +251,49 @@ model Election {
   @@index([electionDate])
 }
 
+// Parcel (tax lot / property parcel from GIS)
+model Parcel {
+  id String @id @default(cuid())
+
+  // Address
+  streetNumber  String?
+  preDirection  String?
+  streetName    String
+  streetSuffix  String?
+  postDirection String?
+  city          String
+  state         String  @default("CA")
+  zipCode       String
+  fullAddress   String?
+
+  // GIS Geometry - stored as GeoJSON (FeatureCollection or Polygon)
+  geometry String? // JSON string: { "type": "Polygon", "coordinates": [...] }
+
+  // Calculated centroid from geometry (calculated on import/creation)
+  centroidLatitude  Float?  // Calculated from geometry if not provided
+  centroidLongitude Float?  // Calculated from geometry if not provided
+
+  // External references
+  apn          String? // Assessor's Parcel Number (county-specific identifier)
+  externalId   String? // Reference to external GIS data source
+  externalSource String? // "county_gis", "zillow", etc.
+
+  // Import tracking
+  importedFrom String?  // Source system or file
+  importedAt   DateTime?
+
+  // Relations
+  households Household[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([apn, externalSource]) // Unique combination of APN + source
+  @@index([fullAddress])
+  @@index([zipCode])
+  @@index([city])
+}
+
 // Multi-unit building address
 model Building {
   id String @id @default(cuid())
@@ -293,6 +336,10 @@ model Household {
   buildingId String?
   building   Building? @relation(fields: [buildingId], references: [id])
 
+  // If this household is on a parcel
+  parcelId String?
+  parcel   Parcel? @relation(fields: [parcelId], references: [id])
+
   // Address (normalized)
   houseNumber   String?
   preDirection  String?
@@ -324,6 +371,8 @@ model Household {
 
   @@unique([houseNumber, streetName, zipCode])
   @@index([buildingId])
+  @@index([parcelId])
+  @@index([city])
   @@index([fullAddress])
   @@index([zipCode])
 }
