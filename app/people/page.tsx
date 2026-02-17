@@ -283,40 +283,6 @@ export default function PeoplePage() {
     }
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'contacted':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
-      case 'attempted':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
-      case 'pending':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
-      case 'refused':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
-      case 'unreachable':
-        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
-      default:
-        return 'bg-cocoa-100 dark:bg-cocoa-900/30 text-cocoa-800 dark:text-cocoa-300';
-    }
-  };
-
-  const getStatusEmoji = (status: string) => {
-    switch (status) {
-      case 'contacted':
-        return '✅';
-      case 'attempted':
-        return '⏳';
-      case 'pending':
-        return '📋';
-      case 'refused':
-        return '❌';
-      case 'unreachable':
-        return '📵';
-      default:
-        return '📊';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -482,7 +448,6 @@ export default function PeoplePage() {
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Email</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Phone</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Type</th>
-                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Voter Status</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Last Contact</th>
                   </tr>
                 </thead>
@@ -519,15 +484,6 @@ export default function PeoplePage() {
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {person.voter ? (
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
-                            {getStatusEmoji(person.voter.contactStatus)} {person.voter.contactStatus}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
                         {person.voter?.lastContactDate ? (
