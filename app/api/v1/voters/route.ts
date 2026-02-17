@@ -15,17 +15,80 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     const search = searchParams.get('search');
+    const partyId = searchParams.get('partyId');
+    const precinctId = searchParams.get('precinctId');
+    const vbmStatus = searchParams.get('vbmStatus');
+    const gender = searchParams.get('gender');
+    const city = searchParams.get('city');
+    const zipCode = searchParams.get('zipCode');
+    const registrationDateFrom = searchParams.get('registrationDateFrom');
+    const registrationDateTo = searchParams.get('registrationDateTo');
+    const hasEmail = searchParams.get('hasEmail');
+    const hasPhone = searchParams.get('hasPhone');
 
     // Build where clause
     const where: any = {};
+    const personWhere: any = {};
     
+    // Text search across name, email, phone
     if (search) {
-      where.person = {
-        OR: [
-          { firstName: { contains: search } },
-          { lastName: { contains: search } },
-        ],
-      };
+      personWhere.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { emails: { some: { address: { contains: search, mode: 'insensitive' } } } },
+        { phones: { some: { number: { contains: search } } } },
+      ];
+    }
+
+    // Gender filter
+    if (gender) {
+      personWhere.gender = gender;
+    }
+
+    // Contact info filters
+    if (hasEmail === 'true') {
+      personWhere.emails = { some: {} };
+    }
+    if (hasPhone === 'true') {
+      personWhere.phones = { some: {} };
+    }
+
+    // City/Zip filters on addresses
+    if (city || zipCode) {
+      const addressFilter: any = {};
+      if (city) addressFilter.city = { contains: city, mode: 'insensitive' };
+      if (zipCode) addressFilter.zipCode = { contains: zipCode };
+      personWhere.addresses = { some: addressFilter };
+    }
+
+    if (Object.keys(personWhere).length > 0) {
+      where.person = personWhere;
+    }
+
+    // Party filter
+    if (partyId) {
+      where.partyId = partyId;
+    }
+
+    // Precinct filter
+    if (precinctId) {
+      where.precinctId = precinctId;
+    }
+
+    // VBM Status filter
+    if (vbmStatus) {
+      where.vbmStatus = vbmStatus === 'None' ? null : vbmStatus;
+    }
+
+    // Registration date range
+    if (registrationDateFrom || registrationDateTo) {
+      where.registrationDate = {};
+      if (registrationDateFrom) {
+        where.registrationDate.gte = new Date(registrationDateFrom);
+      }
+      if (registrationDateTo) {
+        where.registrationDate.lte = new Date(registrationDateTo);
+      }
     }
 
     // Get voters with person data

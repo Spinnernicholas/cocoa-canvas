@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
+import PeopleSearch, { PeopleFilters } from '@/components/PeopleSearch';
+import PeopleImportModal from '@/components/PeopleImportModal';
+import PeopleDetailModal from '@/components/PeopleDetailModal';
 
 interface Address {
   id: string;
@@ -71,14 +73,6 @@ interface Person {
   createdAt: string;
 }
 
-interface ImportFormat {
-  id: string;
-  name: string;
-  description: string;
-  supportedExtensions: string[];
-  supportsIncremental: boolean;
-}
-
 export default function PeoplePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -87,22 +81,28 @@ export default function PeoplePage() {
   const [error, setError] = useState('');
   
   // Search and filter
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewFilter, setViewFilter] = useState<'all' | 'voters' | 'volunteers' | 'donors'>('all'); // View filter for person types
+  const buildDefaultFilters = (): PeopleFilters => ({
+    search: '',
+    partyId: '',
+    precinctId: '',
+    vbmStatus: '',
+    gender: '',
+    city: '',
+    zipCode: '',
+    registrationDateFrom: '',
+    registrationDateTo: '',
+    hasEmail: undefined,
+    hasPhone: undefined,
+  });
+  const [filters, setFilters] = useState<PeopleFilters>(buildDefaultFilters);
+  const [viewFilter, setViewFilter] = useState<'all' | 'voters' | 'volunteers' | 'donors'>('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [limit] = useState(20);
 
-  // Modal
+  // Modals
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importFormats, setImportFormats] = useState<ImportFormat[]>([]);
-  const [selectedFormat, setSelectedFormat] = useState<string>('');
-  const [importType, setImportType] = useState<'full' | 'incremental'>('full');
-  const [loadingFormats, setLoadingFormats] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [importError, setImportError] = useState('');
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
   // Load user
   useEffect(() => {
@@ -124,182 +124,64 @@ export default function PeoplePage() {
   }, [router]);
 
   // Fetch people
-  useEffect(() => {
+  const fetchPeople = async () => {
     if (!user) return;
 
-    const fetchPeople = async () => {
-      try {
-        setLoading(true);
-        setError(''); // Clear any previous errors
-        const token = localStorage.getItem('authToken');
-        
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: ((page - 1) * limit).toString(),
-          filter: viewFilter, // 'all' or 'voters'
-        });
-
-        if (searchQuery) {
-          params.append('search', searchQuery);
-        }
-
-        const response = await fetch(`/api/v1/people?${params}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            // Authentication failed - redirect to login
-            localStorage.removeItem('user');
-            localStorage.removeItem('authToken');
-            router.push('/login');
-            return;
-          }
-          const errorData = await response.json().catch(() => ({}));
-          setError(errorData.error || 'Failed to load people. Please try again.');
-          setPeople([]);
-          return;
-        }
-
-        const data = await response.json();
-        setPeople(data.people || []);
-        setTotal(data.total || 0);
-      } catch (err) {
-        console.error('Error fetching people:', err);
-        setError('Network error. Please check your connection and try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPeople();
-  }, [user, page, searchQuery, viewFilter, limit]);
-
-  // Handle drag and drop
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      // Validate file extension if format is selected
-      if (selectedFormat) {
-        const format = importFormats.find(f => f.id === selectedFormat);
-        if (format) {
-          const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-          if (format.supportedExtensions.includes(ext)) {
-            setImportFile(file);
-            setImportError('');
-          } else {
-            setImportError(`Invalid file type. Expected: ${format.supportedExtensions.join(', ')}`);
-          }
-        }
-      } else {
-        setImportFile(file);
-        setImportError('');
-      }
-    }
-  };
-
-  // Fetch available import formats when modal opens
-  useEffect(() => {
-    if (showImportModal && importFormats.length === 0) {
-      const fetchFormats = async () => {
-        try {
-          setLoadingFormats(true);
-          const response = await fetch('/api/v1/voters/import');
-          if (response.ok) {
-            const data = await response.json();
-            setImportFormats(data.formats || []);
-            // Set default format to simple_csv
-            if (data.formats && data.formats.length > 0) {
-              const simpleFormat = data.formats.find((f: ImportFormat) => f.id === 'simple_csv');
-              setSelectedFormat(simpleFormat?.id || data.formats[0].id);
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching formats:', err);
-        } finally {
-          setLoadingFormats(false);
-        }
-      };
-      fetchFormats();
-    }
-  }, [showImportModal, importFormats.length]);
-
-  const handleImport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!importFile || !selectedFormat) return;
-
-    setImporting(true);
-    setImportError('');
-    const formData = new FormData();
-    formData.append('file', importFile);
-    formData.append('format', selectedFormat);
-    formData.append('importType', importType);
-
     try {
+      setLoading(true);
+      setError('');
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/v1/voters/import', {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
+      
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: ((page - 1) * limit).toString(),
+        filter: viewFilter,
       });
 
-      const data = await response.json();
-      
-      if (response.ok || response.status === 202) {
-        // Job created successfully
-        const jobId = data.jobId;
-        console.log('[Import] Job created:', jobId);
-        
-        // Show success message
-        setError('');
-        setImportError('');
-        setShowImportModal(false);
-        setImportFile(null);
-        setImportType('full');
-        
-        // Redirect to job queue page to monitor progress
-        setTimeout(() => {
-          router.push(`/jobs/${jobId}`);
-        }, 1000);
-      } else {
+      // Add filters from PeopleSearch component
+      if (filters.search) params.append('search', filters.search);
+      if (filters.partyId) params.append('partyId', filters.partyId);
+      if (filters.precinctId) params.append('precinctId', filters.precinctId);
+      if (filters.vbmStatus) params.append('vbmStatus', filters.vbmStatus);
+      if (filters.gender) params.append('gender', filters.gender);
+      if (filters.city) params.append('city', filters.city);
+      if (filters.zipCode) params.append('zipCode', filters.zipCode);
+      if (filters.registrationDateFrom) params.append('registrationDateFrom', filters.registrationDateFrom);
+      if (filters.registrationDateTo) params.append('registrationDateTo', filters.registrationDateTo);
+      if (filters.hasEmail !== undefined) params.append('hasEmail', filters.hasEmail.toString());
+      if (filters.hasPhone !== undefined) params.append('hasPhone', filters.hasPhone.toString());
+
+      const response = await fetch(`/api/v1/people?${params}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
         if (response.status === 401) {
-          // Authentication failed - redirect to login
           localStorage.removeItem('user');
           localStorage.removeItem('authToken');
           router.push('/login');
           return;
         }
-        setImportError(data.error || 'Import failed');
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || 'Failed to load people. Please try again.');
+        setPeople([]);
+        return;
       }
+
+      const data = await response.json();
+      setPeople(data.people || []);
+      setTotal(data.total || 0);
     } catch (err) {
-      console.error('Error uploading file:', err);
-      setImportError('Error uploading file');
+      console.error('Error fetching people:', err);
+      setError('Network error. Please check your connection and try again.');
     } finally {
-      setImporting(false);
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchPeople();
+  }, [user, page, filters, viewFilter]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -354,14 +236,14 @@ export default function PeoplePage() {
           <div>
             <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">👥 People</h1>
             <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">
-              {total} {viewFilter === 'voters' ? 'voters' : 'people'} in database
+              {total} {viewFilter === 'voters' ? 'voters' : viewFilter === 'volunteers' ? 'volunteers' : viewFilter === 'donors' ? 'donors' : 'people'} in database
             </p>
           </div>
           <button
             onClick={() => setShowImportModal(true)}
             className="px-4 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 font-medium transition-colors"
           >
-            📥 Import Voters
+            📥 Import People
           </button>
         </div>
 
@@ -422,30 +304,17 @@ export default function PeoplePage() {
         </div>
 
         {/* Search and Filter */}
-        <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 mb-6 border border-cocoa-200 dark:border-cocoa-700">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="Search name, email, or phone..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 placeholder-cocoa-500 dark:placeholder-cocoa-400"
-            />
-
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setPage(1);
-              }}
-              className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium transition-colors"
-            >
-              🔄 Clear Search
-            </button>
-          </div>
-        </div>
+        <PeopleSearch
+          filters={filters}
+          onFiltersChange={(newFilters) => {
+            setFilters(newFilters);
+            setPage(1);
+          }}
+          onClearFilters={() => {
+            setFilters(buildDefaultFilters());
+            setPage(1);
+          }}
+        />
 
         {/* Error Message */}
         {error && (
@@ -465,7 +334,7 @@ export default function PeoplePage() {
             <div className="p-8 text-center">
               <p className="text-cocoa-600 dark:text-cocoa-300 text-lg">No people found</p>
               <p className="text-cocoa-500 dark:text-cocoa-400 text-sm mt-1">
-                {searchQuery ? 'Try adjusting search' : 'Import voters to get started'}
+                {filters.search ? 'Try adjusting your filters' : 'Import people to get started'}
               </p>
             </div>
           ) : (
@@ -485,7 +354,7 @@ export default function PeoplePage() {
                     <tr
                       key={person.id}
                       className="hover:bg-cocoa-50 dark:hover:bg-cocoa-900/50 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/people/${person.id}`)}
+                      onClick={() => setSelectedPersonId(person.id)}
                     >
                       <td className="px-6 py-4 font-medium text-cocoa-900 dark:text-cream-50">{getPersonName(person)}</td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">{getPrimaryEmail(person) || '—'}</td>
@@ -564,164 +433,20 @@ export default function PeoplePage() {
       </main>
 
       {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">📥 Import Voters</h2>
-            
-            {loadingFormats ? (
-              <div className="py-8 text-center">
-                <div className="inline-block w-6 h-6 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading formats...</p>
-              </div>
-            ) : (
-              <form onSubmit={handleImport}>
-                {/* Import Error Message */}
-                {importError && (
-                  <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg">
-                    ⚠️ {importError}
-                  </div>
-                )}
+      <PeopleImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={fetchPeople}
+      />
 
-                {/* Format Selection */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
-                    Import Format
-                  </label>
-                  <select
-                    value={selectedFormat}
-                    onChange={(e) => {
-                      setSelectedFormat(e.target.value);
-                      setImportFile(null); // Clear file when format changes
-                    }}
-                    className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
-                  >
-                    {importFormats.map((format) => (
-                      <option key={format.id} value={format.id}>
-                        {format.name}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedFormat && (
-                    <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
-                      {importFormats.find(f => f.id === selectedFormat)?.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Import Type */}
-                {selectedFormat && importFormats.find(f => f.id === selectedFormat)?.supportsIncremental && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
-                      Import Type
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="radio"
-                          name="importType"
-                          value="full"
-                          checked={importType === 'full'}
-                          onChange={(e) => setImportType(e.target.value as 'full' | 'incremental')}
-                          className="mr-2"
-                        />
-                        <span className="text-cocoa-700 dark:text-cocoa-300">
-                          <strong>Full Import</strong> - Replace all voter data
-                        </span>
-                      </label>
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="radio"
-                          name="importType"
-                          value="incremental"
-                          checked={importType === 'incremental'}
-                          onChange={(e) => setImportType(e.target.value as 'full' | 'incremental')}
-                          className="mr-2"
-                        />
-                        <span className="text-cocoa-700 dark:text-cocoa-300">
-                          <strong>Incremental</strong> - Update existing voters only
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* File Upload */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
-                    Voter File
-                  </label>
-                  <div
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                      isDragging
-                        ? 'border-cinnamon-500 bg-cinnamon-50 dark:bg-cinnamon-900/20'
-                        : 'border-cocoa-300 dark:border-cocoa-600 hover:border-cocoa-400 dark:hover:border-cocoa-500'
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <input
-                      type="file"
-                      accept={selectedFormat ? importFormats.find(f => f.id === selectedFormat)?.supportedExtensions.join(',') : '*'}
-                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                      className="hidden"
-                      id="file-input"
-                    />
-                    <label 
-                      htmlFor="file-input" 
-                      className="cursor-pointer block"
-                      style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-                    >
-                      <p className="text-cocoa-600 dark:text-cocoa-300">
-                        {importFile ? `📄 ${importFile.name}` : isDragging ? '📥 Drop file here' : '📂 Click or drag file here'}
-                      </p>
-                      {selectedFormat && (
-                        <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
-                          Accepted: {importFormats.find(f => f.id === selectedFormat)?.supportedExtensions.join(', ')}
-                        </p>
-                      )}
-                    </label>
-                  </div>
-                </div>
-
-                {/* Import Stats */}
-                {importing && (
-                  <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="flex items-center justify-center">
-                      <div className="inline-block w-5 h-5 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin mr-3"></div>
-                      <span className="text-blue-800 dark:text-blue-300 font-medium">Processing import...</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowImportModal(false);
-                      setImportFile(null);
-                      setImportType('full');
-                      setImportError('');
-                    }}
-                    disabled={importing}
-                    className="flex-1 px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!importFile || !selectedFormat || importing}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-                  >
-                    {importing ? 'Importing...' : '📥 Import'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+      {/* Detail Modal */}
+      {selectedPersonId && (
+        <PeopleDetailModal
+          personId={selectedPersonId}
+          isOpen={!!selectedPersonId}
+          onClose={() => setSelectedPersonId(null)}
+          onUpdate={fetchPeople}
+        />
       )}
     </div>
   );

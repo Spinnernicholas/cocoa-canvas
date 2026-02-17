@@ -356,7 +356,8 @@ export default function PersonDetailPage() {
   const getPrimaryAddress = () => {
     if (!person) return null;
     const addressInfo = person.addresses.find(a => a.isPrimary);
-    return addressInfo?.fullAddress || null;
+    if (!addressInfo) return null;
+    return formatFullAddressLines(addressInfo).join(', ');
   };
 
   const getResidenceAddress = () => {
@@ -368,10 +369,21 @@ export default function PersonDetailPage() {
     return residence;
   };
 
-  const formatAddress = (address: Address) => {
-    const parts = [];
-    
-    // Street address line
+  const buildCityStateZip = (address: Address) => {
+    const city = address.city?.trim();
+    const state = address.state?.trim();
+    const zip = address.zipCode?.trim();
+    const parts: string[] = [];
+    if (city) parts.push(city);
+    if (state) parts.push(state);
+    let line = parts.join(', ');
+    if (zip) {
+      line = line ? `${line} ${zip}` : zip;
+    }
+    return line;
+  };
+
+  const buildStreetLine = (address: Address) => {
     const streetParts = [];
     if (address.houseNumber) streetParts.push(address.houseNumber);
     if (address.preDirection) streetParts.push(address.preDirection);
@@ -379,28 +391,38 @@ export default function PersonDetailPage() {
     if (address.streetSuffix) streetParts.push(address.streetSuffix);
     if (address.postDirection) streetParts.push(address.postDirection);
     
-    // Unit info
     if (address.unitAbbr && address.unitNumber) {
       streetParts.push(`${address.unitAbbr} ${address.unitNumber}`);
     } else if (address.unitNumber) {
       streetParts.push(`#${address.unitNumber}`);
     }
-    
+
     if (streetParts.length > 0) {
-      parts.push(streetParts.join(' '));
-    } else if (address.fullAddress) {
-      parts.push(address.fullAddress);
+      return streetParts.join(' ');
     }
-    
-    return parts;
+
+    return address.fullAddress || '';
   };
 
-  const formatCityStateZip = (address: Address) => {
-    const parts = [];
-    if (address.city) parts.push(address.city);
-    if (address.state) parts.push(address.state);
-    if (address.zipCode) parts.push(address.zipCode);
-    return parts.length > 0 ? parts.join(', ') : null;
+  const formatFullAddressLines = (address: Address) => {
+    const lines: string[] = [];
+    const streetLine = buildStreetLine(address);
+    const cityStateZip = buildCityStateZip(address);
+
+    if (streetLine) {
+      lines.push(streetLine);
+    }
+    if (cityStateZip) {
+      if (!streetLine || !streetLine.toLowerCase().includes(cityStateZip.toLowerCase())) {
+        lines.push(cityStateZip);
+      }
+    }
+
+    if (lines.length === 0 && address.fullAddress) {
+      lines.push(address.fullAddress);
+    }
+
+    return lines;
   };
 
   if (!user) return null;
@@ -570,8 +592,7 @@ export default function PersonDetailPage() {
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Addresses</p>
                   <div className="space-y-3">
                     {person.addresses.map((address) => {
-                        const addressLines = formatAddress(address);
-                        const cityStateZip = formatCityStateZip(address);
+                        const addressLines = formatFullAddressLines(address);
                         
                         return (
                           <div key={address.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
@@ -589,11 +610,6 @@ export default function PersonDetailPage() {
                                 {line}
                               </p>
                             ))}
-                            {cityStateZip && (
-                              <p className="text-base text-cocoa-900 dark:text-cream-50">
-                                {cityStateZip}
-                              </p>
-                            )}
                             
                             {address.isVerified && (
                               <p className="text-xs text-green-600 dark:text-green-400 mt-1">
@@ -702,8 +718,7 @@ export default function PersonDetailPage() {
               {(() => {
                 const residence = getResidenceAddress();
                 if (residence) {
-                  const addressLines = formatAddress(residence);
-                  const cityStateZip = formatCityStateZip(residence);
+                  const addressLines = formatFullAddressLines(residence);
                   
                   return (
                     <div className="space-y-2">
@@ -714,27 +729,7 @@ export default function PersonDetailPage() {
                               {line}
                             </p>
                           ))}
-                          {cityStateZip && (
-                            <p className="text-base text-cocoa-900 dark:text-cream-50">
-                              {cityStateZip}
-                            </p>
-                          )}
                         </div>
-                      ) : residence.fullAddress ? (
-                        <div>
-                          <p className="text-base text-cocoa-900 dark:text-cream-50">
-                            {residence.fullAddress}
-                          </p>
-                          {cityStateZip && (
-                            <p className="text-base text-cocoa-900 dark:text-cream-50">
-                              {cityStateZip}
-                            </p>
-                          )}
-                        </div>
-                      ) : cityStateZip ? (
-                        <p className="text-base text-cocoa-900 dark:text-cream-50">
-                          {cityStateZip}
-                        </p>
                       ) : (
                         <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">
                           Address on file (details incomplete)
@@ -996,7 +991,7 @@ export default function PersonDetailPage() {
                   type="checkbox"
                   checked={contactForm.followUpNeeded}
                   onChange={(e) => setContactForm({ ...contactForm, followUpNeeded: e.target.checked })}
-                  className="w-4 h-4 roun"
+                  className="w-4 h-4 rounded"
                 />
                 <span className="text-sm font-medium text-cocoa-700 dark:text-cocoa-300">Follow-up needed</span>
               </label>
