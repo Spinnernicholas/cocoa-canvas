@@ -2,7 +2,8 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://cocoa-canvas-docs.example.com',
+  site: 'https://Spinnernicholas.github.io/cocoa-canvas/',
+  base: '/cocoa-canvas/',
   integrations: [
     starlight({
       title: 'Cocoa Canvas',
