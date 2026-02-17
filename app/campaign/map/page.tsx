@@ -154,28 +154,28 @@ export default function CampaignMapPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-cream-50 dark:bg-cocoa-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Redirecting...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cocoa-600 dark:border-cinnamon-400 mx-auto mb-4"></div>
+          <p className="text-cocoa-700 dark:text-cocoa-300">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900">
       <Header userName={user.name} />
 
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar */}
-        <div className="w-80 bg-white dark:bg-gray-800 shadow-lg overflow-y-auto">
+        <div className="w-80 bg-white dark:bg-cocoa-800 shadow-lg overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Campaign Map</h2>
+              <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">Campaign Map</h2>
               <Link
                 href="/campaign"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-sm text-cocoa-600 dark:text-cocoa-300 hover:underline"
               >
                 ← Back
               </Link>
@@ -183,8 +183,9 @@ export default function CampaignMapPage() {
 
             {/* Filters */}
             <div className="space-y-4 mb-6">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50">Filters</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">
                   City
                 </label>
                 <input
@@ -192,12 +193,12 @@ export default function CampaignMapPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Filter by city..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  className="w-full px-3 py-2 border border-cocoa-200 dark:border-cocoa-600 rounded-md dark:bg-cocoa-700 dark:text-cream-50"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">
                   ZIP Code
                 </label>
                 <input
@@ -205,7 +206,7 @@ export default function CampaignMapPage() {
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
                   placeholder="Filter by ZIP..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  className="w-full px-3 py-2 border border-cocoa-200 dark:border-cocoa-600 rounded-md dark:bg-cocoa-700 dark:text-cream-50"
                 />
               </div>
 
@@ -217,7 +218,7 @@ export default function CampaignMapPage() {
                     onChange={(e) => setVotersOnly(e.target.checked)}
                     className="rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Voters only</span>
+                  <span className="ml-2 text-sm text-cocoa-700 dark:text-cocoa-300">Voters only</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -226,43 +227,43 @@ export default function CampaignMapPage() {
                     onChange={(e) => setVolunteersOnly(e.target.checked)}
                     className="rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Volunteers only</span>
+                  <span className="ml-2 text-sm text-cocoa-700 dark:text-cocoa-300">Volunteers only</span>
                 </label>
               </div>
             </div>
 
             {/* Statistics */}
             {stats && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Statistics</h3>
+              <div className="bg-cocoa-50 dark:bg-cocoa-700 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-cocoa-900 dark:text-cream-50 mb-3">Statistics</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Households:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-cocoa-600 dark:text-cocoa-300">Households:</span>
+                    <span className="font-semibold text-cocoa-900 dark:text-cream-50">
                       {stats.totalHouseholds}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">People:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-cocoa-600 dark:text-cocoa-300">People:</span>
+                    <span className="font-semibold text-cocoa-900 dark:text-cream-50">
                       {stats.totalPeople}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Voters:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-cocoa-600 dark:text-cocoa-300">Voters:</span>
+                    <span className="font-semibold text-cocoa-900 dark:text-cream-50">
                       {stats.totalVoters}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Volunteers:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-cocoa-600 dark:text-cocoa-300">Volunteers:</span>
+                    <span className="font-semibold text-cocoa-900 dark:text-cream-50">
                       {stats.totalVolunteers}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Donors:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-cocoa-600 dark:text-cocoa-300">Donors:</span>
+                    <span className="font-semibold text-cocoa-900 dark:text-cream-50">
                       {stats.totalDonors}
                     </span>
                   </div>
@@ -272,24 +273,24 @@ export default function CampaignMapPage() {
 
             {/* Households List */}
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+              <h3 className="font-semibold text-cocoa-900 dark:text-cream-50 mb-3">
                 Households ({households.length})
               </h3>
-              {loading && <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>}
+              {loading && <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Loading...</p>}
               {error && (
                 <p className="text-sm text-red-600 dark:text-red-400">Error: {error}</p>
               )}
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {households.map((h) => (
                   <Link key={h.id} href={`/api/v1/gis/households/${h.id}`}>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors">
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">
+                    <div className="p-3 bg-white dark:bg-cocoa-700 rounded-lg hover:bg-cocoa-50 dark:hover:bg-cocoa-600 cursor-pointer transition-colors border border-cocoa-200 dark:border-cocoa-600">
+                      <p className="font-medium text-cocoa-900 dark:text-cream-50 text-sm">
                         {h.address.street}
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-cocoa-600 dark:text-cocoa-300">
                         {h.address.city}, {h.address.zipCode}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
                         {h.memberCount} member{h.memberCount !== 1 ? 's' : ''}
                       </p>
                     </div>
