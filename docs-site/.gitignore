@@ -7,11 +7,15 @@ pnpm-lock.yaml
 # production
 dist/
 .output/
+.astro/
 
-# auto-generated docs
+# auto-generated docs (but keep index.mdx)
 src/content/docs/
+!src/content/docs/index.mdx
 
 # misc
 .env
+.env.*.local
+*.log
 .env.*.local
 *.log
