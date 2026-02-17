@@ -6,23 +6,29 @@ export default function Home() {
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Decorative Marshmallows */}
-      <div className="hidden dark:block fixed top-10 left-[5%] opacity-40 animate-bounce" style={{ animationDuration: '3s' }}>
-        <Marshmallow size={50} />
+      <div className="hidden dark:block fixed top-10 left-[5%] opacity-40">
+        <Marshmallow size={56} animationDuration="3s" animationDelay="0s" />
       </div>
-      <div className="hidden dark:block fixed top-32 right-[8%] opacity-40 animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}>
-        <Marshmallow size={45} />
+      <div className="hidden dark:block fixed top-32 right-[8%] opacity-40">
+        <Marshmallow size={48} animationDuration="4s" animationDelay="0.5s" />
       </div>
-      <div className="hidden dark:block fixed top-[20%] left-[15%] opacity-40 animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}>
-        <Marshmallow size={35} />
+      <div className="hidden dark:block fixed top-[20%] left-[15%] opacity-40">
+        <Marshmallow size={32} animationDuration="5s" animationDelay="1s" />
       </div>
-      <div className="hidden dark:block fixed top-[40%] right-[12%] opacity-40 animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1.5s' }}>
-        <Marshmallow size={48} />
+      <div className="hidden dark:block fixed top-[40%] right-[12%] opacity-40">
+        <Marshmallow size={52} animationDuration="4.5s" animationDelay="1.5s" />
       </div>
-      <div className="hidden dark:block fixed bottom-[30%] left-[8%] opacity-40 animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.8s' }}>
-        <Marshmallow size={38} />
+      <div className="hidden dark:block fixed bottom-[30%] left-[8%] opacity-40">
+        <Marshmallow size={38} animationDuration="3.5s" animationDelay="0.8s" />
       </div>
-      <div className="hidden dark:block fixed bottom-[15%] right-[18%] opacity-40 animate-bounce" style={{ animationDuration: '4.2s', animationDelay: '2s' }}>
-        <Marshmallow size={52} />
+      <div className="hidden dark:block fixed bottom-[15%] right-[18%] opacity-40">
+        <Marshmallow size={60} animationDuration="4.2s" animationDelay="2s" />
+      </div>
+      <div className="hidden dark:block fixed top-[55%] left-[20%] opacity-40">
+        <Marshmallow size={44} animationDuration="3.8s" animationDelay="0.3s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[45%] right-[6%] opacity-40">
+        <Marshmallow size={28} animationDuration="4.3s" animationDelay="1.2s" />
       </div>
       
       {/* Header */}

@@ -178,11 +178,26 @@ export default function JobsPage() {
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
       {/* Decorative Marshmallows */}
-      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-bounce" style={{ animationDuration: '3.8s' }}>
-        <Marshmallow size={44} />
+      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40">
+        <Marshmallow size={50} animationDuration="3.8s" animationDelay="0s" />
       </div>
-      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
-        <Marshmallow size={36} />
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40">
+        <Marshmallow size={34} animationDuration="4.5s" animationDelay="1s" />
+      </div>
+      <div className="hidden dark:block fixed top-[55%] left-[12%] opacity-40">
+        <Marshmallow size={54} animationDuration="4.1s" animationDelay="0.6s" />
+      </div>
+      <div className="hidden dark:block fixed top-[15%] right-[15%] opacity-40">
+        <Marshmallow size={44} animationDuration="3.7s" animationDelay="1.4s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[40%] left-[8%] opacity-40">
+        <Marshmallow size={52} animationDuration="4.3s" animationDelay="0.8s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[25%] right-[12%] opacity-40">
+        <Marshmallow size={28} animationDuration="3.9s" animationDelay="1.7s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[60%] right-[7%] opacity-40">
+        <Marshmallow size={60} animationDuration="4.4s" animationDelay="1.2s" />
       </div>
 
       <Header userName={user.name} />

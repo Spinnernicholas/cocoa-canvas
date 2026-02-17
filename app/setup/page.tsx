@@ -159,17 +159,29 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800 px-4 relative overflow-hidden">
       {/* Decorative Marshmallows */}
-      <div className="hidden dark:block fixed top-16 left-[8%] opacity-40 animate-bounce" style={{ animationDuration: '3.2s' }}>
-        <Marshmallow size={46} />
+      <div className="hidden dark:block fixed top-16 left-[8%] opacity-40">
+        <Marshmallow size={50} animationDuration="3.2s" animationDelay="0s" />
       </div>
-      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-bounce" style={{ animationDuration: '4.2s', animationDelay: '1.2s' }}>
-        <Marshmallow size={36} />
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40">
+        <Marshmallow size={34} animationDuration="4.2s" animationDelay="1.2s" />
       </div>
-      <div className="hidden dark:block fixed bottom-[30%] left-[15%] opacity-40 animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.8s' }}>
-        <Marshmallow size={48} />
+      <div className="hidden dark:block fixed bottom-[30%] left-[15%] opacity-40">
+        <Marshmallow size={56} animationDuration="4s" animationDelay="0.8s" />
       </div>
-      <div className="hidden dark:block fixed bottom-24 right-[12%] opacity-40 animate-bounce" style={{ animationDuration: '3.6s', animationDelay: '1.8s' }}>
-        <Marshmallow size={38} />
+      <div className="hidden dark:block fixed bottom-24 right-[12%] opacity-40">
+        <Marshmallow size={40} animationDuration="3.6s" animationDelay="1.8s" />
+      </div>
+      <div className="hidden dark:block fixed top-[50%] left-[5%] opacity-40">
+        <Marshmallow size={48} animationDuration="4.4s" animationDelay="0.4s" />
+      </div>
+      <div className="hidden dark:block fixed top-[65%] right-[18%] opacity-40">
+        <Marshmallow size={28} animationDuration="3.8s" animationDelay="1.5s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[50%] left-[22%] opacity-40">
+        <Marshmallow size={44} animationDuration="4.1s" animationDelay="0.6s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[15%] right-[7%] opacity-40">
+        <Marshmallow size={62} animationDuration="3.9s" animationDelay="1.0s" />
       </div>
       
       {/* Theme Toggle - Positioned at top right */}

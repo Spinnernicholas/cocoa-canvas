@@ -81,11 +81,26 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
       {/* Decorative Marshmallows */}
-      <div className="hidden dark:block fixed top-20 right-[8%] opacity-30 animate-bounce" style={{ animationDuration: '4.2s' }}>
-        <Marshmallow size={52} />
+      <div className="hidden dark:block fixed top-20 right-[8%] opacity-30">
+        <Marshmallow size={60} animationDuration="4.2s" animationDelay="0s" />
       </div>
-      <div className="hidden dark:block fixed bottom-32 left-[12%] opacity-25 animate-bounce" style={{ animationDuration: '3.6s' }}>
-        <Marshmallow size={38} />
+      <div className="hidden dark:block fixed bottom-32 left-[12%] opacity-25">
+        <Marshmallow size={38} animationDuration="3.6s" animationDelay="0s" />
+      </div>
+      <div className="hidden dark:block fixed top-[35%] left-[8%] opacity-30">
+        <Marshmallow size={48} animationDuration="4s" animationDelay="0.8s" />
+      </div>
+      <div className="hidden dark:block fixed top-[55%] right-[15%] opacity-30">
+        <Marshmallow size={42} animationDuration="3.8s" animationDelay="1.3s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[45%] left-[18%] opacity-30">
+        <Marshmallow size={52} animationDuration="4.3s" animationDelay="0.5s" />
+      </div>
+      <div className="hidden dark:block fixed top-[15%] left-[6%] opacity-30">
+        <Marshmallow size={30} animationDuration="3.9s" animationDelay="1.6s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[20%] right-[10%] opacity-30">
+        <Marshmallow size={54} animationDuration="4.1s" animationDelay="1.0s" />
       </div>
 
       <Header userName={user.name} />

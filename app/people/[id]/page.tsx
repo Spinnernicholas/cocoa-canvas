@@ -457,8 +457,26 @@ export default function PersonDetailPage() {
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
       {/* Decorative Marshmallows */}
-      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-bounce" style={{ animationDuration: '3.8s' }}>
-        <Marshmallow size={44} />
+      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.8s' }}>
+        <Marshmallow size={50} animationDuration="3.8s" />
+      </div>
+      <div className="hidden dark:block fixed top-[25%] right-[12%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.2s', animationDelay: '0.9s' }}>
+        <Marshmallow size={42} animationDuration="4.2s" />
+      </div>
+      <div className="hidden dark:block fixed top-[50%] left-[10%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4s', animationDelay: '1.3s' }}>
+        <Marshmallow size={52} animationDuration="4s" />
+      </div>
+      <div className="hidden dark:block fixed top-[65%] right-[8%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.6s', animationDelay: '1.6s' }}>
+        <Marshmallow size={36} animationDuration="3.6s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[35%] left-[15%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.4s', animationDelay: '0.5s' }}>
+        <Marshmallow size={56} animationDuration="4.4s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[20%] right-[15%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.9s', animationDelay: '1.8s' }}>
+        <Marshmallow size={28} animationDuration="3.9s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[55%] right-[18%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.3s', animationDelay: '1.1s' }}>
+        <Marshmallow size={62} animationDuration="4.3s" />
       </div>
 
       <Header userName={user.name} />

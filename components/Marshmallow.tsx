@@ -6,15 +6,17 @@ import { useState, useEffect } from 'react';
 interface MarshmallowProps {
   className?: string;
   size?: number;
+  animationDuration?: string;
+  animationDelay?: string;
 }
 
-export default function Marshmallow({ className = '', size = 40 }: MarshmallowProps) {
+export default function Marshmallow({ className = '', size = 40, animationDuration = '3s', animationDelay = '0s' }: MarshmallowProps) {
   const { theme } = useTheme();
   const [rotation, setRotation] = useState(0);
 
   // Set random rotation after hydration to avoid SSR mismatch
   useEffect(() => {
-    setRotation(Math.random() * 30 - 15);
+    setRotation(Math.random() * 90 - 45);
   }, []);
   
   // Dark marshmallows for light theme, light marshmallows for dark theme
@@ -23,14 +25,25 @@ export default function Marshmallow({ className = '', size = 40 }: MarshmallowPr
   const highlightFill = theme === 'light' ? '#A89584' : '#FFFFFF';
   
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 470 470" 
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={{ transform: `rotate(${rotation}deg)` }}
-    >
+    <div className="relative inline-block" style={{ width: size, height: size }}>
+      {/* Wave ripple - only in dark mode, stationary outside bouncing container */}
+      {/* {theme === 'dark' && (
+        <div className="cocoa-wave" style={{ animationDuration, animationDelay }} />
+      )} */}
+      
+      {/* Bouncing marshmallow container */}
+      <div 
+        className="animate-marshmallow-bob"
+        style={{ animationDuration, animationDelay }}
+      >
+        <svg 
+          width={size} 
+          height={size} 
+          viewBox="0 0 470 470" 
+          xmlns="http://www.w3.org/2000/svg"
+          className={`relative z-10 ${className}`}
+          style={{ transform: `rotate(${rotation}deg)` }}
+        >
       <g>
         {/* Main marshmallow body with stroke */}
         <path d="M349.54,30.23C318.833,10.736,278.155,0,235,0s-83.832,10.736-114.54,30.23c-31.765,20.166-49.259,47.332-49.259,76.493
@@ -59,5 +72,7 @@ export default function Marshmallow({ className = '', size = 40 }: MarshmallowPr
           fill={mainFill}/>
       </g>
     </svg>
+      </div>
+    </div>
   );
 }
