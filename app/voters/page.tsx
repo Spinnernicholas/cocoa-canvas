@@ -66,6 +66,7 @@ export default function VotersPage() {
   const [importType, setImportType] = useState<'full' | 'incremental'>('full');
   const [loadingFormats, setLoadingFormats] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [importError, setImportError] = useState('');
 
   // Load user
   useEffect(() => {
@@ -174,12 +175,14 @@ export default function VotersPage() {
           const ext = '.' + file.name.split('.').pop()?.toLowerCase();
           if (format.supportedExtensions.includes(ext)) {
             setImportFile(file);
+            setImportError('');
           } else {
-            setError(`Invalid file type. Expected: ${format.supportedExtensions.join(', ')}`);
+            setImportError(`Invalid file type. Expected: ${format.supportedExtensions.join(', ')}`);
           }
         }
       } else {
         setImportFile(file);
+        setImportError('');
       }
     }
   };
@@ -215,6 +218,7 @@ export default function VotersPage() {
     if (!importFile || !selectedFormat) return;
 
     setImporting(true);
+    setImportError('');
     const formData = new FormData();
     formData.append('file', importFile);
     formData.append('format', selectedFormat);
@@ -237,6 +241,7 @@ export default function VotersPage() {
         
         // Show success message
         setError('');
+        setImportError('');
         setShowImportModal(false);
         setImportFile(null);
         setImportType('full');
@@ -253,11 +258,11 @@ export default function VotersPage() {
           router.push('/login');
           return;
         }
-        setError(data.error || 'Import failed');
+        setImportError(data.error || 'Import failed');
       }
     } catch (err) {
       console.error('Error uploading file:', err);
-      setError('Error uploading file');
+      setImportError('Error uploading file');
     } finally {
       setImporting(false);
     }
@@ -508,6 +513,13 @@ export default function VotersPage() {
               </div>
             ) : (
               <form onSubmit={handleImport}>
+                {/* Import Error Message */}
+                {importError && (
+                  <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg">
+                    ⚠️ {importError}
+                  </div>
+                )}
+
                 {/* Format Selection */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-2">
@@ -628,6 +640,7 @@ export default function VotersPage() {
                       setShowImportModal(false);
                       setImportFile(null);
                       setImportType('full');
+                      setImportError('');
                     }}
                     disabled={importing}
                     className="flex-1 px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"

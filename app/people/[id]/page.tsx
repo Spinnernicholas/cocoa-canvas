@@ -24,6 +24,13 @@ interface ContactInfo {
   };
   email?: string;
   phone?: string;
+  houseNumber?: string;
+  preDirection?: string;
+  streetName?: string;
+  streetSuffix?: string;
+  postDirection?: string;
+  unitAbbr?: string;
+  unitNumber?: string;
   fullAddress?: string;
   city?: string;
   state?: string;
@@ -38,6 +45,11 @@ interface Voter {
   lastContactDate?: string;
   lastContactMethod?: string;
   registrationDate?: string;
+  registrationNumber?: string;
+  externalId?: string;
+  externalSource?: string;
+  vbmStatus?: string;
+  precinctPortion?: string;
   party?: {
     name: string;
     abbr: string;
@@ -327,6 +339,51 @@ export default function PersonDetailPage() {
     return addressInfo?.fullAddress || null;
   };
 
+  const getResidenceAddress = () => {
+    if (!person) return null;
+    // Look for contact info with location name "Residence" or category "Residence"
+    const residence = person.contactInfo.find(ci => 
+      ci.location?.name?.toLowerCase().includes('residence') ||
+      ci.fullAddress
+    );
+    return residence;
+  };
+
+  const formatAddress = (contactInfo: ContactInfo) => {
+    const parts = [];
+    
+    // Street address line
+    const streetParts = [];
+    if (contactInfo.houseNumber) streetParts.push(contactInfo.houseNumber);
+    if (contactInfo.preDirection) streetParts.push(contactInfo.preDirection);
+    if (contactInfo.streetName) streetParts.push(contactInfo.streetName);
+    if (contactInfo.streetSuffix) streetParts.push(contactInfo.streetSuffix);
+    if (contactInfo.postDirection) streetParts.push(contactInfo.postDirection);
+    
+    // Unit info
+    if (contactInfo.unitAbbr && contactInfo.unitNumber) {
+      streetParts.push(`${contactInfo.unitAbbr} ${contactInfo.unitNumber}`);
+    } else if (contactInfo.unitNumber) {
+      streetParts.push(`#${contactInfo.unitNumber}`);
+    }
+    
+    if (streetParts.length > 0) {
+      parts.push(streetParts.join(' '));
+    } else if (contactInfo.fullAddress) {
+      parts.push(contactInfo.fullAddress);
+    }
+    
+    return parts;
+  };
+
+  const formatCityStateZip = (contactInfo: ContactInfo) => {
+    const parts = [];
+    if (contactInfo.city) parts.push(contactInfo.city);
+    if (contactInfo.state) parts.push(contactInfo.state);
+    if (contactInfo.zipCode) parts.push(contactInfo.zipCode);
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
   if (!user) return null;
 
   if (loading) {
@@ -508,29 +565,149 @@ export default function PersonDetailPage() {
               </div>
             </form>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Email</p>
-                <p className="text-lg text-cocoa-900 dark:text-cream-50">{getPrimaryEmail() || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Phone</p>
-                <p className="text-lg text-cocoa-900 dark:text-cream-50">{getPrimaryPhone() || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Address</p>
-                <p className="text-lg text-cocoa-900 dark:text-cream-50">{getPrimaryAddress() || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Contact</p>
-                <p className="text-lg text-cocoa-900 dark:text-cream-50">
-                  {person.voter?.lastContactDate
-                    ? `${formatDate(person.voter.lastContactDate)} (${person.voter.lastContactMethod || 'N/A'})`
-                    : '—'}
-                </p>
-              </div>
+            <div className="space-y-6">
+              {/* Addresses */}
+              {person.contactInfo && person.contactInfo.some(c => {
+                const addressLines = formatAddress(c);
+                const cityStateZip = formatCityStateZip(c);
+                return addressLines.length > 0 || cityStateZip;
+              }) && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Addresses</p>
+                  <div className="space-y-3">
+                    {person.contactInfo
+                      .filter(contact => {
+                        const addressLines = formatAddress(contact);
+                        const cityStateZip = formatCityStateZip(contact);
+                        return addressLines.length > 0 || cityStateZip;
+                      })
+                      .map((contact) => {
+                        const addressLines = formatAddress(contact);
+                        const cityStateZip = formatCityStateZip(contact);
+                        
+                        return (
+                          <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
+                                {contact.location.name}
+                              </span>
+                              {contact.isPrimary && (
+                                <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
+                              )}
+                            </div>
+                            
+                            {addressLines.map((line, idx) => (
+                              <p key={idx} className="text-base text-cocoa-900 dark:text-cream-50">
+                                {line}
+                              </p>
+                            ))}
+                            {cityStateZip && (
+                              <p className="text-base text-cocoa-900 dark:text-cream-50">
+                                {cityStateZip}
+                              </p>
+                            )}
+                            
+                            {contact.isVerified && (
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                ✓ Verified
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Phone Numbers */}
+              {person.contactInfo && person.contactInfo.some(c => c.phone) && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Phone Numbers</p>
+                  <div className="space-y-3">
+                    {person.contactInfo
+                      .filter(contact => contact.phone)
+                      .map((contact) => (
+                        <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
+                              {contact.location.name}
+                            </span>
+                            {contact.isPrimary && (
+                              <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
+                            )}
+                          </div>
+                          
+                          <p className="text-base text-cocoa-900 dark:text-cream-50 font-medium">
+                            {contact.phone}
+                          </p>
+                          
+                          {contact.isVerified && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              ✓ Verified
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Email Addresses */}
+              {person.contactInfo && person.contactInfo.some(c => c.email) && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Email Addresses</p>
+                  <div className="space-y-3">
+                    {person.contactInfo
+                      .filter(contact => contact.email)
+                      .map((contact) => (
+                        <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
+                              {contact.location.name}
+                            </span>
+                            {contact.isPrimary && (
+                              <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
+                            )}
+                          </div>
+                          
+                          <p className="text-base text-cocoa-900 dark:text-cream-50">
+                            {contact.email}
+                          </p>
+                          
+                          {contact.isVerified && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              ✓ Verified
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* No Contact Info Message */}
+              {person.contactInfo && person.contactInfo.length === 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-2">Contact Information</p>
+                  <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">No contact information on file</p>
+                </div>
+              )}
+              
+              {/* Last Contact (for voters) */}
+              {person.voter && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Contact</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">
+                    {person.voter.lastContactDate
+                      ? `${formatDate(person.voter.lastContactDate)} (${person.voter.lastContactMethod || 'N/A'})`
+                      : '—'}
+                  </p>
+                </div>
+              )}
+              
+              {/* Notes */}
               {person.notes && (
-                <div className="md:col-span-2">
+                <div>
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Notes</p>
                   <p className="text-base text-cocoa-900 dark:text-cream-50">{person.notes}</p>
                 </div>
@@ -538,6 +715,171 @@ export default function PersonDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Voter Info */}
+        {person.voter && (
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
+            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-6">🗳️ Voter Information</h2>
+            
+            {/* Residence Section */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-3 flex items-center gap-2">
+                🏠 Residence Address
+              </h3>
+              {(() => {
+                const residence = getResidenceAddress();
+                if (residence) {
+                  const addressLines = formatAddress(residence);
+                  const cityStateZip = formatCityStateZip(residence);
+                  
+                  return (
+                    <div className="space-y-2">
+                      {addressLines.length > 0 ? (
+                        <div>
+                          {addressLines.map((line, idx) => (
+                            <p key={idx} className="text-base text-cocoa-900 dark:text-cream-50">
+                              {line}
+                            </p>
+                          ))}
+                          {cityStateZip && (
+                            <p className="text-base text-cocoa-900 dark:text-cream-50">
+                              {cityStateZip}
+                            </p>
+                          )}
+                        </div>
+                      ) : residence.fullAddress ? (
+                        <div>
+                          <p className="text-base text-cocoa-900 dark:text-cream-50">
+                            {residence.fullAddress}
+                          </p>
+                          {cityStateZip && (
+                            <p className="text-base text-cocoa-900 dark:text-cream-50">
+                              {cityStateZip}
+                            </p>
+                          )}
+                        </div>
+                      ) : cityStateZip ? (
+                        <p className="text-base text-cocoa-900 dark:text-cream-50">
+                          {cityStateZip}
+                        </p>
+                      ) : (
+                        <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">
+                          Address on file (details incomplete)
+                        </p>
+                      )}
+                      
+                      {residence.email && (
+                        <p className="text-sm text-cocoa-700 dark:text-cocoa-300">
+                          <span className="font-medium">Email:</span> {residence.email}
+                        </p>
+                      )}
+                      {residence.phone && (
+                        <p className="text-sm text-cocoa-700 dark:text-cocoa-300">
+                          <span className="font-medium">Phone:</span> {residence.phone}
+                        </p>
+                      )}
+                      {residence.isVerified && (
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                          ✓ Verified
+                        </p>
+                      )}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">
+                      No residence address on file
+                    </p>
+                  );
+                }
+              })()}
+            </div>
+
+            {/* Registration Information */}
+            <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-3 flex items-center gap-2">
+                📋 Registration Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Registration Date</p>
+                  <p className="text-base text-cocoa-900 dark:text-cream-50">
+                    {person.voter.registrationDate ? formatDate(person.voter.registrationDate) : 'Not recorded'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Registration Number</p>
+                  <p className="text-base text-cocoa-900 dark:text-cream-50 font-mono">
+                    {person.voter.registrationNumber || person.voter.externalId || 'Not available'}
+                  </p>
+                </div>
+                {person.voter.externalSource && (
+                  <div>
+                    <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Data Source</p>
+                    <p className="text-base text-cocoa-900 dark:text-cream-50">
+                      {person.voter.externalSource.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Party & Precinct Information */}
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-3 flex items-center gap-2">
+                🎯 Party & Precinct
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Party Affiliation</p>
+                  {person.voter.party ? (
+                    <p className="text-base text-cocoa-900 dark:text-cream-50">
+                      <span className="font-semibold">{person.voter.party.abbr}</span> - {person.voter.party.name}
+                    </p>
+                  ) : (
+                    <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">No party registered</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Precinct</p>
+                  {person.voter.precinct ? (
+                    <div>
+                      <p className="text-base text-cocoa-900 dark:text-cream-50">{person.voter.precinct.name}</p>
+                      {person.voter.precinctPortion && (
+                        <p className="text-sm text-cocoa-700 dark:text-cocoa-300">
+                          Portion: {person.voter.precinctPortion}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">No precinct assigned</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Voting Status */}
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-3 flex items-center gap-2">
+                ✉️ Voting Status
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">VBM Status</p>
+                  <p className="text-base text-cocoa-900 dark:text-cream-50">
+                    {person.voter.vbmStatus || 'Standard voting'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Contact Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
+                    {person.voter.contactStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Volunteer Info */}
         {person.volunteer && (

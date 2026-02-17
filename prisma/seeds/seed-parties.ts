@@ -19,6 +19,11 @@ export const PARTIES = [
     color: '#e81b23',
   },
   {
+    abbr: 'NPP',
+    name: 'No Party Preference',
+    color: '#808080',
+  },
+  {
     abbr: 'AIP',
     name: 'American Independent',
     color: '#754e37',
