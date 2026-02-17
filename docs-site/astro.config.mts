@@ -3,6 +3,7 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://Spinnernicholas.github.io/cocoa-canvas/',
+  base: '/cocoa-canvas/',
   integrations: [
     starlight({
       title: 'Cocoa Canvas',
