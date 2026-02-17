@@ -367,6 +367,7 @@ async function processVoterRecord(
     voter = await prisma.voter.update({
       where: { id: voter.id },
       data: voterData,
+      include: { person: true },
     });
     
     // Clear contact info and vote history if full import
@@ -378,19 +379,24 @@ async function processVoterRecord(
     // Create new voter
     voter = await prisma.voter.create({
       data: voterData,
+      include: { person: true },
     });
   }
   
   // Step 6: Add residence address as ContactInfo (linked to Person)
+  // Combine address and email in one ContactInfo record (unique constraint on personId+locationId)
   const resAddress = buildResidenceAddress(record);
-  if (resAddress) {
+  const email = normalize(record.EmailAddress);
+  
+  if (resAddress || email) {
     await prisma.contactInfo.create({
       data: {
         personId: person.id,
         locationId: locations.residenceLocationId,
         ...resAddress,
+        email: email || undefined, // Include email with residence address
         isPrimary: true,
-        isVerified: true,
+        isVerified: !!resAddress, // Verified if we have address
         source: 'contra_costa',
       },
     });
@@ -426,42 +432,25 @@ async function processVoterRecord(
     });
   }
   
-  // Step 9: Add email
-  const email = normalize(record.EmailAddress);
-  if (email) {
-    // Find or use a default location for email
-    await prisma.contactInfo.create({
-      data: {
-        personId: person.id,
-        locationId: locations.residenceLocationId, // Use residence as default for email
-        email,
-        isPrimary: false,
-        isVerified: false,
-        source: 'contra_costa',
-      },
-    });
-  }
-  
-  // Step 10: Import vote history (5 most recent elections)
+  // Step 9: Import vote history (5 most recent elections)
   for (let i = 1; i <= 5; i++) {
     const electionDate = parseDate(record[`ElectionDate_${i}` as keyof ContraCostaVoterRecord]);
     if (electionDate) {
-      // Look up or create Election
+      const electionAbbr = normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN';
+      
+      // Look up or create Election by date
       let election = await prisma.election.findUnique({
-        where: { date_abbr: {
-          date: electionDate,
-          abbr: normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN'
-        }},
+        where: { electionDate },
         select: { id: true }
       });
       
       if (!election) {
         election = await prisma.election.create({
           data: {
-            date: electionDate,
-            abbr: normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN',
-            description: normalize(record[`ElectionDesc_${i}` as keyof ContraCostaVoterRecord]),
-            type: normalize(record[`ElectionType_${i}` as keyof ContraCostaVoterRecord]),
+            electionDate,
+            electionAbbr,
+            electionDesc: normalize(record[`ElectionDesc_${i}` as keyof ContraCostaVoterRecord]),
+            electionType: normalize(record[`ElectionType_${i}` as keyof ContraCostaVoterRecord]),
           },
         });
       }

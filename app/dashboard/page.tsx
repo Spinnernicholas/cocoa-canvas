@@ -107,13 +107,13 @@ export default function DashboardPage() {
         <div className="mb-8">
           <h3 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Quick Navigation</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Voters */}
+            {/* People */}
             <Link
-              href="/voters"
+              href="/people"
               className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700 hover:shadow-md hover:border-cocoa-300 dark:hover:border-cocoa-600 transition-all"
             >
-              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">👥 Voters</h4>
-              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage voter database</p>
+              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">👥 People</h4>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage people & voters</p>
             </Link>
 
             {/* Campaigns */}

@@ -14,17 +14,30 @@ import Redis from 'ioredis';
 // Redis connection configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-// Create Redis connection for BullMQ
-export function createRedisConnection() {
-  return new Redis(REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  });
+// Parse Redis URL for connection options
+function parseRedisUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname || 'localhost',
+      port: parseInt(parsed.port) || 6379,
+      password: parsed.password || undefined,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    };
+  } catch {
+    return {
+      host: 'localhost',
+      port: 6379,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    };
+  }
 }
 
 // Default queue options
 export const defaultQueueOptions: QueueOptions = {
-  connection: createRedisConnection(),
+  connection: parseRedisUrl(REDIS_URL),
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -43,7 +56,7 @@ export const defaultQueueOptions: QueueOptions = {
 
 // Default worker options
 export const defaultWorkerOptions: WorkerOptions = {
-  connection: createRedisConnection(),
+  connection: parseRedisUrl(REDIS_URL),
   concurrency: 5,
   limiter: {
     max: 10,
@@ -98,7 +111,7 @@ export async function closeQueues() {
  */
 export async function checkRedisHealth(): Promise<boolean> {
   try {
-    const redis = createRedisConnection();
+    const redis = new Redis(parseRedisUrl(REDIS_URL));
     const pong = await redis.ping();
     await redis.quit();
     return pong === 'PONG';

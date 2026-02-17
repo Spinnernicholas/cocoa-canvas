@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.person = {
         OR: [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
+          { firstName: { contains: search } },
+          { lastName: { contains: search } },
         ],
       };
     }
@@ -38,13 +38,21 @@ export async function GET(request: NextRequest) {
       prisma.voter.findMany({
         where,
         include: {
-          person: true,
+          person: {
+            include: {
+              contactInfo: {
+                include: {
+                  location: true,
+                },
+              },
+              contactLogs: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+              },
+            },
+          },
           party: true,
           precinct: true,
-          contactLogs: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,

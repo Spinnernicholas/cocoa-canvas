@@ -15,47 +15,42 @@ export async function POST(
       return authResult.response || NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const person = await prisma.person.findUnique({
+      where: { id },
+      select: { id: true, voter: { select: { id: true } } },
+    });
+
+    if (!person) {
+      return NextResponse.json({ error: 'Person not found' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { contactType, method, outcome, notes, followUpNeeded, followUpDate } = body;
 
-    const contactMethod = method || contactType; // Support both field names for backwards compatibility
-
-    if (!contactMethod) {
-      return NextResponse.json({ error: 'Contact method is required' }, { status: 400 });
-    }
-
-    // Check if voter exists
-    const voter = await prisma.voter.findUnique({
-      where: { id },
-      include: { person: true },
-    });
-
-    if (!voter) {
-      return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
-    }
-
-    // Create contact log (linked to Person)
+    // Create contact log for the person
     const contactLog = await prisma.contactLog.create({
       data: {
-        personId: voter.personId,
-        method: contactMethod,
-        outcome: outcome || null,
-        notes: notes || null,
+        personId: person.id,
+        method: method || contactType || undefined, // Support both field names
+        outcome,
+        notes,
         followUpNeeded: followUpNeeded || false,
-        followUpDate: followUpDate ? new Date(followUpDate) : null,
+        followUpDate: followUpDate ? new Date(followUpDate) : undefined,
       },
     });
 
-    // Update voter's last contact info
-    await prisma.voter.update({
-      where: { id },
-      data: {
-        lastContactDate: new Date(),
-        lastContactMethod: contactMethod,
-      },
-    });
+    // Update voter's lastContactDate and lastContactMethod if they are a voter
+    if (person.voter && method) {
+      await prisma.voter.update({
+        where: { id: person.voter.id },
+        data: {
+          lastContactDate: new Date(),
+          lastContactMethod: method,
+        },
+      });
+    }
 
-    await auditLog(authResult.user?.userId || '', 'CONTACT_LOG_CREATE', request, 'contact_log', contactLog.id);
+    await auditLog(authResult.user?.userId || '', 'CONTACT_LOG_CREATE', request, 'person', person.id);
 
     return NextResponse.json(contactLog, { status: 201 });
   } catch (error) {
@@ -76,24 +71,12 @@ export async function GET(
       return authResult.response || NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if voter exists and get their personId
-    const voter = await prisma.voter.findUnique({
-      where: { id },
-      select: { personId: true },
-    });
-
-    if (!voter) {
-      return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
-    }
-
     const contactLogs = await prisma.contactLog.findMany({
-      where: { personId: voter.personId },
+      where: { personId: id },
       orderBy: { createdAt: 'desc' },
     });
 
-    await auditLog(authResult.user?.userId || '', 'CONTACT_LOG_LIST', request, 'voter', id);
-
-    return NextResponse.json(contactLogs);
+    return NextResponse.json({ contactLogs });
   } catch (error) {
     console.error('Error fetching contact logs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

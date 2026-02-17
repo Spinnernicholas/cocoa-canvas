@@ -32,19 +32,8 @@ interface ContactInfo {
   isVerified: boolean;
 }
 
-interface Person {
-  id: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  notes?: string;
-  contactInfo: ContactInfo[];
-  contactLogs: ContactLog[];
-}
-
 interface Voter {
   id: string;
-  person: Person;
   contactStatus: string;
   lastContactDate?: string;
   lastContactMethod?: string;
@@ -56,16 +45,46 @@ interface Voter {
   precinct?: {
     name: string;
   };
+}
+
+interface Volunteer {
+  id: string;
+  status: string;
+  skills?: string;
+  availability?: string;
+  hoursContributed: number;
+  lastVolunteerDate?: string;
+}
+
+interface Donor {
+  id: string;
+  totalContributed: number;
+  donorTier?: string;
+  lastDonationDate?: string;
+  lastDonationAmount?: number;
+}
+
+interface Person {
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  notes?: string;
+  contactInfo: ContactInfo[];
+  contactLogs: ContactLog[];
+  voter?: Voter | null;
+  volunteer?: Volunteer | null;
+  donor?: Donor | null;
   createdAt: string;
 }
 
-export default function VoterDetailPage() {
+export default function PersonDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const voterId = params.id as string;
+  const personId = params.id as string;
 
   const [user, setUser] = useState<any>(null);
-  const [voter, setVoter] = useState<Voter | null>(null);
+  const [person, setPerson] = useState<Person | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
@@ -107,16 +126,16 @@ export default function VoterDetailPage() {
     }
   }, [router]);
 
-  // Fetch voter
+  // Fetch person
   useEffect(() => {
-    if (!user || !voterId) return;
+    if (!user || !personId) return;
 
-    const fetchVoter = async () => {
+    const fetchPerson = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('authToken');
         
-        const response = await fetch(`/api/v1/voters/${voterId}`, {
+        const response = await fetch(`/api/v1/people/${personId}`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
 
@@ -128,36 +147,36 @@ export default function VoterDetailPage() {
             router.push('/login');
             return;
           }
-          setError('Failed to load voter');
+          setError('Failed to load person');
           return;
         }
 
         const data = await response.json();
-        setVoter(data);
+        setPerson(data);
         setFormData({
-          firstName: data.person.firstName,
-          lastName: data.person.lastName,
-          middleName: data.person.middleName || '',
-          notes: data.person.notes || '',
-          contactStatus: data.contactStatus,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          middleName: data.middleName || '',
+          notes: data.notes || '',
+          contactStatus: data.voter?.contactStatus || '',
         });
       } catch (err) {
-        console.error('Error fetching voter:', err);
-        setError('Error loading voter');
+        console.error('Error fetching person:', err);
+        setError('Error loading person');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchVoter();
-  }, [user, voterId]);
+    fetchPerson();
+  }, [user, personId]);
 
-  const handleSaveVoter = async (e: React.FormEvent) => {
+  const handleSavePerson = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/v1/voters/${voterId}`, {
+      const response = await fetch(`/api/v1/people/${personId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -174,16 +193,16 @@ export default function VoterDetailPage() {
           router.push('/login');
           return;
         }
-        setError('Failed to save voter');
+        setError('Failed to save person');
         return;
       }
 
       const updated = await response.json();
-      setVoter(updated);
+      setPerson(updated);
       setEditing(false);
     } catch (err) {
-      console.error('Error saving voter:', err);
-      setError('Error saving voter');
+      console.error('Error saving person:', err);
+      setError('Error saving person');
     }
   };
 
@@ -192,7 +211,7 @@ export default function VoterDetailPage() {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/v1/voters/${voterId}/contact-log`, {
+      const response = await fetch(`/api/v1/people/${personId}/contact-log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,24 +241,24 @@ export default function VoterDetailPage() {
         followUpDate: '',
       });
       
-      // Refresh voter data
-      const fetchResponse = await fetch(`/api/v1/voters/${voterId}`, {
+      // Refresh person data
+      const fetchResponse = await fetch(`/api/v1/people/${personId}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
       const updated = await fetchResponse.json();
-      setVoter(updated);
+      setPerson(updated);
     } catch (err) {
       console.error('Error logging contact:', err);
       setError('Error logging contact');
     }
   };
 
-  const handleDeleteVoter = async () => {
-    if (!confirm('Are you sure you want to delete this voter?')) return;
+  const handleDeletePerson = async () => {
+    if (!confirm('Are you sure you want to delete this person?')) return;
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/v1/voters/${voterId}`, {
+      const response = await fetch(`/api/v1/people/${personId}`, {
         method: 'DELETE',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
@@ -252,14 +271,14 @@ export default function VoterDetailPage() {
           router.push('/login');
           return;
         }
-        setError('Failed to delete voter');
+        setError('Failed to delete person');
         return;
       }
 
-      router.push('/voters');
+      router.push('/people');
     } catch (err) {
-      console.error('Error deleting voter:', err);
-      setError('Error deleting voter');
+      console.error('Error deleting person:', err);
+      setError('Error deleting person');
     }
   };
 
@@ -286,25 +305,25 @@ export default function VoterDetailPage() {
   };
 
   // Helper functions to extract contact info
-  const getVoterName = () => {
-    if (!voter) return '';
-    const { firstName, lastName, middleName } = voter.person;
+  const getPersonName = () => {
+    if (!person) return '';
+    const { firstName, lastName, middleName } = person;
     return middleName ? `${firstName} ${middleName} ${lastName}` : `${firstName} ${lastName}`;
   };
 
   const getPrimaryEmail = () => {
-    if (!voter) return null;
-    return voter.person.contactInfo.find(ci => ci.email)?.email || null;
+    if (!person) return null;
+    return person.contactInfo.find(ci => ci.email)?.email || null;
   };
 
   const getPrimaryPhone = () => {
-    if (!voter) return null;
-    return voter.person.contactInfo.find(ci => ci.phone)?.phone || null;
+    if (!person) return null;
+    return person.contactInfo.find(ci => ci.phone)?.phone || null;
   };
 
   const getPrimaryAddress = () => {
-    if (!voter) return null;
-    const addressInfo = voter.person.contactInfo.find(ci => ci.fullAddress);
+    if (!person) return null;
+    const addressInfo = person.contactInfo.find(ci => ci.fullAddress);
     return addressInfo?.fullAddress || null;
   };
 
@@ -317,20 +336,20 @@ export default function VoterDetailPage() {
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <div className="inline-block w-6 h-6 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading voter...</p>
+            <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading person...</p>
           </div>
         </main>
       </div>
     );
   }
 
-  if (!voter) {
+  if (!person) {
     return (
       <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900">
         <Header userName={user.name} />
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
-            <p className="text-cocoa-600 dark:text-cocoa-300">Voter not found</p>
+            <p className="text-cocoa-600 dark:text-cocoa-300">Person not found</p>
           </div>
         </main>
       </div>
@@ -353,7 +372,7 @@ export default function VoterDetailPage() {
             onClick={() => router.back()}
             className="text-cocoa-600 dark:text-cinnamon-400 hover:text-cocoa-700 dark:hover:text-cinnamon-300 font-medium text-sm flex items-center gap-1"
           >
-            ← Back to Voters
+            ← Back to People
           </button>
           <div className="flex gap-2">
             {!editing && (
@@ -365,7 +384,7 @@ export default function VoterDetailPage() {
                   Edit
                 </button>
                 <button
-                  onClick={handleDeleteVoter}
+                  onClick={handleDeletePerson}
                   className="px-3 py-1 bg-red-500 dark:bg-red-600 text-white rounded-lg text-sm hover:bg-red-600 dark:hover:bg-red-700"
                 >
                   Delete
@@ -381,17 +400,43 @@ export default function VoterDetailPage() {
           </div>
         )}
 
-        {/* Voter Info */}
+        {/* Person Info */}
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">{getVoterName()}</h1>
-            <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(voter.contactStatus)}`}>
-              {voter.contactStatus}
-            </span>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">{getPersonName()}</h1>
+              <div className="flex gap-2">
+                {person.voter && (
+                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                    🗳️ Voter
+                  </span>
+                )}
+                {person.volunteer && (
+                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                    🤝 Volunteer
+                  </span>
+                )}
+                {person.donor && (
+                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
+                    💰 Donor
+                  </span>
+                )}
+                {!person.voter && !person.volunteer && !person.donor && (
+                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300">
+                    👤 Person
+                  </span>
+                )}
+              </div>
+            </div>
+            {person.voter && (
+              <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
+                {person.voter.contactStatus}
+              </span>
+            )}
           </div>
 
           {editing ? (
-            <form onSubmit={handleSaveVoter} className="space-y-4">
+            <form onSubmit={handleSavePerson} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">First Name</label>
@@ -420,20 +465,22 @@ export default function VoterDetailPage() {
                     className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
                   />
                 </div>
-                <div className="md:col-span-3">
-                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Status</label>
-                  <select
-                    value={formData.contactStatus}
-                    onChange={(e) => setFormData({ ...formData, contactStatus: e.target.value })}
-                    className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="attempted">Attempted</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="refused">Refused</option>
-                    <option value="unreachable">Unreachable</option>
-                  </select>
-                </div>
+                {person.voter && (
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Status</label>
+                    <select
+                      value={formData.contactStatus}
+                      onChange={(e) => setFormData({ ...formData, contactStatus: e.target.value })}
+                      className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="attempted">Attempted</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="refused">Refused</option>
+                      <option value="unreachable">Unreachable</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Notes</label>
@@ -477,20 +524,86 @@ export default function VoterDetailPage() {
               <div>
                 <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Contact</p>
                 <p className="text-lg text-cocoa-900 dark:text-cream-50">
-                  {voter.lastContactDate
-                    ? `${formatDate(voter.lastContactDate)} (${voter.lastContactMethod || 'N/A'})`
+                  {person.voter?.lastContactDate
+                    ? `${formatDate(person.voter.lastContactDate)} (${person.voter.lastContactMethod || 'N/A'})`
                     : '—'}
                 </p>
               </div>
-              {voter.person.notes && (
+              {person.notes && (
                 <div className="md:col-span-2">
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Notes</p>
-                  <p className="text-base text-cocoa-900 dark:text-cream-50">{voter.person.notes}</p>
+                  <p className="text-base text-cocoa-900 dark:text-cream-50">{person.notes}</p>
                 </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Volunteer Info */}
+        {person.volunteer && (
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
+            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">🤝 Volunteer Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Status</p>
+                <p className="text-lg text-cocoa-900 dark:text-cream-50">{person.volunteer.status}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Hours Contributed</p>
+                <p className="text-lg text-cocoa-900 dark:text-cream-50">{person.volunteer.hoursContributed} hours</p>
+              </div>
+              {person.volunteer.skills && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Skills</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">{person.volunteer.skills}</p>
+                </div>
+              )}
+              {person.volunteer.availability && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Availability</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">{person.volunteer.availability}</p>
+                </div>
+              )}
+              {person.volunteer.lastVolunteerDate && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Volunteer Date</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">{formatDate(person.volunteer.lastVolunteerDate)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Donor Info */}
+        {person.donor && (
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
+            <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">💰 Donor Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Total Contributed</p>
+                <p className="text-lg text-cocoa-900 dark:text-cream-50">${person.donor.totalContributed.toFixed(2)}</p>
+              </div>
+              {person.donor.donorTier && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Donor Tier</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">{person.donor.donorTier}</p>
+                </div>
+              )}
+              {person.donor.lastDonationDate && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Donation Date</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">{formatDate(person.donor.lastDonationDate)}</p>
+                </div>
+              )}
+              {person.donor.lastDonationAmount && (
+                <div>
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Donation Amount</p>
+                  <p className="text-lg text-cocoa-900 dark:text-cream-50">${person.donor.lastDonationAmount.toFixed(2)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Contact Log */}
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
@@ -504,9 +617,9 @@ export default function VoterDetailPage() {
             </button>
           </div>
 
-          {voter.person.contactLogs && voter.person.contactLogs.length > 0 ? (
+          {person.contactLogs && person.contactLogs.length > 0 ? (
             <div className="space-y-4">
-              {voter.person.contactLogs.map((log) => (
+              {person.contactLogs.map((log) => (
                 <div key={log.id} className="border-l-4 border-cinnamon-500 pl-4 py-2">
                   <div className="flex items-center justify-between mb-1">
                     <p className="font-medium text-cocoa-900 dark:text-cream-50">{log.method || log.contactType || 'Contact'}</p>

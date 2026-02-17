@@ -354,6 +354,8 @@ model Person {
 
   // Relations
   voter       Voter? // Optional: if this person is registered to vote
+  volunteer   Volunteer? // Optional: if this person volunteers
+  donor       Donor? // Optional: if this person is a donor
   contactInfo ContactInfo[]
   contactLogs ContactLog[]
 
@@ -485,6 +487,82 @@ model Voter {
   @@index([registrationNumber])
   @@index([precinctId])
   @@index([contactStatus])
+}
+
+// Volunteer profile (specializes Person)
+model Volunteer {
+  id String @id @default(cuid())
+
+  // Link to core identity
+  personId String @unique
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  // Volunteer info
+  status String @default("active") // active, inactive, unavailable
+  skills String? // JSON array or comma-separated: "phone_banking,canvassing,data_entry"
+  
+  // Availability
+  availability String? // JSON or text: preferred days/times
+  hoursCommitted Int? // Total hours committed
+  hoursCompleted Int @default(0) // Hours completed so far
+  
+  // Assignment tracking
+  currentAssignment String? // Description of current task
+  teamId String? // Team or group assignment
+  
+  // Contact preferences
+  preferredContactMethod String? // email, phone, sms
+  canDrive Boolean @default(false)
+  hasOwnEquipment Boolean @default(false) // Own laptop, phone, etc.
+  
+  // Notes
+  notes String?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([teamId])
+}
+
+// Donor profile (specializes Person)
+model Donor {
+  id String @id @default(cuid())
+
+  // Link to core identity
+  personId String @unique
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  // Donor info
+  status String @default("active") // active, lapsed, major, recurring
+  totalContributed Float @default(0) // Total lifetime contributions
+  lastContributionDate DateTime?
+  lastContributionAmount Float?
+  
+  // Donor tier
+  donorTier String? // "sustainer", "major", "monthly", "annual"
+  recurringAmount Float? // Monthly recurring amount if applicable
+  
+  // Preferences
+  preferredAskAmount Float? // Suggested ask amount
+  doNotContact Boolean @default(false)
+  anonymousGiving Boolean @default(false)
+  
+  // Recognition
+  recognitionName String? // How they want to be recognized publicly
+  acknowledgeInPublic Boolean @default(true)
+  
+  // Notes
+  notes String?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([donorTier])
+  @@index([lastContributionDate])
 }
 
 // Election participation history

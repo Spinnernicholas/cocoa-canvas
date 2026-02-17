@@ -17,6 +17,29 @@ interface ContactInfo {
   isPrimary: boolean;
 }
 
+interface Voter {
+  id: string;
+  contactStatus: string;
+  lastContactDate?: string;
+  lastContactMethod?: string;
+  party?: { name: string; abbr: string };
+  precinct?: { name: string };
+}
+
+interface Volunteer {
+  id: string;
+  status: string;
+  skills?: string;
+  availability?: string;
+}
+
+interface Donor {
+  id: string;
+  status: string;
+  totalContributed: number;
+  lastContributionDate?: string;
+}
+
 interface Person {
   id: string;
   firstName: string;
@@ -24,14 +47,9 @@ interface Person {
   middleName?: string;
   contactInfo: ContactInfo[];
   contactLogs: any[];
-}
-
-interface Voter {
-  id: string;
-  person: Person;
-  contactStatus: string;
-  lastContactDate?: string;
-  lastContactMethod?: string;
+  voter?: Voter | null;
+  volunteer?: Volunteer | null;
+  donor?: Donor | null;
   createdAt: string;
 }
 
@@ -43,15 +61,16 @@ interface ImportFormat {
   supportsIncremental: boolean;
 }
 
-export default function VotersPage() {
+export default function PeoplePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [voters, setVoters] = useState<Voter[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   // Search and filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewFilter, setViewFilter] = useState<'all' | 'voters' | 'volunteers' | 'donors'>('all'); // View filter for person types
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -86,11 +105,11 @@ export default function VotersPage() {
     }
   }, [router]);
 
-  // Fetch voters
+  // Fetch people
   useEffect(() => {
     if (!user) return;
 
-    const fetchVoters = async () => {
+    const fetchPeople = async () => {
       try {
         setLoading(true);
         setError(''); // Clear any previous errors
@@ -99,6 +118,7 @@ export default function VotersPage() {
         const params = new URLSearchParams({
           limit: limit.toString(),
           offset: ((page - 1) * limit).toString(),
+          filter: viewFilter, // 'all' or 'voters'
         });
 
         if (searchQuery) {
@@ -109,7 +129,7 @@ export default function VotersPage() {
           params.append('status', statusFilter);
         }
 
-        const response = await fetch(`/api/v1/voters?${params}`, {
+        const response = await fetch(`/api/v1/people?${params}`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
 
@@ -122,24 +142,24 @@ export default function VotersPage() {
             return;
           }
           const errorData = await response.json().catch(() => ({}));
-          setError(errorData.error || 'Failed to load voters. Please try again.');
-          setVoters([]);
+          setError(errorData.error || 'Failed to load people. Please try again.');
+          setPeople([]);
           return;
         }
 
         const data = await response.json();
-        setVoters(data.voters || []);
+        setPeople(data.people || []);
         setTotal(data.total || 0);
       } catch (err) {
-        console.error('Error fetching voters:', err);
+        console.error('Error fetching people:', err);
         setError('Network error. Please check your connection and try again.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchVoters();
-  }, [user, page, searchQuery, statusFilter, limit]);
+    fetchPeople();
+  }, [user, page, searchQuery, viewFilter, statusFilter, limit]);
 
   // Handle drag and drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -303,17 +323,17 @@ export default function VotersPage() {
   };
 
   // Helper functions to extract contact info
-  const getVoterName = (voter: Voter) => {
-    const { firstName, lastName, middleName } = voter.person;
+  const getPersonName = (person: Person) => {
+    const { firstName, lastName, middleName } = person;
     return middleName ? `${firstName} ${middleName} ${lastName}` : `${firstName} ${lastName}`;
   };
 
-  const getPrimaryEmail = (voter: Voter) => {
-    return voter.person.contactInfo.find(ci => ci.email)?.email || null;
+  const getPrimaryEmail = (person: Person) => {
+    return person.contactInfo.find(ci => ci.email)?.email || null;
   };
 
-  const getPrimaryPhone = (voter: Voter) => {
-    return voter.person.contactInfo.find(ci => ci.phone)?.phone || null;
+  const getPrimaryPhone = (person: Person) => {
+    return person.contactInfo.find(ci => ci.phone)?.phone || null;
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -337,14 +357,72 @@ export default function VotersPage() {
         {/* Header Section */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">👥 Voters</h1>
-            <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">{total} voters in database</p>
+            <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">👥 People</h1>
+            <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">
+              {total} {viewFilter === 'voters' ? 'voters' : 'people'} in database
+            </p>
           </div>
           <button
             onClick={() => setShowImportModal(true)}
             className="px-4 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 font-medium transition-colors"
           >
             📥 Import Voters
+          </button>
+        </div>
+
+        {/* View Filter Tabs */}
+        <div className="mb-6 flex gap-2">
+          <button
+            onClick={() => {
+              setViewFilter('all');
+              setPage(1);
+            }}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewFilter === 'all'
+                ? 'bg-cocoa-600 dark:bg-cinnamon-600 text-white'
+                : 'bg-white dark:bg-cocoa-800 border border-cocoa-200 dark:border-cocoa-700 text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700'
+            }`}
+          >
+            👥 All People
+          </button>
+          <button
+            onClick={() => {
+              setViewFilter('voters');
+              setPage(1);
+            }}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewFilter === 'voters'
+                ? 'bg-cocoa-600 dark:bg-cinnamon-600 text-white'
+                : 'bg-white dark:bg-cocoa-800 border border-cocoa-200 dark:border-cocoa-700 text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700'
+            }`}
+          >
+            🗳️ Voters Only
+          </button>
+          <button
+            onClick={() => {
+              setViewFilter('volunteers');
+              setPage(1);
+            }}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewFilter === 'volunteers'
+                ? 'bg-cocoa-600 dark:bg-cinnamon-600 text-white'
+                : 'bg-white dark:bg-cocoa-800 border border-cocoa-200 dark:border-cocoa-700 text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700'
+            }`}
+          >
+            🤝 Volunteers
+          </button>
+          <button
+            onClick={() => {
+              setViewFilter('donors');
+              setPage(1);
+            }}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewFilter === 'donors'
+                ? 'bg-cocoa-600 dark:bg-cinnamon-600 text-white'
+                : 'bg-white dark:bg-cocoa-800 border border-cocoa-200 dark:border-cocoa-700 text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700'
+            }`}
+          >
+            💰 Donors
           </button>
         </div>
 
@@ -398,16 +476,16 @@ export default function VotersPage() {
           </div>
         )}
 
-        {/* Voters Table */}
+        {/* People Table */}
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
               <div className="inline-block w-6 h-6 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading voters...</p>
+              <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading people...</p>
             </div>
-          ) : voters.length === 0 ? (
+          ) : people.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-cocoa-600 dark:text-cocoa-300 text-lg">No voters found</p>
+              <p className="text-cocoa-600 dark:text-cocoa-300 text-lg">No people found</p>
               <p className="text-cocoa-500 dark:text-cocoa-400 text-sm mt-1">
                 {searchQuery || statusFilter !== 'all' ? 'Try adjusting filters' : 'Import voters to get started'}
               </p>
@@ -420,30 +498,59 @@ export default function VotersPage() {
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Name</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Email</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Phone</th>
+                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Type</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Status</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Last Contact</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cocoa-200 dark:divide-cocoa-700">
-                  {voters.map((voter) => (
+                  {people.map((person) => (
                     <tr
-                      key={voter.id}
+                      key={person.id}
                       className="hover:bg-cocoa-50 dark:hover:bg-cocoa-900/50 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/voters/${voter.id}`)}
+                      onClick={() => router.push(`/people/${person.id}`)}
                     >
-                      <td className="px-6 py-4 font-medium text-cocoa-900 dark:text-cream-50">{getVoterName(voter)}</td>
-                      <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">{getPrimaryEmail(voter) || '—'}</td>
-                      <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">{getPrimaryPhone(voter) || '—'}</td>
+                      <td className="px-6 py-4 font-medium text-cocoa-900 dark:text-cream-50">{getPersonName(person)}</td>
+                      <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">{getPrimaryEmail(person) || '—'}</td>
+                      <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">{getPrimaryPhone(person) || '—'}</td>
                       <td className="px-6 py-4">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusBadgeColor(voter.contactStatus)}`}>
-                          {getStatusEmoji(voter.contactStatus)} {voter.contactStatus}
-                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {person.voter && (
+                            <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                              🗳️ Voter
+                            </span>
+                          )}
+                          {person.volunteer && (
+                            <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                              🤝 Volunteer
+                            </span>
+                          )}
+                          {person.donor && (
+                            <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
+                              💰 Donor
+                            </span>
+                          )}
+                          {!person.voter && !person.volunteer && !person.donor && (
+                            <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300">
+                              👤 Person
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {person.voter ? (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
+                            {getStatusEmoji(person.voter.contactStatus)} {person.voter.contactStatus}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
-                        {voter.lastContactDate ? (
+                        {person.voter?.lastContactDate ? (
                           <>
-                            <div>{formatDate(voter.lastContactDate)}</div>
-                            <div className="text-xs text-cocoa-500 dark:text-cocoa-400">{voter.lastContactMethod || 'N/A'}</div>
+                            <div>{formatDate(person.voter.lastContactDate)}</div>
+                            <div className="text-xs text-cocoa-500 dark:text-cocoa-400">{person.voter.lastContactMethod || 'N/A'}</div>
                           </>
                         ) : (
                           '—'

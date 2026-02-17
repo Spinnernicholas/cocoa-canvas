@@ -18,12 +18,20 @@ export async function GET(
     const voter = await prisma.voter.findUnique({
       where: { id },
       include: {
-        person: true,
+        person: {
+          include: {
+            contactInfo: {
+              include: {
+                location: true,
+              },
+            },
+            contactLogs: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        },
         party: true,
         precinct: true,
-        contactLogs: {
-          orderBy: { createdAt: 'desc' },
-        },
       },
     });
 
@@ -85,12 +93,15 @@ export async function PUT(
         ...(contactStatus && { contactStatus }),
       },
       include: {
-        person: true,
+        person: {
+          include: {
+            contactLogs: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        },
         party: true,
         precinct: true,
-        contactLogs: {
-          orderBy: { createdAt: 'desc' },
-        },
       },
     });
 
@@ -126,15 +137,16 @@ export async function DELETE(
     // Check if voter exists
     const voter = await prisma.voter.findUnique({
       where: { id },
+      select: { personId: true },
     });
 
     if (!voter) {
       return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
     }
 
-    // Delete related contact logs
+    // Delete related contact logs (linked to Person)
     await prisma.contactLog.deleteMany({
-      where: { voterId: id },
+      where: { personId: voter.personId },
     });
 
     // Delete voter
