@@ -1,0 +1,41 @@
+/* Cocoa Canvas theme colors */
+:root {
+  /* Primary cocoa brown colors */
+  --sl-color-accent-low: #faf8f5;
+  --sl-color-accent-low-contrast: #f5f0e8;
+  --sl-color-accent: #8B6F47;
+  --sl-color-accent-high: #54402a;
+  
+  /* Dark theme adjustments */
+  --sl-color-accent-dark: #a89967;
+  --sl-color-accent-dark-high: #d4bcA0;
+  
+  /* Cinnamon accent for highlights */
+  --sl-color-success: #c85a3a;
+  --sl-color-warning: #d97757;
+  
+  /* Text colors */
+  --sl-color-white: #fef9f5;
+  --sl-color-gray-1: #fffdfb;
+  --sl-color-gray-2: #f5f0e8;
+  --sl-color-gray-6: #3d2e1f;
+  --sl-color-gray-7: #2a1f15;
+}
+
+/* Light theme */
+[data-theme='light'] {
+  --sl-color-accent-low: #faf8f5;
+  --sl-color-accent-low-contrast: #f5f0e8;
+  --sl-color-accent: #6d5537;
+  --sl-color-accent-high: #54402a;
+  --sl-color-backdrop: rgba(139, 111, 71, 0.1);
+}
+
+/* Dark theme */
+[data-theme='dark'] {
+  --sl-color-accent-low: #3d2e1f;
+  --sl-color-accent-low-contrast: #54402a;
+  --sl-color-accent: #a89967;
+  --sl-color-accent-high: #d4bcA0;
+  --sl-color-backdrop: rgba(168, 153, 103, 0.2);
+}

@@ -8,6 +8,7 @@ export default defineConfig({
     starlight({
       title: 'Cocoa Canvas',
       description: 'Open-source voter database and canvassing platform',
+      customCss: ['./src/styles/theme.css'],
       social: [
         { label: 'GitHub', icon: 'github', href: 'https://github.com/Spinnernicholas/cocoa-canvas' },
       ],
