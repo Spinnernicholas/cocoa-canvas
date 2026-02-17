@@ -190,9 +190,9 @@ export async function importContraCostaFile(
   // Ensure location types exist
   const residenceLocation = await prisma.location.findUnique({ where: { name: 'Residence' } });
   const mailingLocation = await prisma.location.findUnique({ where: { name: 'Mailing' } });
-  const cellLocation = await prisma.location.findUnique({ where: { name: 'Cell' } });
+  const unknownLocation = await prisma.location.findUnique({ where: { name: 'Unknown' } });
   
-  if (!residenceLocation || !mailingLocation || !cellLocation) {
+  if (!residenceLocation || !mailingLocation || !unknownLocation) {
     return {
       success: false,
       processed: 0,
@@ -221,7 +221,7 @@ export async function importContraCostaFile(
         await processVoterRecord(record, importType, {
           residenceLocationId: residenceLocation.id,
           mailingLocationId: mailingLocation.id,
-          cellLocationId: cellLocation.id,
+          unknownLocationId: unknownLocation.id,
         });
         
         processed++;
@@ -257,7 +257,7 @@ export async function importContraCostaFile(
 async function processVoterRecord(
   record: ContraCostaVoterRecord,
   importType: 'full' | 'incremental',
-  locations: { residenceLocationId: string; mailingLocationId: string; cellLocationId: string }
+  locations: { residenceLocationId: string; mailingLocationId: string; unknownLocationId: string }
 ) {
   
   const voterFileId = normalize(record.VoterID);
@@ -371,7 +371,9 @@ async function processVoterRecord(
     
     // Clear contact info and vote history if full import
     if (importType === 'full') {
-      await prisma.contactInfo.deleteMany({ where: { personId: person.id } });
+      await prisma.address.deleteMany({ where: { personId: person.id } });
+      await prisma.phone.deleteMany({ where: { personId: person.id } });
+      await prisma.email.deleteMany({ where: { personId: person.id } });
       await prisma.voteHistory.deleteMany({ where: { voterId: voter.id } });
     }
   } else {
@@ -382,20 +384,17 @@ async function processVoterRecord(
     });
   }
   
-  // Step 6: Add residence address as ContactInfo (linked to Person)
-  // Combine address and email in one ContactInfo record (unique constraint on personId+locationId)
+  // Step 6: Add residence address (linked to Person)
   const resAddress = buildResidenceAddress(record);
-  const email = normalize(record.EmailAddress);
   
-  if (resAddress || email) {
-    await prisma.contactInfo.create({
+  if (resAddress) {
+    await prisma.address.create({
       data: {
         personId: person.id,
         locationId: locations.residenceLocationId,
         ...resAddress,
-        email: email || undefined, // Include email with residence address
         isPrimary: true,
-        isVerified: !!resAddress, // Verified if we have address
+        isVerified: true,
         source: 'contra_costa',
       },
     });
@@ -404,7 +403,7 @@ async function processVoterRecord(
   // Step 7: Add mailing address (if different from residence)
   const mailAddress = buildMailingAddress(record);
   if (mailAddress && mailAddress.fullAddress !== resAddress?.fullAddress) {
-    await prisma.contactInfo.create({
+    await prisma.address.create({
       data: {
         personId: person.id,
         locationId: locations.mailingLocationId,
@@ -416,14 +415,14 @@ async function processVoterRecord(
     });
   }
   
-  // Step 8: Add phone number
-  const phone = normalize(record.PhoneNumber);
-  if (phone) {
-    await prisma.contactInfo.create({
+  // Step 8: Add email address
+  const email = normalize(record.EmailAddress);
+  if (email) {
+    await prisma.email.create({
       data: {
         personId: person.id,
-        locationId: locations.cellLocationId,
-        phone,
+        locationId: locations.unknownLocationId,
+        address: email,
         isPrimary: true,
         isVerified: false,
         source: 'contra_costa',
@@ -431,7 +430,22 @@ async function processVoterRecord(
     });
   }
   
-  // Step 9: Import vote history (5 most recent elections)
+  // Step 9: Add phone number
+  const phone = normalize(record.PhoneNumber);
+  if (phone) {
+    await prisma.phone.create({
+      data: {
+        personId: person.id,
+        locationId: locations.unknownLocationId,
+        number: phone,
+        isPrimary: true,
+        isVerified: false,
+        source: 'contra_costa',
+      },
+    });
+  }
+  
+  // Step 10: Import vote history (5 most recent elections)
   for (let i = 1; i <= 5; i++) {
     const electionDate = parseDate(record[`ElectionDate_${i}` as keyof ContraCostaVoterRecord]);
     if (electionDate) {

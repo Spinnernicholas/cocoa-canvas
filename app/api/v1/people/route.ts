@@ -41,10 +41,20 @@ export async function GET(request: NextRequest) {
       prisma.person.findMany({
         where,
         include: {
-          voter: { include: { party: true, precinct: true } },
+          voter: { include: { party: true,precinct: true } },
           volunteer: true,
           donor: true,
-          contactInfo: {
+          addresses: {
+            include: {
+              location: true,
+            },
+          },
+          phones: {
+            include: {
+              location: true,
+            },
+          },
+          emails: {
             include: {
               location: true,
             },
@@ -105,7 +115,17 @@ export async function POST(request: NextRequest) {
       },
       include: {
         voter: true,
-        contactInfo: {
+        addresses: {
+          include: {
+            location: true,
+          },
+        },
+        phones: {
+          include: {
+            location: true,
+          },
+        },
+        emails: {
           include: {
             location: true,
           },

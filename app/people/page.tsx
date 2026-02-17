@@ -6,14 +6,33 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
 
-interface ContactInfo {
+interface Address {
   id: string;
   location: {
     name: string;
   };
-  email?: string;
-  phone?: string;
   fullAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  isPrimary: boolean;
+}
+
+interface Phone {
+  id: string;
+  location: {
+    name: string;
+  };
+  number: string;
+  isPrimary: boolean;
+}
+
+interface Email {
+  id: string;
+  location: {
+    name: string;
+  };
+  address: string;
   isPrimary: boolean;
 }
 
@@ -42,7 +61,9 @@ interface Person {
   firstName: string;
   lastName: string;
   middleName?: string;
-  contactInfo: ContactInfo[];
+  addresses: Address[];
+  phones: Phone[];
+  emails: Email[];
   contactLogs: any[];
   voter?: Voter | null;
   volunteer?: Volunteer | null;
@@ -292,11 +313,11 @@ export default function PeoplePage() {
   };
 
   const getPrimaryEmail = (person: Person) => {
-    return person.contactInfo.find(ci => ci.email)?.email || null;
+    return person.emails.find(e => e.isPrimary)?.address || null;
   };
 
   const getPrimaryPhone = (person: Person) => {
-    return person.contactInfo.find(ci => ci.phone)?.phone || null;
+    return person.phones.find(p => p.isPrimary)?.number || null;
   };
 
   const getLatestContactLog = (person: Person) => {

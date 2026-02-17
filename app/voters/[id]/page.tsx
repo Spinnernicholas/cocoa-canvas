@@ -16,18 +16,45 @@ interface ContactLog {
   createdAt: string;
 }
 
-interface ContactInfo {
+interface Address {
   id: string;
   location: {
     id: string;
     name: string;
   };
-  email?: string;
-  phone?: string;
   fullAddress?: string;
   city?: string;
   state?: string;
   zipCode?: string;
+  houseNumber?: string;
+  preDirection?: string;
+  streetName?: string;
+  streetSuffix?: string;
+  postDirection?: string;
+  unitAbbr?: string;
+  unitNumber?: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+}
+
+interface Phone {
+  id: string;
+  location: {
+    id: string;
+    name: string;
+  };
+  number: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+}
+
+interface Email {
+  id: string;
+  location: {
+    id: string;
+    name: string;
+  };
+  address: string;
   isPrimary: boolean;
   isVerified: boolean;
 }
@@ -38,7 +65,9 @@ interface Person {
   lastName: string;
   middleName?: string;
   notes?: string;
-  contactInfo: ContactInfo[];
+  addresses: Address[];
+  phones: Phone[];
+  emails: Email[];
   contactLogs: ContactLog[];
 }
 
@@ -289,17 +318,17 @@ export default function VoterDetailPage() {
 
   const getPrimaryEmail = () => {
     if (!voter) return null;
-    return voter.person.contactInfo.find(ci => ci.email)?.email || null;
+    return voter.person.emails.find(e => e.isPrimary)?.address || null;
   };
 
   const getPrimaryPhone = () => {
     if (!voter) return null;
-    return voter.person.contactInfo.find(ci => ci.phone)?.phone || null;
+    return voter.person.phones.find(p => p.isPrimary)?.number || null;
   };
 
   const getPrimaryAddress = () => {
     if (!voter) return null;
-    const addressInfo = voter.person.contactInfo.find(ci => ci.fullAddress);
+    const addressInfo = voter.person.addresses.find(a => a.isPrimary);
     return addressInfo?.fullAddress || null;
   };
 

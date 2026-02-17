@@ -26,7 +26,17 @@ export async function GET(
         },
         volunteer: true,
         donor: true,
-        contactInfo: {
+        addresses: {
+          include: {
+            location: true,
+          },
+        },
+        phones: {
+          include: {
+            location: true,
+          },
+        },
+        emails: {
           include: {
             location: true,
           },
@@ -83,7 +93,17 @@ export async function PUT(
         },
         volunteer: true,
         donor: true,
-        contactInfo: {
+        addresses: {
+          include: {
+            location: true,
+          },
+        },
+        phones: {
+          include: {
+            location: true,
+          },
+        },
+        emails: {
           include: {
             location: true,
           },

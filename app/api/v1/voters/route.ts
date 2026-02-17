@@ -35,7 +35,17 @@ export async function GET(request: NextRequest) {
         include: {
           person: {
             include: {
-              contactInfo: {
+              addresses: {
+                include: {
+                  location: true,
+                },
+              },
+              phones: {
+                include: {
+                  location: true,
+                },
+              },
+              emails: {
                 include: {
                   location: true,
                 },

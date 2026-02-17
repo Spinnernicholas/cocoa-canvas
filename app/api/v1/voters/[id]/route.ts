@@ -20,7 +20,17 @@ export async function GET(
       include: {
         person: {
           include: {
-            contactInfo: {
+            addresses: {
+              include: {
+                location: true,
+              },
+            },
+            phones: {
+              include: {
+                location: true,
+              },
+            },
+            emails: {
               include: {
                 location: true,
               },
@@ -92,6 +102,21 @@ export async function PUT(
       include: {
         person: {
           include: {
+            addresses: {
+              include: {
+                location: true,
+              },
+            },
+            phones: {
+              include: {
+                location: true,
+              },
+            },
+            emails: {
+              include: {
+                location: true,
+              },
+            },
             contactLogs: {
               orderBy: { createdAt: 'desc' },
             },

@@ -103,19 +103,19 @@ export default function JobDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'processing': return 'text-blue-600 dark:text-blue-400';
-      case 'completed': return 'text-green-600 dark:text-green-400';
-      case 'failed': return 'text-red-600 dark:text-red-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+      case 'processing': return 'text-blue-700 dark:text-blue-300';
+      case 'completed': return 'text-green-700 dark:text-green-300';
+      case 'failed': return 'text-red-700 dark:text-red-300';
+      default: return 'text-cocoa-700 dark:text-cocoa-300';
     }
   };
 
   const getStatusBgColor = (status: string) => {
     switch (status) {
-      case 'processing': return 'bg-blue-100 dark:bg-blue-900';
-      case 'completed': return 'bg-green-100 dark:bg-green-900';
-      case 'failed': return 'bg-red-100 dark:bg-red-900';
-      default: return 'bg-gray-100 dark:bg-gray-900';
+      case 'processing': return 'bg-blue-100 dark:bg-blue-900/30';
+      case 'completed': return 'bg-green-100 dark:bg-green-900/30';
+      case 'failed': return 'bg-red-100 dark:bg-red-900/30';
+      default: return 'bg-cocoa-100 dark:bg-cocoa-900/30';
     }
   };
 
@@ -139,34 +139,42 @@ export default function JobDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
+      {/* Decorative Marshmallows */}
+      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-bounce" style={{ animationDuration: '3.8s' }}>
+        <Marshmallow size={44} />
+      </div>
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
+        <Marshmallow size={36} />
+      </div>
+
       <Header userName={user?.name || 'User'} />
       
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
         <div className="mb-6">
-          <Link href="/jobs" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link href="/jobs" className="text-cinnamon-600 dark:text-cinnamon-400 hover:underline">
             ← Back to Jobs
           </Link>
         </div>
 
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">Loading job details...</p>
+            <p className="text-cocoa-600 dark:text-cocoa-400">Loading job details...</p>
           </div>
         ) : error ? (
-          <div className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 p-4 rounded-lg">
+          <div className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-4 rounded-lg border border-red-200 dark:border-red-800">
             {error}
           </div>
         ) : job ? (
           <div className="space-y-6">
             {/* Header */}
-            <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
+            <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">
                     Job {job.id.substring(0, 8)}
                   </h1>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  <p className="text-cocoa-600 dark:text-cocoa-400 text-sm mt-1">
                     {job.type === 'voter_import' ? 'Voter Import' : job.type}
                   </p>
                 </div>
@@ -178,19 +186,19 @@ export default function JobDetailPage() {
 
             {/* Progress Bar */}
             {job.status === 'processing' && (
-              <div className="space-y-2">
+              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{Math.round(job.progress)}%</span>
+                  <span className="text-sm font-medium text-cocoa-700 dark:text-cocoa-300">Progress</span>
+                  <span className="text-sm font-semibold text-cocoa-900 dark:text-cream-50">{Math.round(job.progress)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div className="w-full bg-cocoa-200 dark:bg-cocoa-700 rounded-full h-3">
                   <div
-                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-cocoa-600 to-cinnamon-600 h-3 rounded-full transition-all duration-300"
                     style={{ width: `${job.progress}%` }}
                   />
                 </div>
                 {job.totalItems && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-cocoa-600 dark:text-cocoa-400">
                     {job.processedItems || 0} of {job.totalItems} items processed
                   </p>
                 )}
@@ -199,49 +207,49 @@ export default function JobDetailPage() {
 
             {/* Job Details */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Created</p>
-                <p className="mt-2 text-sm text-gray-900 dark:text-white">{formatDate(job.createdAt)}</p>
+              <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
+                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Created</p>
+                <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.createdAt)}</p>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Duration</p>
-                <p className="mt-2 text-sm text-gray-900 dark:text-white">{calculateDuration(job.startedAt, job.completedAt)}</p>
+              <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
+                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Duration</p>
+                <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{calculateDuration(job.startedAt, job.completedAt)}</p>
               </div>
               {job.startedAt && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Started</p>
-                  <p className="mt-2 text-sm text-gray-900 dark:text-white">{formatDate(job.startedAt)}</p>
+                <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Started</p>
+                  <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.startedAt)}</p>
                 </div>
               )}
               {job.completedAt && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Completed</p>
-                  <p className="mt-2 text-sm text-gray-900 dark:text-white">{formatDate(job.completedAt)}</p>
+                <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
+                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Completed</p>
+                  <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.completedAt)}</p>
                 </div>
               )}
             </div>
 
             {/* Import Job Details */}
             {job.type === 'voter_import' && job.data && (
-              <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Details</h3>
+              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
+                <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Import Details</h3>
                 <dl className="space-y-4">
                   {job.data.format && (
                     <div>
-                      <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">Format</dt>
-                      <dd className="mt-1 text-sm text-gray-900 dark:text-white">{job.data.format}</dd>
+                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Format</dt>
+                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.format}</dd>
                     </div>
                   )}
                   {job.data.importType && (
                     <div>
-                      <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">Import Type</dt>
-                      <dd className="mt-1 text-sm text-gray-900 dark:text-white">{job.data.importType === 'full' ? 'Full Import' : 'Merge with Existing'}</dd>
+                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Import Type</dt>
+                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.importType === 'full' ? 'Full Import' : 'Merge with Existing'}</dd>
                     </div>
                   )}
                   {job.totalItems && (
                     <div>
-                      <dt className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Items</dt>
-                      <dd className="mt-1 text-sm text-gray-900 dark:text-white">{job.totalItems}</dd>
+                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Total Items</dt>
+                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.totalItems}</dd>
                     </div>
                   )}
                 </dl>
@@ -250,11 +258,11 @@ export default function JobDetailPage() {
 
             {/* Error Log */}
             {job.errorLog && job.errorLog.length > 0 && (
-              <div className="bg-red-50 dark:bg-red-900 p-6 rounded-lg">
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-4">Errors ({job.errorLog.length})</h3>
                 <ul className="space-y-3">
                   {job.errorLog.slice(0, 10).map((error: any, idx: number) => (
-                    <li key={idx} className="text-sm text-red-800 dark:text-red-200 bg-red-100 dark:bg-red-800 p-3 rounded">
+                    <li key={idx} className="text-sm text-red-800 dark:text-red-200 bg-red-100 dark:bg-red-800/50 p-3 rounded">
                       <p className="font-monospace break-words">{error.message || error}</p>
                       {error.row && <p className="text-xs mt-1 opacity-75">Row {error.row}</p>}
                     </li>
@@ -270,7 +278,7 @@ export default function JobDetailPage() {
 
             {/* Success Message */}
             {job.status === 'completed' && (
-              <div className="bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-100 p-6 rounded-lg">
+              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-100 rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold mb-2">✓ Job Completed Successfully</h3>
                 {job.type === 'voter_import' && (
                   <p>Your voter import has been completed. The voters have been added to the system.</p>
@@ -280,22 +288,22 @@ export default function JobDetailPage() {
 
             {/* Failed Message */}
             {job.status === 'failed' && (
-              <div className="bg-red-50 dark:bg-red-900 text-red-800 dark:text-red-100 p-6 rounded-lg">
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-100 rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold mb-2">✗ Job Failed</h3>
                 <p>The job encountered errors and could not be completed. Review the error log above for details.</p>
               </div>
             )}
 
             {/* Back to Jobs Button */}
-            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-              <Link href="/jobs" className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <div className="pt-6">
+              <Link href="/jobs" className="inline-block px-6 py-2 bg-gradient-to-r from-cocoa-600 to-cinnamon-600 text-white rounded-lg hover:from-cocoa-700 hover:to-cinnamon-700 font-medium transition-colors shadow-sm">
                 Back to Job Queue
               </Link>
             </div>
           </div>
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">Job not found</p>
+            <p className="text-cocoa-600 dark:text-cocoa-400">Job not found</p>
           </div>
         )}
       </div>

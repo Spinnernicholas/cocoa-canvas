@@ -36,6 +36,11 @@ export const LOCATION_TYPES = {
     name: 'Residence',
     description: 'Voter registration residence address',
   },
+  UNKNOWN: {
+    id: 'loc_unknown',
+    name: 'Unknown',
+    description: 'Location type not specified or unknown',
+  },
 } as const;
 
 export async function seedLocations(verbose = true) {

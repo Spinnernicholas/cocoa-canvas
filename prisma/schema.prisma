@@ -356,7 +356,9 @@ model Person {
   voter       Voter? // Optional: if this person is registered to vote
   volunteer   Volunteer? // Optional: if this person volunteers
   donor       Donor? // Optional: if this person is a donor
-  contactInfo ContactInfo[]
+  addresses   Address[]
+  phones      Phone[]
+  emails      Email[]
   contactLogs ContactLog[]
 
   createdAt DateTime @default(now())
@@ -379,7 +381,9 @@ model Location {
   isActive    Boolean @default(true)
 
   // Relations
-  contactInfo ContactInfo[]
+  addresses Address[]
+  phones    Phone[]
+  emails    Email[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -388,19 +392,19 @@ model Location {
   @@index([category])
 }
 
-// Contact information (phone, email, address)
-model ContactInfo {
+// Physical address
+model Address {
   id String @id @default(cuid())
 
   // Which person
   personId String
   person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  // Contact location/type
+  // Address location/type
   locationId String
   location   Location @relation(fields: [locationId], references: [id])
 
-  // Address components (for address-type locations)
+  // Address components
   houseNumber   String?
   preDirection  String? // N, S, E, W
   streetName    String?
@@ -413,28 +417,95 @@ model ContactInfo {
   zipCode       String?
   fullAddress   String? // Computed/normalized address
 
-  // Digital contact
-  phone String? // E.164 format: +1-650-253-0000
-  email String? // Normalized lowercase
-
   // Verification / Priority
-  isPrimary   Boolean @default(false) // Primary method for this location type
-  isVerified  Boolean @default(false) // Verified as working
-  isCurrently Boolean @default(true) // Still valid (not "moved")
+  isPrimary   Boolean @default(false) // Primary address for this location type
+  isVerified  Boolean @default(false) // Verified as accurate
+  isCurrently Boolean @default(true) // Still current (not "moved")
 
   // Tracking
-  source         String? // "county_file", "csv_import", "user_entry", "enrichment"
-  verifiedAt     DateTime?
-  violationCount Int       @default(0) // TCPA violations
+  source     String? // "county_file", "csv_import", "user_entry", "enrichment"
+  verifiedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([personId, locationId])
   @@index([personId])
   @@index([locationId])
-  @@index([phone])
-  @@index([email])
+  @@index([isPrimary])
+  @@index([isCurrently])
+}
+
+// Phone number
+model Phone {
+  id String @id @default(cuid())
+
+  // Which person
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  // Phone location/type (Cell, Home, Work, etc.)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  // Phone number
+  number String // E.164 format: +1-650-253-0000
+
+  // Verification / Priority
+  isPrimary        Boolean @default(false) // Primary phone for this location type
+  isVerified       Boolean @default(false) // Verified as working
+  isCurrently      Boolean @default(true) // Still valid
+  violationCount   Int     @default(0) // TCPA violations
+  canText          Boolean @default(false) // SMS-capable
+  hasConsent       Boolean @default(false) // Has consent for contact
+  doNotCall        Boolean @default(false) // On do-not-call list
+
+  // Tracking
+  source     String? // "county_file", "csv_import", "user_entry", "enrichment"
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personId])
+  @@index([locationId])
+  @@index([number])
+  @@index([isPrimary])
+  @@index([isCurrently])
+}
+
+// Email address
+model Email {
+  id String @id @default(cuid())
+
+  // Which person
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  // Email location/type (Personal, Work, etc.)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  // Email address
+  address String // Normalized lowercase
+
+  // Verification / Priority
+  isPrimary       Boolean @default(false) // Primary email for this location type
+  isVerified      Boolean @default(false) // Verified as working
+  isCurrently     Boolean @default(true) // Still valid
+  bounceCount     Int     @default(0) // Email bounces
+  hasConsent      Boolean @default(false) // Has consent for contact
+  unsubscribed    Boolean @default(false) // Unsubscribed from emails
+
+  // Tracking
+  source     String? // "county_file", "csv_import", "user_entry", "enrichment"
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personId])
+  @@index([locationId])
+  @@index([address])
   @@index([isPrimary])
   @@index([isCurrently])
 }

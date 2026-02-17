@@ -16,14 +16,12 @@ interface ContactLog {
   createdAt: string;
 }
 
-interface ContactInfo {
+interface Address {
   id: string;
   location: {
     id: string;
     name: string;
   };
-  email?: string;
-  phone?: string;
   houseNumber?: string;
   preDirection?: string;
   streetName?: string;
@@ -35,6 +33,28 @@ interface ContactInfo {
   city?: string;
   state?: string;
   zipCode?: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+}
+
+interface Phone {
+  id: string;
+  location: {
+    id: string;
+    name: string;
+  };
+  number: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+}
+
+interface Email {
+  id: string;
+  location: {
+    id: string;
+    name: string;
+  };
+  address: string;
   isPrimary: boolean;
   isVerified: boolean;
 }
@@ -82,7 +102,9 @@ interface Person {
   lastName: string;
   middleName?: string;
   notes?: string;
-  contactInfo: ContactInfo[];
+  addresses: Address[];
+  phones: Phone[];
+  emails: Email[];
   contactLogs: ContactLog[];
   voter?: Voter | null;
   volunteer?: Volunteer | null;
@@ -323,62 +345,61 @@ export default function PersonDetailPage() {
 
   const getPrimaryEmail = () => {
     if (!person) return null;
-    return person.contactInfo.find(ci => ci.email)?.email || null;
+    return person.emails.find(e => e.isPrimary)?.address || null;
   };
 
   const getPrimaryPhone = () => {
     if (!person) return null;
-    return person.contactInfo.find(ci => ci.phone)?.phone || null;
+    return person.phones.find(p => p.isPrimary)?.number || null;
   };
 
   const getPrimaryAddress = () => {
     if (!person) return null;
-    const addressInfo = person.contactInfo.find(ci => ci.fullAddress);
+    const addressInfo = person.addresses.find(a => a.isPrimary);
     return addressInfo?.fullAddress || null;
   };
 
   const getResidenceAddress = () => {
     if (!person) return null;
-    // Look for contact info with location name "Residence" or category "Residence"
-    const residence = person.contactInfo.find(ci => 
-      ci.location?.name?.toLowerCase().includes('residence') ||
-      ci.fullAddress
-    );
+    // Look for address with location name "Residence"
+    const residence = person.addresses.find(a => 
+      a.location?.name?.toLowerCase().includes('residence')
+    ) || person.addresses.find(a => a.isPrimary);
     return residence;
   };
 
-  const formatAddress = (contactInfo: ContactInfo) => {
+  const formatAddress = (address: Address) => {
     const parts = [];
     
     // Street address line
     const streetParts = [];
-    if (contactInfo.houseNumber) streetParts.push(contactInfo.houseNumber);
-    if (contactInfo.preDirection) streetParts.push(contactInfo.preDirection);
-    if (contactInfo.streetName) streetParts.push(contactInfo.streetName);
-    if (contactInfo.streetSuffix) streetParts.push(contactInfo.streetSuffix);
-    if (contactInfo.postDirection) streetParts.push(contactInfo.postDirection);
+    if (address.houseNumber) streetParts.push(address.houseNumber);
+    if (address.preDirection) streetParts.push(address.preDirection);
+    if (address.streetName) streetParts.push(address.streetName);
+    if (address.streetSuffix) streetParts.push(address.streetSuffix);
+    if (address.postDirection) streetParts.push(address.postDirection);
     
     // Unit info
-    if (contactInfo.unitAbbr && contactInfo.unitNumber) {
-      streetParts.push(`${contactInfo.unitAbbr} ${contactInfo.unitNumber}`);
-    } else if (contactInfo.unitNumber) {
-      streetParts.push(`#${contactInfo.unitNumber}`);
+    if (address.unitAbbr && address.unitNumber) {
+      streetParts.push(`${address.unitAbbr} ${address.unitNumber}`);
+    } else if (address.unitNumber) {
+      streetParts.push(`#${address.unitNumber}`);
     }
     
     if (streetParts.length > 0) {
       parts.push(streetParts.join(' '));
-    } else if (contactInfo.fullAddress) {
-      parts.push(contactInfo.fullAddress);
+    } else if (address.fullAddress) {
+      parts.push(address.fullAddress);
     }
     
     return parts;
   };
 
-  const formatCityStateZip = (contactInfo: ContactInfo) => {
+  const formatCityStateZip = (address: Address) => {
     const parts = [];
-    if (contactInfo.city) parts.push(contactInfo.city);
-    if (contactInfo.state) parts.push(contactInfo.state);
-    if (contactInfo.zipCode) parts.push(contactInfo.zipCode);
+    if (address.city) parts.push(address.city);
+    if (address.state) parts.push(address.state);
+    if (address.zipCode) parts.push(address.zipCode);
     return parts.length > 0 ? parts.join(', ') : null;
   };
 
@@ -544,31 +565,21 @@ export default function PersonDetailPage() {
           ) : (
             <div className="space-y-6">
               {/* Addresses */}
-              {person.contactInfo && person.contactInfo.some(c => {
-                const addressLines = formatAddress(c);
-                const cityStateZip = formatCityStateZip(c);
-                return addressLines.length > 0 || cityStateZip;
-              }) && (
+              {person.addresses && person.addresses.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Addresses</p>
                   <div className="space-y-3">
-                    {person.contactInfo
-                      .filter(contact => {
-                        const addressLines = formatAddress(contact);
-                        const cityStateZip = formatCityStateZip(contact);
-                        return addressLines.length > 0 || cityStateZip;
-                      })
-                      .map((contact) => {
-                        const addressLines = formatAddress(contact);
-                        const cityStateZip = formatCityStateZip(contact);
+                    {person.addresses.map((address) => {
+                        const addressLines = formatAddress(address);
+                        const cityStateZip = formatCityStateZip(address);
                         
                         return (
-                          <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                          <div key={address.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
                             <div className="flex items-start justify-between mb-2">
                               <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
-                                {contact.location.name}
+                                {address.location.name}
                               </span>
-                              {contact.isPrimary && (
+                              {address.isPrimary && (
                                 <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
                               )}
                             </div>
@@ -584,7 +595,7 @@ export default function PersonDetailPage() {
                               </p>
                             )}
                             
-                            {contact.isVerified && (
+                            {address.isVerified && (
                               <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                 ✓ Verified
                               </p>
@@ -597,28 +608,26 @@ export default function PersonDetailPage() {
               )}
               
               {/* Phone Numbers */}
-              {person.contactInfo && person.contactInfo.some(c => c.phone) && (
+              {person.phones && person.phones.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Phone Numbers</p>
                   <div className="space-y-3">
-                    {person.contactInfo
-                      .filter(contact => contact.phone)
-                      .map((contact) => (
-                        <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                    {person.phones.map((phone) => (
+                        <div key={phone.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
                           <div className="flex items-start justify-between mb-1">
                             <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
-                              {contact.location.name}
+                              {phone.location.name}
                             </span>
-                            {contact.isPrimary && (
+                            {phone.isPrimary && (
                               <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
                             )}
                           </div>
                           
                           <p className="text-base text-cocoa-900 dark:text-cream-50 font-medium">
-                            {contact.phone}
+                            {phone.number}
                           </p>
                           
-                          {contact.isVerified && (
+                          {phone.isVerified && (
                             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                               ✓ Verified
                             </p>
@@ -630,28 +639,26 @@ export default function PersonDetailPage() {
               )}
               
               {/* Email Addresses */}
-              {person.contactInfo && person.contactInfo.some(c => c.email) && (
+              {person.emails && person.emails.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-3">Email Addresses</p>
                   <div className="space-y-3">
-                    {person.contactInfo
-                      .filter(contact => contact.email)
-                      .map((contact) => (
-                        <div key={contact.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
+                    {person.emails.map((email) => (
+                        <div key={email.id} className="p-3 bg-cocoa-50 dark:bg-cocoa-900/30 rounded-lg border border-cocoa-200 dark:border-cocoa-700">
                           <div className="flex items-start justify-between mb-1">
                             <span className="inline-block px-2 py-1 bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-800 dark:text-cocoa-200 rounded text-xs font-semibold">
-                              {contact.location.name}
+                              {email.location.name}
                             </span>
-                            {contact.isPrimary && (
+                            {email.isPrimary && (
                               <span className="text-xs text-cinnamon-600 dark:text-cinnamon-400 font-semibold">★ Primary</span>
                             )}
                           </div>
                           
                           <p className="text-base text-cocoa-900 dark:text-cream-50">
-                            {contact.email}
+                            {email.address}
                           </p>
                           
-                          {contact.isVerified && (
+                          {email.isVerified && (
                             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                               ✓ Verified
                             </p>
@@ -663,24 +670,13 @@ export default function PersonDetailPage() {
               )}
               
               {/* No Contact Info Message */}
-              {person.contactInfo && person.contactInfo.length === 0 && (
+              {person.addresses.length === 0 && person.phones.length === 0 && person.emails.length === 0 && (
                 <div>
                   <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide mb-2">Contact Information</p>
                   <p className="text-base text-cocoa-600 dark:text-cocoa-400 italic">No contact information on file</p>
                 </div>
               )}
               
-              {/* Last Contact (for voters) */}
-              {person.voter && (
-                <div>
-                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Contact</p>
-                  <p className="text-lg text-cocoa-900 dark:text-cream-50">
-                    {person.voter.lastContactDate
-                      ? `${formatDate(person.voter.lastContactDate)} (${person.voter.lastContactMethod || 'N/A'})`
-                      : '—'}
-                  </p>
-                </div>
-              )}
               
               {/* Notes */}
               {person.notes && (
@@ -745,16 +741,6 @@ export default function PersonDetailPage() {
                         </p>
                       )}
                       
-                      {residence.email && (
-                        <p className="text-sm text-cocoa-700 dark:text-cocoa-300">
-                          <span className="font-medium">Email:</span> {residence.email}
-                        </p>
-                      )}
-                      {residence.phone && (
-                        <p className="text-sm text-cocoa-700 dark:text-cocoa-300">
-                          <span className="font-medium">Phone:</span> {residence.phone}
-                        </p>
-                      )}
                       {residence.isVerified && (
                         <p className="text-xs text-green-600 dark:text-green-400 mt-2">
                           ✓ Verified
