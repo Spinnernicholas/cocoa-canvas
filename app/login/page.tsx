@@ -14,25 +14,25 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-100 to-cocoa-100 dark:from-cocoa-900 dark:to-cocoa-800 px-4 relative overflow-hidden">
       {/* Decorative Marshmallows */}
       <div className="hidden dark:block fixed top-20 left-[10%] opacity-40">
-        <Marshmallow size={52} animationDuration="3.5s" animationDelay="0s" />
+        <Marshmallow size={40} animationDuration="3.5s" animationDelay="0s" />
       </div>
       <div className="hidden dark:block fixed top-[30%] right-[15%] opacity-40">
-        <Marshmallow size={30} animationDuration="4s" animationDelay="1s" />
+        <Marshmallow size={42} animationDuration="4s" animationDelay="1s" />
       </div>
       <div className="hidden dark:block fixed bottom-[25%] left-[12%] opacity-40">
-        <Marshmallow size={56} animationDuration="4.5s" animationDelay="1.5s" />
+        <Marshmallow size={43} animationDuration="4.5s" animationDelay="1.5s" />
       </div>
       <div className="hidden dark:block fixed bottom-20 right-[10%] opacity-40">
-        <Marshmallow size={40} animationDuration="3.8s" animationDelay="0.5s" />
+        <Marshmallow size={44} animationDuration="3.8s" animationDelay="0.5s" />
       </div>
       <div className="hidden dark:block fixed top-[50%] left-[5%] opacity-40">
-        <Marshmallow size={46} animationDuration="4.2s" animationDelay="0.8s" />
+        <Marshmallow size={45} animationDuration="4.2s" animationDelay="0.8s" />
       </div>
       <div className="hidden dark:block fixed top-[65%] right-[8%] opacity-40">
-        <Marshmallow size={42} animationDuration="3.6s" animationDelay="1.8s" />
+        <Marshmallow size={41} animationDuration="3.6s" animationDelay="1.8s" />
       </div>
       <div className="hidden dark:block fixed bottom-[45%] right-[20%] opacity-40">
-        <Marshmallow size={64} animationDuration="4.3s" animationDelay="1.2s" />
+        <Marshmallow size={40} animationDuration="4.3s" animationDelay="1.2s" />
       </div>
       
       {/* Theme Toggle - Positioned at top right */}
