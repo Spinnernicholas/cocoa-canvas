@@ -63,7 +63,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { firstName, lastName, middleName, notes, contactStatus } = body;
+    const { firstName, lastName, middleName, notes } = body;
 
     // Update Person
     const person = await prisma.person.update({
@@ -75,17 +75,24 @@ export async function PUT(
         notes: notes || null,
       },
       include: {
-        voter: true,
+        voter: {
+          include: {
+            party: true,
+            precinct: true,
+          },
+        },
+        volunteer: true,
+        donor: true,
+        contactInfo: {
+          include: {
+            location: true,
+          },
+        },
+        contactLogs: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
-
-    // Update Voter contactStatus if exists and provided
-    if (person.voter && contactStatus) {
-      await prisma.voter.update({
-        where: { id: person.voter.id },
-        data: { contactStatus },
-      });
-    }
 
     await auditLog(authResult.user?.userId || '', 'PERSON_UPDATE', request, 'person', person.id);
 

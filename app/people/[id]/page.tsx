@@ -107,7 +107,6 @@ export default function PersonDetailPage() {
     lastName: '',
     middleName: '',
     notes: '',
-    contactStatus: '',
   });
 
   // Contact log state
@@ -170,7 +169,6 @@ export default function PersonDetailPage() {
           lastName: data.lastName,
           middleName: data.middleName || '',
           notes: data.notes || '',
-          contactStatus: data.voter?.contactStatus || '',
         });
       } catch (err) {
         console.error('Error fetching person:', err);
@@ -522,22 +520,6 @@ export default function PersonDetailPage() {
                     className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
                   />
                 </div>
-                {person.voter && (
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Status</label>
-                    <select
-                      value={formData.contactStatus}
-                      onChange={(e) => setFormData({ ...formData, contactStatus: e.target.value })}
-                      className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="attempted">Attempted</option>
-                      <option value="contacted">Contacted</option>
-                      <option value="refused">Refused</option>
-                      <option value="unreachable">Unreachable</option>
-                    </select>
-                  </div>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Notes</label>
