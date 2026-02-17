@@ -39,17 +39,6 @@ export async function POST(
       },
     });
 
-    // Update voter's lastContactDate and lastContactMethod if they are a voter
-    if (person.voter && method) {
-      await prisma.voter.update({
-        where: { id: person.voter.id },
-        data: {
-          lastContactDate: new Date(),
-          lastContactMethod: method,
-        },
-      });
-    }
-
     await auditLog(authResult.user?.userId || '', 'CONTACT_LOG_CREATE', request, 'person', person.id);
 
     return NextResponse.json(contactLog, { status: 201 });

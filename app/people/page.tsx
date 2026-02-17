@@ -19,9 +19,6 @@ interface ContactInfo {
 
 interface Voter {
   id: string;
-  contactStatus: string;
-  lastContactDate?: string;
-  lastContactMethod?: string;
   party?: { name: string; abbr: string };
   precinct?: { name: string };
 }
@@ -302,6 +299,17 @@ export default function PeoplePage() {
     return person.contactInfo.find(ci => ci.phone)?.phone || null;
   };
 
+  const getLatestContactLog = (person: Person) => {
+    if (!person.contactLogs || person.contactLogs.length === 0) return null;
+    const latest = person.contactLogs[0];
+    return (
+      <>
+        <div>{formatDate(latest.createdAt)}</div>
+        <div className="text-xs text-cocoa-500 dark:text-cocoa-400">{latest.method || 'N/A'}</div>
+      </>
+    );
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   if (!user) return null;
@@ -486,14 +494,7 @@ export default function PeoplePage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
-                        {person.voter?.lastContactDate ? (
-                          <>
-                            <div>{formatDate(person.voter.lastContactDate)}</div>
-                            <div className="text-xs text-cocoa-500 dark:text-cocoa-400">{person.voter.lastContactMethod || 'N/A'}</div>
-                          </>
-                        ) : (
-                          '—'
-                        )}
+                        {getLatestContactLog(person) || '—'}
                       </td>
                     </tr>
                   ))}

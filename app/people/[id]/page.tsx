@@ -483,11 +483,6 @@ export default function PersonDetailPage() {
                 )}
               </div>
             </div>
-            {person.voter && (
-              <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
-                {person.voter.contactStatus}
-              </span>
-            )}
           </div>
 
           {editing ? (
@@ -851,12 +846,6 @@ export default function PersonDetailPage() {
                   <p className="text-base text-cocoa-900 dark:text-cream-50">
                     {person.voter.vbmStatus || 'Standard voting'}
                   </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Contact Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(person.voter.contactStatus)}`}>
-                    {person.voter.contactStatus}
-                  </span>
                 </div>
               </div>
             </div>

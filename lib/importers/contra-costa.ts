@@ -355,7 +355,6 @@ async function processVoterRecord(
     vbmStatus: normalize(record.VBMProgramStatus),
     precinctId,
     precinctPortion: normalize(record.PrecinctPortion),
-    contactStatus: 'pending' as const,
     importedFrom: 'contra_costa',
     importType,
     importFormat: 'contra_costa',

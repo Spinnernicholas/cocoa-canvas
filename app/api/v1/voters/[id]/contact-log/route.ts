@@ -46,15 +46,6 @@ export async function POST(
       },
     });
 
-    // Update voter's last contact info
-    await prisma.voter.update({
-      where: { id },
-      data: {
-        lastContactDate: new Date(),
-        lastContactMethod: contactMethod,
-      },
-    });
-
     await auditLog(authResult.user?.userId || '', 'CONTACT_LOG_CREATE', request, 'contact_log', contactLog.id);
 
     return NextResponse.json(contactLog, { status: 201 });

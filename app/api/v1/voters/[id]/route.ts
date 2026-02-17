@@ -61,7 +61,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { firstName, lastName, middleName, notes, contactStatus } = body;
+    const { firstName, lastName, middleName, notes } = body;
 
     // Check if voter exists
     const existingVoter = await prisma.voter.findUnique({
@@ -86,12 +86,9 @@ export async function PUT(
       });
     }
 
-    // Update Voter
-    const voter = await prisma.voter.update({
+    // Fetch updated voter with relations
+    const voter = await prisma.voter.findUnique({
       where: { id },
-      data: {
-        ...(contactStatus && { contactStatus }),
-      },
       include: {
         person: {
           include: {
@@ -104,6 +101,10 @@ export async function PUT(
         precinct: true,
       },
     });
+
+    if (!voter) {
+      return NextResponse.json({ error: 'Voter not found' }, { status: 404 });
+    }
 
     await auditLog(authResult.user?.userId || '', 'VOTER_UPDATE', request, 'voter', voter.id);
 

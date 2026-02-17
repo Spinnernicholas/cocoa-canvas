@@ -45,9 +45,6 @@ interface Person {
 interface Voter {
   id: string;
   person: Person;
-  contactStatus: string;
-  lastContactDate?: string;
-  lastContactMethod?: string;
   registrationDate?: string;
   party?: {
     name: string;
@@ -76,7 +73,6 @@ export default function VoterDetailPage() {
     lastName: '',
     middleName: '',
     notes: '',
-    contactStatus: '',
   });
 
   // Contact log state
@@ -139,7 +135,6 @@ export default function VoterDetailPage() {
           lastName: data.person.lastName,
           middleName: data.person.middleName || '',
           notes: data.person.notes || '',
-          contactStatus: data.contactStatus,
         });
       } catch (err) {
         console.error('Error fetching voter:', err);
@@ -308,6 +303,12 @@ export default function VoterDetailPage() {
     return addressInfo?.fullAddress || null;
   };
 
+  const getLatestContactLog = () => {
+    if (!voter || !voter.person.contactLogs || voter.person.contactLogs.length === 0) return null;
+    const latest = voter.person.contactLogs[0];
+    return `${formatDate(latest.createdAt)} (${latest.method || 'N/A'})`;
+  };
+
   if (!user) return null;
 
   if (loading) {
@@ -385,9 +386,6 @@ export default function VoterDetailPage() {
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">{getVoterName()}</h1>
-            <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${getStatusBadgeColor(voter.contactStatus)}`}>
-              {voter.contactStatus}
-            </span>
           </div>
 
           {editing ? (
@@ -419,20 +417,6 @@ export default function VoterDetailPage() {
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
                   />
-                </div>
-                <div className="md:col-span-3">
-                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">Status</label>
-                  <select
-                    value={formData.contactStatus}
-                    onChange={(e) => setFormData({ ...formData, contactStatus: e.target.value })}
-                    className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="attempted">Attempted</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="refused">Refused</option>
-                    <option value="unreachable">Unreachable</option>
-                  </select>
                 </div>
               </div>
               <div>
@@ -477,9 +461,7 @@ export default function VoterDetailPage() {
               <div>
                 <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Last Contact</p>
                 <p className="text-lg text-cocoa-900 dark:text-cream-50">
-                  {voter.lastContactDate
-                    ? `${formatDate(voter.lastContactDate)} (${voter.lastContactMethod || 'N/A'})`
-                    : '—'}
+                  {getLatestContactLog() || '—'}
                 </p>
               </div>
               {voter.person.notes && (

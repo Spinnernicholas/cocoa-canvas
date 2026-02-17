@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     const search = searchParams.get('search');
-    const status = searchParams.get('status');
 
     // Build where clause
     const where: any = {};
@@ -27,10 +26,6 @@ export async function GET(request: NextRequest) {
           { lastName: { contains: search } },
         ],
       };
-    }
-
-    if (status && status !== 'all') {
-      where.contactStatus = status;
     }
 
     // Get voters with person data
@@ -104,7 +99,6 @@ export async function POST(request: NextRequest) {
     const voter = await prisma.voter.create({
       data: {
         personId: person.id,
-        contactStatus: 'pending',
         registrationDate: new Date(),
       },
       include: {

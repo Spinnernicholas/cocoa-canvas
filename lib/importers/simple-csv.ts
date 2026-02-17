@@ -123,7 +123,6 @@ export class SimpleCsvImporter implements VoterImporter {
             data: {
               personId: person.id,
               externalSource: 'simple_csv',
-              contactStatus: 'pending',
               registrationDate: new Date(),
               importedFrom: 'simple_csv',
               importType: 'full',

@@ -464,12 +464,6 @@ model Voter {
   precinct        Precinct? @relation(fields: [precinctId], references: [id])
   precinctPortion String? // Which portion if split
 
-  // Canvassing status (app-driven, mutable)
-  contactStatus     String    @default("pending")
-  // pending, attempted, contacted, refused, unreachable, moved
-  lastContactDate   DateTime?
-  lastContactMethod String? // call, email, door, sms
-
   // Import tracking
   importedFrom String? // Source file name, path, or system
   importType   String? // "full" or "incremental"
@@ -486,7 +480,6 @@ model Voter {
   @@index([externalId])
   @@index([registrationNumber])
   @@index([precinctId])
-  @@index([contactStatus])
 }
 
 // Volunteer profile (specializes Person)
