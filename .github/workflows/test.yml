@@ -31,8 +31,21 @@ jobs:
       - name: Generate Prisma client
         run: cd cocoa-canvas && npm run prisma:generate
       
+      - name: Debug directory structure
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Listing root:"
+          ls -la
+          echo "Listing cocoa-canvas:"
+          ls -la cocoa-canvas
+          cd cocoa-canvas
+          echo "Inside cocoa-canvas:"
+          pwd
+          ls -la | head -20
+      
       - name: Run linter
-        run: cd cocoa-canvas && npm run lint
+        run: cd cocoa-canvas && npx next lint
       
       - name: Run tests with coverage
         run: cd cocoa-canvas && npm run test:ci
