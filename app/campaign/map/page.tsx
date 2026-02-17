@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import Marshmallow from '@/components/Marshmallow';
 
 // Dynamically import Leaflet map component
 const MapComponent = dynamic(() => import('@/components/Map'), {
@@ -164,10 +165,23 @@ export default function CampaignMapPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900">
+    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
+      {/* Decorative Marshmallows */}
+      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.8s' }}>
+        <Marshmallow size={40} animationDuration="3.8s" />
+      </div>
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
+        <Marshmallow size={42} animationDuration="4.5s" />
+      </div>
+      <div className="hidden dark:block fixed top-[55%] left-[12%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.1s', animationDelay: '0.6s' }}>
+        <Marshmallow size={43} animationDuration="4.1s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[40%] left-[8%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.3s', animationDelay: '0.8s' }}>
+        <Marshmallow size={44} animationDuration="4.3s" />
+      </div>
       <Header userName={user.name} />
 
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex h-[calc(100vh-4rem)] relative z-10">
         {/* Sidebar */}
         <div className="w-80 bg-white dark:bg-cocoa-800 shadow-lg overflow-y-auto">
           <div className="p-6">

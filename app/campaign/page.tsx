@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import Marshmallow from '@/components/Marshmallow';
 
 interface User {
   id: string;
@@ -186,10 +187,29 @@ export default function CampaignPage() {
   }
 
   return (
-    <div className="bg-cream-50 dark:bg-cocoa-900 min-h-screen">
+    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
+      {/* Decorative Marshmallows */}
+      <div className="hidden dark:block fixed top-32 left-[6%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.8s' }}>
+        <Marshmallow size={40} animationDuration="3.8s" />
+      </div>
+      <div className="hidden dark:block fixed top-[35%] right-[10%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
+        <Marshmallow size={42} animationDuration="4.5s" />
+      </div>
+      <div className="hidden dark:block fixed top-[55%] left-[12%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.1s', animationDelay: '0.6s' }}>
+        <Marshmallow size={43} animationDuration="4.1s" />
+      </div>
+      <div className="hidden dark:block fixed top-[15%] right-[15%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.7s', animationDelay: '1.4s' }}>
+        <Marshmallow size={44} animationDuration="3.7s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[40%] left-[8%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '4.3s', animationDelay: '0.8s' }}>
+        <Marshmallow size={45} animationDuration="4.3s" />
+      </div>
+      <div className="hidden dark:block fixed bottom-[25%] right-[12%] opacity-40 animate-marshmallow-bob" style={{ animationDuration: '3.9s', animationDelay: '1.7s' }}>
+        <Marshmallow size={41} animationDuration="3.9s" />
+      </div>
       <Header userName={user.name} />
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
             {error}
