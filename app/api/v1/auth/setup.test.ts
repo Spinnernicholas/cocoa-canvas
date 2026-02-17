@@ -1,25 +1,26 @@
+import type { Mock } from 'vitest';
 import { POST } from '@/app/api/v1/auth/setup/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      count: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
+      count: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
     },
     session: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
     auditLog: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
   },
 }));
 
-jest.mock('@/lib/audit/logger', () => ({
-  auditLog: jest.fn(),
+vi.mock('@/lib/audit/logger', () => ({
+  auditLog: vi.fn(),
 }));
 
 describe('POST /api/v1/auth/setup', () => {
@@ -35,11 +36,11 @@ describe('POST /api/v1/auth/setup', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should reject if users already exist', async () => {
-    (prisma.user.count as jest.Mock).mockResolvedValue(1);
+    (prisma.user.count as Mock).mockResolvedValue(1);
 
     const request = mockRequest({
       email: 'admin@example.com',
@@ -55,7 +56,7 @@ describe('POST /api/v1/auth/setup', () => {
   });
 
   it('should reject if passwords do not match', async () => {
-    (prisma.user.count as jest.Mock).mockResolvedValue(0);
+    (prisma.user.count as Mock).mockResolvedValue(0);
 
     const request = mockRequest({
       email: 'admin@example.com',
@@ -71,7 +72,7 @@ describe('POST /api/v1/auth/setup', () => {
   });
 
   it('should reject missing required fields', async () => {
-    (prisma.user.count as jest.Mock).mockResolvedValue(0);
+    (prisma.user.count as Mock).mockResolvedValue(0);
 
     const request = mockRequest({
       email: 'admin@example.com',
@@ -85,7 +86,7 @@ describe('POST /api/v1/auth/setup', () => {
   });
 
   it('should reject invalid JSON', async () => {
-    (prisma.user.count as jest.Mock).mockResolvedValue(0);
+    (prisma.user.count as Mock).mockResolvedValue(0);
 
     const req = new NextRequest('http://localhost:3000/api/v1/auth/setup', {
       method: 'POST',

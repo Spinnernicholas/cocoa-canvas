@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as createVoter, GET as listVoters } from '@/app/api/v1/voters/route';
 import { GET as getVoter, PUT as updateVoter, DELETE as deleteVoter } from '@/app/api/v1/voters/[id]/route';
@@ -6,29 +7,29 @@ import { prisma } from '@/lib/prisma';
 import { generateToken } from '@/lib/auth/jwt';
 
 // Mock prisma
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      findUnique: jest.fn(),
+      findUnique: vi.fn(),
     },
     session: {
-      findUnique: jest.fn(),
+      findUnique: vi.fn(),
     },
     voter: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
     contactLog: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     auditLog: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
   },
 }));
@@ -46,13 +47,13 @@ describe('Voter API Endpoints (Integration)', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    vi.clearAllMocks();
+    (prisma.user.findUnique as Mock).mockResolvedValue({
       id: userId,
       email: 'test@example.com',
       role: 'admin',
     });
-    (prisma.session.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.session.findUnique as Mock).mockResolvedValue({
       id: 'session-123',
       userId,
       token: validToken,
@@ -79,7 +80,7 @@ describe('Voter API Endpoints (Integration)', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.voter.create as jest.Mock).mockResolvedValue(newVoter);
+      (prisma.voter.create as Mock).mockResolvedValue(newVoter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters'), {
         method: 'POST',
@@ -115,7 +116,7 @@ describe('Voter API Endpoints (Integration)', () => {
     });
 
     it('should return 401 if not authenticated', async () => {
-      (prisma.session.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.session.findUnique as Mock).mockResolvedValue(null);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters'), {
         method: 'POST',
@@ -151,8 +152,8 @@ describe('Voter API Endpoints (Integration)', () => {
         },
       ];
 
-      (prisma.voter.findMany as jest.Mock).mockResolvedValue(voters);
-      (prisma.voter.count as jest.Mock).mockResolvedValue(1);
+      (prisma.voter.findMany as Mock).mockResolvedValue(voters);
+      (prisma.voter.count as Mock).mockResolvedValue(1);
 
       const request = new NextRequest(
         new URL('http://localhost:3000/api/v1/voters?limit=20&offset=0'),
@@ -191,8 +192,8 @@ describe('Voter API Endpoints (Integration)', () => {
         },
       ];
 
-      (prisma.voter.findMany as jest.Mock).mockResolvedValue(voters);
-      (prisma.voter.count as jest.Mock).mockResolvedValue(1);
+      (prisma.voter.findMany as Mock).mockResolvedValue(voters);
+      (prisma.voter.count as Mock).mockResolvedValue(1);
 
       const request = new NextRequest(
         new URL('http://localhost:3000/api/v1/voters?search=John&limit=20&offset=0'),
@@ -239,7 +240,7 @@ describe('Voter API Endpoints (Integration)', () => {
         ],
       };
 
-      (prisma.voter.findUnique as jest.Mock).mockResolvedValue(voter);
+      (prisma.voter.findUnique as Mock).mockResolvedValue(voter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1'), {
         method: 'GET',
@@ -255,7 +256,7 @@ describe('Voter API Endpoints (Integration)', () => {
     });
 
     it('should return 404 if voter not found', async () => {
-      (prisma.voter.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.voter.findUnique as Mock).mockResolvedValue(null);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/nonexistent'), {
         method: 'GET',
@@ -288,8 +289,8 @@ describe('Voter API Endpoints (Integration)', () => {
         contactLogs: [],
       };
 
-      (prisma.voter.findUnique as jest.Mock).mockResolvedValue(updatedVoter);
-      (prisma.voter.update as jest.Mock).mockResolvedValue(updatedVoter);
+      (prisma.voter.findUnique as Mock).mockResolvedValue(updatedVoter);
+      (prisma.voter.update as Mock).mockResolvedValue(updatedVoter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1'), {
         method: 'PUT',
@@ -331,9 +332,9 @@ describe('Voter API Endpoints (Integration)', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.voter.findUnique as jest.Mock).mockResolvedValue(voter);
-      (prisma.contactLog.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (prisma.voter.delete as jest.Mock).mockResolvedValue(voter);
+      (prisma.voter.findUnique as Mock).mockResolvedValue(voter);
+      (prisma.contactLog.deleteMany as Mock).mockResolvedValue({ count: 0 });
+      (prisma.voter.delete as Mock).mockResolvedValue(voter);
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1'), {
         method: 'DELETE',
@@ -381,9 +382,9 @@ describe('Voter API Endpoints (Integration)', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.voter.findUnique as jest.Mock).mockResolvedValue(voter);
-      (prisma.contactLog.create as jest.Mock).mockResolvedValue(contactLog);
-      (prisma.voter.update as jest.Mock).mockResolvedValue({ ...voter, lastContactDate: new Date() });
+      (prisma.voter.findUnique as Mock).mockResolvedValue(voter);
+      (prisma.contactLog.create as Mock).mockResolvedValue(contactLog);
+      (prisma.voter.update as Mock).mockResolvedValue({ ...voter, lastContactDate: new Date() });
 
       const request = new NextRequest(new URL('http://localhost:3000/api/v1/voters/voter-1/contact-log'), {
         method: 'POST',

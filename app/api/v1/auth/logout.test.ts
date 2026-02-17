@@ -1,25 +1,26 @@
+import type { Mock } from 'vitest';
 import { POST } from '@/app/api/v1/auth/logout/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     session: {
-      deleteMany: jest.fn(() => Promise.resolve({ count: 1 })),
+      deleteMany: vi.fn(() => Promise.resolve({ count: 1 })),
     },
     auditLog: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
   },
 }));
 
-jest.mock('@/lib/middleware/auth', () => ({
-  validateProtectedRoute: jest.fn(),
-  extractToken: jest.fn(() => 'fake-token'),
+vi.mock('@/lib/middleware/auth', () => ({
+  validateProtectedRoute: vi.fn(),
+  extractToken: vi.fn(() => 'fake-token'),
 }));
 
-jest.mock('@/lib/audit/logger', () => ({
-  auditLog: jest.fn(),
+vi.mock('@/lib/audit/logger', () => ({
+  auditLog: vi.fn(),
 }));
 
 const mockRequest = (token: string) => {
@@ -36,9 +37,9 @@ const mockRequest = (token: string) => {
 
 describe('POST /api/v1/auth/logout', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Ensure mocks are properly set up
-    (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
   });
 
   it('should logout user successfully', async () => {
@@ -87,7 +88,7 @@ describe('POST /api/v1/auth/logout', () => {
     });
 
     extractToken.mockReturnValue('fake-token');
-    (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
 
     const request = mockRequest('fake-token');
     const response = await POST(request);
@@ -110,7 +111,7 @@ describe('POST /api/v1/auth/logout', () => {
     });
 
     extractToken.mockReturnValue('fake-token');
-    (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
 
     const request = mockRequest('fake-token');
     await POST(request);

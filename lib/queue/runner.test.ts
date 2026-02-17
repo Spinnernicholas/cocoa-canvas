@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   createJob,
   getJob,
@@ -14,15 +15,15 @@ import {
 } from '@/lib/queue/runner';
 import { prisma } from '@/lib/prisma';
 
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     job: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      count: jest.fn(),
-      deleteMany: jest.fn(),
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
@@ -50,12 +51,12 @@ describe('Job Queue System', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createJob', () => {
     it('should create a new job', async () => {
-      (prisma.job.create as jest.Mock).mockResolvedValue(mockJob);
+      (prisma.job.create as Mock).mockResolvedValue(mockJob);
 
       const job = await createJob('import_voters', mockUserId, { filePath: 'test.csv' });
 
@@ -66,7 +67,7 @@ describe('Job Queue System', () => {
     });
 
     it('should handle creation errors', async () => {
-      (prisma.job.create as jest.Mock).mockRejectedValue(new Error('DB error'));
+      (prisma.job.create as Mock).mockRejectedValue(new Error('DB error'));
 
       const job = await createJob('import_voters', mockUserId);
 
@@ -75,7 +76,7 @@ describe('Job Queue System', () => {
 
     it('should create job with custom data', async () => {
       const jobWithData = { ...mockJob, data: JSON.stringify({ filePath: 'voters.csv', type: 'import' }) };
-      (prisma.job.create as jest.Mock).mockResolvedValue(jobWithData);
+      (prisma.job.create as Mock).mockResolvedValue(jobWithData);
 
       const job = await createJob('import_voters', mockUserId, { filePath: 'voters.csv', type: 'import' });
 
@@ -86,7 +87,7 @@ describe('Job Queue System', () => {
 
   describe('getJob', () => {
     it('should retrieve a job by ID', async () => {
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(mockJob);
+      (prisma.job.findUnique as Mock).mockResolvedValue(mockJob);
 
       const job = await getJob(mockJobId);
 
@@ -99,7 +100,7 @@ describe('Job Queue System', () => {
     });
 
     it('should return null for non-existent job', async () => {
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.job.findUnique as Mock).mockResolvedValue(null);
 
       const job = await getJob('nonexistent');
 
@@ -107,7 +108,7 @@ describe('Job Queue System', () => {
     });
 
     it('should handle lookup errors', async () => {
-      (prisma.job.findUnique as jest.Mock).mockRejectedValue(new Error('DB error'));
+      (prisma.job.findUnique as Mock).mockRejectedValue(new Error('DB error'));
 
       const job = await getJob(mockJobId);
 
@@ -117,7 +118,7 @@ describe('Job Queue System', () => {
 
   describe('getJobs', () => {
     it('should retrieve jobs list', async () => {
-      (prisma.job.findMany as jest.Mock).mockResolvedValue([mockJob]);
+      (prisma.job.findMany as Mock).mockResolvedValue([mockJob]);
 
       const jobs = await getJobs();
 
@@ -127,7 +128,7 @@ describe('Job Queue System', () => {
     });
 
     it('should filter jobs by status', async () => {
-      (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.job.findMany as Mock).mockResolvedValue([]);
 
       await getJobs({ status: 'pending' });
 
@@ -139,7 +140,7 @@ describe('Job Queue System', () => {
     });
 
     it('should filter jobs by type', async () => {
-      (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.job.findMany as Mock).mockResolvedValue([]);
 
       await getJobs({ type: 'import_voters' });
 
@@ -151,7 +152,7 @@ describe('Job Queue System', () => {
     });
 
     it('should handle retrieval errors', async () => {
-      (prisma.job.findMany as jest.Mock).mockRejectedValue(new Error('DB error'));
+      (prisma.job.findMany as Mock).mockRejectedValue(new Error('DB error'));
 
       const jobs = await getJobs();
 
@@ -162,7 +163,7 @@ describe('Job Queue System', () => {
   describe('startJob', () => {
     it('should update job status to processing', async () => {
       const processingJob = { ...mockJob, status: 'processing', startedAt: new Date() };
-      (prisma.job.update as jest.Mock).mockResolvedValue(processingJob);
+      (prisma.job.update as Mock).mockResolvedValue(processingJob);
 
       const job = await startJob(mockJobId);
 
@@ -175,7 +176,7 @@ describe('Job Queue System', () => {
   describe('updateJobProgress', () => {
     it('should update processed items', async () => {
       const progressJob = { ...mockJob, processedItems: 50 };
-      (prisma.job.update as jest.Mock).mockResolvedValue(progressJob);
+      (prisma.job.update as Mock).mockResolvedValue(progressJob);
 
       const job = await updateJobProgress(mockJobId, 50);
 
@@ -185,7 +186,7 @@ describe('Job Queue System', () => {
 
     it('should update total items if provided', async () => {
       const progressJob = { ...mockJob, processedItems: 50, totalItems: 100 };
-      (prisma.job.update as jest.Mock).mockResolvedValue(progressJob);
+      (prisma.job.update as Mock).mockResolvedValue(progressJob);
 
       const job = await updateJobProgress(mockJobId, 50, 100);
 
@@ -196,8 +197,8 @@ describe('Job Queue System', () => {
   describe('completeJob', () => {
     it('should mark job as completed', async () => {
       const completedJob = { ...mockJob, status: 'completed', completedAt: new Date() };
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(mockJob);
-      (prisma.job.update as jest.Mock).mockResolvedValue(completedJob);
+      (prisma.job.findUnique as Mock).mockResolvedValue(mockJob);
+      (prisma.job.update as Mock).mockResolvedValue(completedJob);
 
       const job = await completeJob(mockJobId);
 
@@ -214,8 +215,8 @@ describe('Job Queue System', () => {
         completedAt: new Date(),
         errorLog: JSON.stringify([{ timestamp: new Date().toISOString(), message: 'Job failed' }])
       };
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(mockJob);
-      (prisma.job.update as jest.Mock).mockResolvedValue(failedJob);
+      (prisma.job.findUnique as Mock).mockResolvedValue(mockJob);
+      (prisma.job.update as Mock).mockResolvedValue(failedJob);
 
       const job = await failJob(mockJobId, 'Job failed');
 
@@ -226,8 +227,8 @@ describe('Job Queue System', () => {
   describe('cancelJob', () => {
     it('should cancel a pending job', async () => {
       const cancelledJob = { ...mockJob, status: 'failed', completedAt: new Date() };
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(mockJob);
-      (prisma.job.update as jest.Mock).mockResolvedValue(cancelledJob);
+      (prisma.job.findUnique as Mock).mockResolvedValue(mockJob);
+      (prisma.job.update as Mock).mockResolvedValue(cancelledJob);
 
       const job = await cancelJob(mockJobId);
 
@@ -237,7 +238,7 @@ describe('Job Queue System', () => {
 
     it('should not cancel processing job', async () => {
       const processingJob = { ...mockJob, status: 'processing' };
-      (prisma.job.findUnique as jest.Mock).mockResolvedValue(processingJob);
+      (prisma.job.findUnique as Mock).mockResolvedValue(processingJob);
 
       const job = await cancelJob(mockJobId);
 

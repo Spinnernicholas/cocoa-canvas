@@ -1,21 +1,22 @@
+import type { Mock } from 'vitest';
 import { GET, POST } from '@/app/api/v1/jobs/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     job: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      count: jest.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      count: vi.fn(),
     },
   },
 }));
 
-jest.mock('@/lib/middleware/auth');
-jest.mock('@/lib/audit/logger', () => ({
-  auditLog: jest.fn(),
+vi.mock('@/lib/middleware/auth');
+vi.mock('@/lib/audit/logger', () => ({
+  auditLog: vi.fn(),
 }));
 
 const mockRequest = (method: string, query?: string) => {
@@ -35,7 +36,7 @@ const mockRequest = (method: string, query?: string) => {
 
 describe('GET /api/v1/jobs', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should list all jobs', async () => {
@@ -56,7 +57,7 @@ describe('GET /api/v1/jobs', () => {
       },
     ];
 
-    (prisma.job.findMany as jest.Mock).mockResolvedValue(mockJobs);
+    (prisma.job.findMany as Mock).mockResolvedValue(mockJobs);
 
     const request = mockRequest('GET');
     const response = await GET(request);
@@ -68,7 +69,7 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('should filter jobs by status', async () => {
-    (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.job.findMany as Mock).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'status=pending');
     await GET(request);
@@ -81,7 +82,7 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('should filter jobs by type', async () => {
-    (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.job.findMany as Mock).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'type=import_voters');
     await GET(request);
@@ -94,7 +95,7 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('should handle pagination', async () => {
-    (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.job.findMany as Mock).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'limit=10&offset=20');
     await GET(request);
@@ -108,7 +109,7 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('should cap limit at 200', async () => {
-    (prisma.job.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.job.findMany as Mock).mockResolvedValue([]);
 
     const request = mockRequest('GET', 'limit=500');
     await GET(request);
@@ -123,7 +124,7 @@ describe('GET /api/v1/jobs', () => {
 
 describe('POST /api/v1/jobs', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should create a new job', async () => {
@@ -149,7 +150,7 @@ describe('POST /api/v1/jobs', () => {
       createdBy: { id: 'user123', email: 'user@example.com', name: 'User' },
     };
 
-    (prisma.job.create as jest.Mock).mockResolvedValue(mockJob);
+    (prisma.job.create as Mock).mockResolvedValue(mockJob);
 
     const req = new NextRequest('http://localhost:3000/api/v1/jobs', {
       method: 'POST',
@@ -246,7 +247,7 @@ describe('POST /api/v1/jobs', () => {
       response: null,
     });
 
-    (prisma.job.create as jest.Mock).mockRejectedValue(new Error('DB error'));
+    (prisma.job.create as Mock).mockRejectedValue(new Error('DB error'));
 
     const req = new NextRequest('http://localhost:3000/api/v1/jobs', {
       method: 'POST',

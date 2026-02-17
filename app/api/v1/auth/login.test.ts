@@ -1,29 +1,30 @@
+import type { Mock } from 'vitest';
 import { POST } from '@/app/api/v1/auth/login/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
     },
     session: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
     auditLog: {
-      create: jest.fn(),
+      create: vi.fn(),
     },
   },
 }));
 
-jest.mock('@/lib/audit/logger', () => ({
-  auditLog: jest.fn(),
+vi.mock('@/lib/audit/logger', () => ({
+  auditLog: vi.fn(),
 }));
 
-jest.mock('@/lib/auth/password');
-jest.mock('@/lib/auth/jwt');
-jest.mock('@/lib/auth/session');
+vi.mock('@/lib/auth/password');
+vi.mock('@/lib/auth/jwt');
+vi.mock('@/lib/auth/session');
 
 const mockRequest = (body: any) => {
   const req = new NextRequest('http://localhost:3000/api/v1/auth/login', {
@@ -40,7 +41,7 @@ const mockRequest = (body: any) => {
 
 describe('POST /api/v1/auth/login', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should login user successfully', async () => {
@@ -54,9 +55,9 @@ describe('POST /api/v1/auth/login', () => {
       lockedUntil: null,
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.user.update as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.session.create as jest.Mock).mockResolvedValue({
+    (prisma.user.findUnique as Mock).mockResolvedValue(mockUser);
+    (prisma.user.update as Mock).mockResolvedValue(mockUser);
+    (prisma.session.create as Mock).mockResolvedValue({
       id: 'session123',
       token: 'fake-jwt-token',
     });
@@ -84,7 +85,7 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   it('should reject invalid email', async () => {
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as Mock).mockResolvedValue(null);
 
     const request = mockRequest({
       email: 'nonexistent@example.com',
@@ -109,8 +110,8 @@ describe('POST /api/v1/auth/login', () => {
       lockedUntil: null,
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.user.update as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as Mock).mockResolvedValue(mockUser);
+    (prisma.user.update as Mock).mockResolvedValue(mockUser);
 
     // Mock failed password verification
     const { verifyPassword } = require('@/lib/auth/password');
@@ -139,7 +140,7 @@ describe('POST /api/v1/auth/login', () => {
       lockedUntil: null,
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as Mock).mockResolvedValue(mockUser);
 
     const request = mockRequest({
       email: 'user@example.com',
@@ -204,8 +205,8 @@ describe('POST /api/v1/auth/login', () => {
       lockedUntil: null,
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.user.update as jest.Mock).mockResolvedValue({
+    (prisma.user.findUnique as Mock).mockResolvedValue(mockUser);
+    (prisma.user.update as Mock).mockResolvedValue({
       ...mockUser,
       loginAttempts: 4,
     });

@@ -1,30 +1,31 @@
+import type { Mock } from 'vitest';
 import { createSession, getSession, invalidateSession } from '@/lib/auth/session';
 import { generateToken } from '@/lib/auth/jwt';
 import { prisma } from '@/lib/prisma';
 
 // Mock Prisma
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     session: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      deleteMany: jest.fn(),
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
 
 // Mock JWT verification
-jest.mock('@/lib/auth/jwt', () => ({
-  generateToken: jest.fn(() => 'fake-jwt-token'),
-  verifyToken: jest.fn((token) => {
+vi.mock('@/lib/auth/jwt', () => ({
+  generateToken: vi.fn(() => 'fake-jwt-token'),
+  verifyToken: vi.fn((token) => {
     if (token === 'fake-jwt-token' || token === 'valid-token') {
       return { userId: 'user123', email: 'user@example.com' };
     }
     return null;
   }),
-  decodeToken: jest.fn(),
-  isTokenExpired: jest.fn(),
-  getTokenTimeRemaining: jest.fn(),
+  decodeToken: vi.fn(),
+  isTokenExpired: vi.fn(),
+  getTokenTimeRemaining: vi.fn(),
 }));
 
 describe('Session Management', () => {
@@ -34,7 +35,7 @@ describe('Session Management', () => {
   const mockUserAgent = 'Mozilla/5.0';
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createSession', () => {
@@ -49,7 +50,7 @@ describe('Session Management', () => {
         createdAt: new Date(),
       };
 
-      (prisma.session.create as jest.Mock).mockResolvedValue(mockSession);
+      (prisma.session.create as Mock).mockResolvedValue(mockSession);
 
       const session = await createSession(mockUserId, mockToken, mockIpAddress, mockUserAgent);
 
@@ -70,7 +71,7 @@ describe('Session Management', () => {
         createdAt: new Date(),
       };
 
-      (prisma.session.create as jest.Mock).mockResolvedValue(mockSession);
+      (prisma.session.create as Mock).mockResolvedValue(mockSession);
 
       const session = await createSession(mockUserId, mockToken);
 
@@ -92,7 +93,7 @@ describe('Session Management', () => {
         createdAt: new Date(),
       };
 
-      (prisma.session.findUnique as jest.Mock).mockResolvedValue(mockSession);
+      (prisma.session.findUnique as Mock).mockResolvedValue(mockSession);
 
       const session = await getSession('valid-token');
 
@@ -102,7 +103,7 @@ describe('Session Management', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      (prisma.session.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.session.findUnique as Mock).mockResolvedValue(null);
 
       const session = await getSession('nonexistent-token');
 
@@ -125,7 +126,7 @@ describe('Session Management', () => {
         createdAt: new Date(),
       };
 
-      (prisma.session.findUnique as jest.Mock).mockResolvedValue(mockSession);
+      (prisma.session.findUnique as Mock).mockResolvedValue(mockSession);
 
       const session = await getSession('valid-token');
 
@@ -135,7 +136,7 @@ describe('Session Management', () => {
 
   describe('invalidateSession', () => {
     it('should delete a session', async () => {
-      (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 1 });
 
       const result = await invalidateSession(mockToken);
 
@@ -146,7 +147,7 @@ describe('Session Management', () => {
     });
 
     it('should handle deleteMany for multiple matching tokens', async () => {
-      (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 2 });
+      (prisma.session.deleteMany as Mock).mockResolvedValue({ count: 2 });
 
       const result = await invalidateSession(mockToken);
 
@@ -167,7 +168,7 @@ describe('Session Management', () => {
         createdAt: new Date(),
       };
 
-      (prisma.session.create as jest.Mock).mockResolvedValue(mockSession);
+      (prisma.session.create as Mock).mockResolvedValue(mockSession);
 
       const session = await createSession(mockUserId, mockToken);
 
