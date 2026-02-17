@@ -143,25 +143,25 @@ export default function OptionGroupsPage() {
     <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
       {/* Decorative Marshmallows */}
       <div className="hidden dark:block fixed top-32 left-[6%] opacity-40">
-        <Marshmallow size={50} animationDuration="3.8s" animationDelay="0s" />
+        <Marshmallow size={40} animationDuration="3.8s" animationDelay="0s" />
       </div>
       <div className="hidden dark:block fixed top-[20%] right-[12%] opacity-40">
-        <Marshmallow size={36} animationDuration="4.2s" animationDelay="0.7s" />
+        <Marshmallow size={42} animationDuration="4.2s" animationDelay="0.7s" />
       </div>
       <div className="hidden dark:block fixed top-[45%] left-[15%] opacity-40">
-        <Marshmallow size={52} animationDuration="4s" animationDelay="1.2s" />
+        <Marshmallow size={43} animationDuration="4s" animationDelay="1.2s" />
       </div>
       <div className="hidden dark:block fixed top-[60%] right-[8%] opacity-40">
-        <Marshmallow size={42} animationDuration="3.6s" animationDelay="1.5s" />
+        <Marshmallow size={44} animationDuration="3.6s" animationDelay="1.5s" />
       </div>
       <div className="hidden dark:block fixed bottom-[30%] left-[10%] opacity-40">
-        <Marshmallow size={56} animationDuration="4.4s" animationDelay="0.5s" />
+        <Marshmallow size={45} animationDuration="4.4s" animationDelay="0.5s" />
       </div>
       <div className="hidden dark:block fixed bottom-[15%] right-[18%] opacity-40">
-        <Marshmallow size={28} animationDuration="3.9s" animationDelay="1.8s" />
+        <Marshmallow size={41} animationDuration="3.9s" animationDelay="1.8s" />
       </div>
       <div className="hidden dark:block fixed bottom-[50%] left-[20%] opacity-40">
-        <Marshmallow size={58} animationDuration="4.1s" animationDelay="1.0s" />
+        <Marshmallow size={42} animationDuration="4.1s" animationDelay="1.0s" />
       </div>
 
       <Header userName={user.name} />
