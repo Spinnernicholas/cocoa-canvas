@@ -24,6 +24,7 @@ node --version  # Should show v22.x.x
 ```bash
 git clone https://github.com/Spinnernicholas/cocoa-canvas.git
 cd cocoa-canvas
+cd cocoa-canvas
 ```
 
 ## Step 3: Install Dependencies
@@ -70,6 +71,7 @@ The app will be running at:
 
 Now you can edit files and see changes instantly:
 - Edit React components in `app/` folder
+- Edit backend logic in `lib/` folder
 - Changes appear automatically (hot reload)
 - No need to restart the server
 
@@ -111,15 +113,16 @@ npm install
 
 ## 🚀 Next Steps
 
-- Read [planning/PHASE_PLAN.md](planning/PHASE_PLAN.md) to understand what comes next
-- Check [admin/DOCKER_SETUP.md](admin/DOCKER_SETUP.md) for production deployment with Docker
-- Start implementing Phase 1 features! See [planning/API_PLAN.md](planning/API_PLAN.md)
+- Read [../planning/PHASE_PLAN.md](../planning/PHASE_PLAN.md) to understand what comes next
+- Check [../admin/DOCKER_SETUP.md](../admin/DOCKER_SETUP.md) for production deployment with Docker
+- Start implementing Phase 1 features! See [../planning/API_PLAN.md](../planning/API_PLAN.md)
 
 ## 🐳 Production Deployment
 
-For production, use Docker. See [admin/DOCKER_SETUP.md](admin/DOCKER_SETUP.md) for details:
+For production, use Docker. See [../admin/DOCKER_SETUP.md](../admin/DOCKER_SETUP.md) for details:
 
 ```bash
+# You're already in the cocoa-canvas directory
 docker-compose up -d
 ```
 

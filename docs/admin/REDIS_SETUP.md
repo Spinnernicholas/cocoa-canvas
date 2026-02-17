@@ -6,9 +6,13 @@ This application uses Redis for job queues, caching, and scheduled tasks.
 
 ### Option 1: Docker Compose (Recommended)
 
-The easiest way to run Redis locally is using Docker Compose:
+The easiest way to run Redis locally is using Docker Compose.
+
+Run all commands from the `cocoa-canvas/` directory:
 
 ```bash
+cd cocoa-canvas
+
 # Start Redis in the background
 npm run docker:dev:up
 

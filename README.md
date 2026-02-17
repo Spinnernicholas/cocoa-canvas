@@ -21,6 +21,7 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 **Local Development:**
 ```bash
+cd cocoa-canvas
 npm install
 npm run dev
 ```
@@ -39,6 +40,25 @@ ADMIN_NAME=Administrator
 ```
 
 See [DOCKER_SETUP.md](docs/admin/DOCKER_SETUP.md) for production configuration and [AUTO_SETUP.md](docs/admin/AUTO_SETUP.md) for detailed auto-setup documentation.
+
+## 📁 Project Structure
+
+```
+.
+├── cocoa-canvas/        # Next.js application (main codebase)
+│   ├── app/            # Next.js app directory
+│   ├── components/     # React components
+│   ├── lib/            # Backend logic, database, utilities
+│   ├── prisma/         # Database schema and migrations
+│   ├── package.json
+│   └── ...
+├── docs/               # Documentation
+│   ├── QUICK_START.md
+│   ├── admin/          # Deployment & configuration guides
+│   ├── developer/      # Architecture & technical docs
+│   └── planning/       # Project planning docs
+└── README.md           # You are here
+```
 
 ## 🏗️ Stack
 

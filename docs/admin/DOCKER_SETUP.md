@@ -2,7 +2,7 @@
 
 This guide explains how to run Cocoa Canvas using Docker for **production deployments**.
 
-**For local development**, see [QUICK_START.md](../QUICK_START.md) - just run `npm run dev`.
+**For local development**, see [QUICK_START.md](../QUICK_START.md) - just run `cd webapp && npm run dev` from the project root.
 
 ## Prerequisites
 
@@ -11,7 +11,10 @@ This guide explains how to run Cocoa Canvas using Docker for **production deploy
 
 ## Quick Start - Production
 
+Run from the `cocoa-canvas/` directory (where the docker-compose files are located):
+
 ```bash
+cd cocoa-canvas
 docker-compose up -d
 ```
 
