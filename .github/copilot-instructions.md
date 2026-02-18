@@ -37,14 +37,19 @@ const voters = await prisma.voter.findMany({ where: { campaignId: "..." } });
 
 ### 2. Importer Registry Pattern
 
-58+ voter file formats supported via single endpoint using Strategy + Registry pattern. See [lib/importers/](cocoa-canvas/lib/importers/).
+Voter file formats supported via pluggable Strategy + Registry pattern. Currently registered: `simple_csv`, `contra_costa`. See [lib/importers/](cocoa-canvas/lib/importers/).
 
 **Add new importer**:
-1. Create `lib/importers/{format-name}.ts` implementing `VoterImporter` interface
+1. Create `lib/importers/{format-name}.ts` implementing `VoterImporter` interface with:
+   - `formatId`: unique identifier (e.g., `"alameda"`)
+   - `formatName`: human-readable name
+   - `formatDescription`: UI description
+   - `validate()`: verify file structure
+   - `parse()`: convert file to `VoterRecord[]`
 2. Register in `lib/importers/index.ts`: `importerRegistry.register(yourImporter)`
 3. Use unified endpoint: `POST /api/v1/voters/import` with `format` parameter
 
-Example: [lib/importers/contra-costa.ts](cocoa-canvas/lib/importers/contra-costa.ts), [lib/importers/registry.ts](cocoa-canvas/lib/importers/registry.ts)
+Examples: [lib/importers/contra-costa.ts](cocoa-canvas/lib/importers/contra-costa.ts), [lib/importers/simple-csv.ts](cocoa-canvas/lib/importers/simple-csv.ts)
 
 ### 3. Dual Job System
 
@@ -147,19 +152,36 @@ return NextResponse.json({ success: true, data: result });
 return NextResponse.json({ error: "Message" }, { status: 400 });
 ```
 
+**Route requirements**:
+- Add `export const dynamic = 'force-dynamic';` for routes that query the database or depend on request data (prevents static generation)
+- Always add `import { validateProtectedRoute } from '@/lib/middleware/auth';` for protected routes
+- Parse query params via `request.url` (NextRequest), build filters, use Prisma directly
+
 **Query patterns**:
-- Always add `export const dynamic = 'force-dynamic';` for non-static routes
 - Use Prisma directly (no repository pattern): `import { prisma } from '@/lib/prisma'`
 - Parse errors consistently: Catch Prisma errors and return clean messages
+- Implement pagination: `limit` (capped at 100), `offset` patterns in query string
 
 ## Project Conventions
 
-1. **No campaign references**: Voters, contacts, precincts have no `campaignId`
-2. **JSON in TEXT fields**: Prisma SQLite stores JSON as TEXT. Use `JSON.stringify()` / `JSON.parse()` for Job.data, Job.errorLog
-3. **File uploads**: Store in `tmp/uploads/`, clean up after processing
-4. **Audit logging**: Use `auditLog(userId, action, resource, resourceId, details)` for security events
-5. **Error logs**: Store as JSON array in Job.errorLog: `JSON.stringify([{row: 1, error: "..."}])`
-6. **Client-side auth**: Store JWT in `localStorage.getItem('authToken')`, send as `Authorization: Bearer {token}`
+1. **No campaign references**: Voters, contacts, precincts have no `campaignId` (single campaign model)
+2. **JSON serialization in Job fields**: Job.data, Job.errorLog are TEXT fields storing JSON. Use `JSON.stringify()` / `JSON.parse()`:
+   ```typescript
+   // Storing job data
+   await createJob('import_voters', userId, { filePath, format: 'csv' });
+   // Retrieve and parse
+   const job = await getJob(jobId);
+   const data = JSON.parse(job.data || '{}');
+   ```
+3. **Error logs as structured array**: Store as `[{row: 1, error: "..."}]`:
+   ```typescript
+   const errors = JSON.parse(job.errorLog || '[]');
+   errors.push({ row: lineNum, error: message });
+   await updateJobProgress(jobId, { errorLog: JSON.stringify(errors) });
+   ```
+4. **File uploads**: Store in `tmp/uploads/`, clean up after successful processing. Use `fs.unlinkSync()` to remove.
+5. **Audit logging**: All security-relevant actions logged via `auditLog(userId, action, resource, resourceId, details)` (see [lib/audit/logger.ts](cocoa-canvas/lib/audit/logger.ts))
+6. **Client-side auth**: Store JWT in `localStorage.getItem('authToken')`, send as `Authorization: Bearer {token}` header
 
 ## Environment Variables
 
