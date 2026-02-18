@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { OutputStats } from './types';
 
 /**
  * Job Queue Runner
@@ -157,16 +158,33 @@ export async function startJob(jobId: string) {
  * Update job progress
  * 
  * Call this during processing to track how many items have been processed.
+ * Optionally pass output stats to track job-specific metrics.
  */
 export async function updateJobProgress(
   jobId: string,
   processedItems: number,
-  totalItems?: number
+  totalItems?: number,
+  outputStats?: Partial<OutputStats>
 ) {
   try {
     const updateData: any = { processedItems };
     if (totalItems !== undefined && totalItems > 0) {
       updateData.totalItems = totalItems;
+    }
+    
+    // Merge output stats with existing ones if provided
+    if (outputStats) {
+      const job = await prisma.job.findUnique({
+        where: { id: jobId },
+      });
+      
+      if (job && job.outputStats) {
+        const existing = JSON.parse(job.outputStats);
+        const merged = { ...existing, ...outputStats };
+        updateData.outputStats = JSON.stringify(merged);
+      } else {
+        updateData.outputStats = JSON.stringify(outputStats);
+      }
     }
 
     return await prisma.job.update({
@@ -175,6 +193,44 @@ export async function updateJobProgress(
     });
   } catch (error) {
     console.error('[Update Job Progress Error]', error);
+    return null;
+  }
+}
+
+/**
+ * Update output statistics for a job
+ * 
+ * Stores job-specific metrics like bytes processed, records created, etc.
+ * Useful for tracking progress with file-based metrics.
+ */
+export async function updateJobOutputStats(
+  jobId: string,
+  stats: Partial<OutputStats>
+) {
+  try {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+    });
+
+    if (!job) {
+      console.warn('[Update Output Stats] Job not found:', jobId);
+      return null;
+    }
+
+    let merged = { ...stats };
+    if (job.outputStats) {
+      const existing = JSON.parse(job.outputStats);
+      merged = { ...existing, ...stats };
+    }
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        outputStats: JSON.stringify(merged),
+      },
+    });
+  } catch (error) {
+    console.error('[Update Output Stats Error]', error);
     return null;
   }
 }
@@ -337,16 +393,42 @@ export function parseJobErrors(errorLogJson: string | null): JobError[] {
 /**
  * Get progress percentage for a job
  * 
+ * Prioritizes file-based progress from outputStats if available,
+ * falls back to record-based progress.
  * Returns 0 if no items processed yet, 100 if completed/failed
  */
 export function getJobProgress(job: {
   status: string;
   totalItems: number;
   processedItems: number;
+  outputStats?: string | null;
 }): number {
   if (job.status === 'completed' || job.status === 'failed') {
     return 100;
   }
+  
+  // Try to get progress from outputStats (file-based)
+  if (job.outputStats) {
+    try {
+      const stats = JSON.parse(job.outputStats);
+      
+      // File-based progress (for imports)
+      if (stats.bytesProcessed !== undefined && stats.fileSize !== undefined && stats.fileSize > 0) {
+        const progress = Math.round((stats.bytesProcessed / stats.fileSize) * 100);
+        return Math.min(progress, 99);
+      }
+      
+      // Or use explicit percentComplete if set
+      if (stats.percentComplete !== undefined) {
+        return Math.min(stats.percentComplete, 99);
+      }
+    } catch (error) {
+      console.warn('[getJobProgress] Failed to parse outputStats:', error);
+      // Fall through to record-based progress
+    }
+  }
+  
+  // Fall back to record-based progress
   if (job.totalItems === 0) {
     return 0;
   }

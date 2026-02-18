@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
       ...job,
       data: job.data ? JSON.parse(job.data) : null,
       errorLog: job.errorLog ? JSON.parse(job.errorLog) : [],
+      outputStats: job.outputStats ? JSON.parse(job.outputStats) : null,
       progress: getJobProgress(job),
     }));
 

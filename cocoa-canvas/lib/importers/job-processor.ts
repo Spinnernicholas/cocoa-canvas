@@ -9,10 +9,12 @@ import { importerRegistry } from '@/lib/importers';
 import {
   startJob,
   updateJobProgress,
+  updateJobOutputStats,
   completeJob,
   failJob,
   addJobError,
 } from '@/lib/queue/runner';
+import { OutputStats } from '@/lib/queue/types';
 
 export interface ImportJobData {
   filePath: string;
@@ -37,7 +39,7 @@ export async function processImportJob(
   jobData: ImportJobData
 ): Promise<void> {
   try {
-    const { filePath, format, importType, fileName, userId } = jobData;
+    const { filePath, format, importType, fileName, fileSize, userId } = jobData;
 
     console.log(`[Import Job] Starting: ${jobId} - ${fileName} (${format})`);
 
@@ -56,13 +58,31 @@ export async function processImportJob(
       filePath,
       importType,
       format,
+      fileSize,
       userId,
-      onProgress: async (processed, total, errors) => {
-        // Update job progress
-        await updateJobProgress(jobId, processed, total || undefined);
+      onProgress: async (processed, total, errors, bytesProcessed) => {
+        // Build output stats for voter import
+        const outputStats: Partial<OutputStats> = {
+          type: 'voter_import',
+          recordsProcessed: processed,
+          totalErrors: errors,
+        };
+        
+        // Add file-based progress tracking if available
+        if (fileSize && bytesProcessed !== undefined) {
+          outputStats.bytesProcessed = bytesProcessed;
+          outputStats.fileSize = fileSize;
+          outputStats.percentComplete = Math.min(
+            Math.round((bytesProcessed / fileSize) * 100),
+            99
+          );
+        }
+        
+        // Update job progress with output stats
+        await updateJobProgress(jobId, processed, total || undefined, outputStats);
         
         if (errors > 0) {
-          console.log(`[Import Job] ${jobId} - Processed: ${processed}, Errors: ${errors}`);
+          console.log(`[Import Job] ${jobId} - Processed: ${processed}, Bytes: ${bytesProcessed}, Errors: ${errors}`);
         }
       },
     });
@@ -78,7 +98,32 @@ export async function processImportJob(
       }
     }
 
-    // Complete the job with final stats
+    // Complete the job with final output stats
+    const finalOutputStats: Partial<OutputStats> = {
+      type: 'voter_import',
+      recordsProcessed: result.processed,
+      recordsCreated: result.created,
+      recordsUpdated: result.updated,
+      recordsSkipped: result.skipped,
+      totalErrors: result.errors,
+      percentComplete: 100,
+    };
+    
+    if (fileSize) {
+      finalOutputStats.fileSize = fileSize;
+      finalOutputStats.bytesProcessed = fileSize; // Mark as fully processed
+    }
+    
+    // Add line and header info if available
+    if (result.linesProcessed !== undefined) {
+      finalOutputStats.linesProcessed = result.linesProcessed;
+    }
+    if (result.headerDetected !== undefined) {
+      finalOutputStats.headerDetected = result.headerDetected;
+    }
+    
+    await updateJobOutputStats(jobId, finalOutputStats);
+    
     await completeJob(jobId, {
       processed: result.processed,
       created: result.created,

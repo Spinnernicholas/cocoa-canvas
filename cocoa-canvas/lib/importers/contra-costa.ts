@@ -22,12 +22,13 @@ import {
 export interface ContraCostaImportOptions {
   filePath: string;
   importType: 'full' | 'incremental';
+  fileSize?: number; // Total file size in bytes for progress tracking
   jobId?: string;
-  onProgress?: (processed: number, total: number, errors: number) => void;
+  onProgress?: (processed: number, total: number, errors: number, bytesProcessed?: number) => void;
 }
 
 export interface ContraCostaVoterRecord {
-  RegistrationNumber: string;
+  RegistrationNumber?: string; // Optional
   VoterID: string;
   VoterTitle: string;
   LastName: string;
@@ -176,13 +177,16 @@ function normalize(value: string | undefined | null): string | null {
  */
 export async function importContraCostaFile(
   options: ContraCostaImportOptions
-): Promise<{ success: boolean; processed: number; errors: number; message?: string }> {
+): Promise<{ success: boolean; processed: number; errors: number; message?: string; bytesProcessed?: number; linesProcessed?: number; headerDetected?: boolean }> {
   
-  const { filePath, importType, jobId, onProgress } = options;
+  const { filePath, importType, jobId, fileSize, onProgress } = options;
   
   let processed = 0;
   let errors = 0;
   let skipped = 0;
+  let bytesProcessed = 0;
+  let linesProcessed = 0;
+  let headerDetected = false;
   
   console.log(`[Contra Costa Import] Starting ${importType} import from: ${filePath}`);
   
@@ -203,19 +207,50 @@ export async function importContraCostaFile(
   return new Promise((resolve) => {
     const parser = parse({
       delimiter: '\t',
-      columns: true,
+      columns: true, // First row is treated as header
       skip_empty_lines: true,
       relax_column_count: true,
     });
     
     const stream = createReadStream(filePath);
     
+    // Track bytes read from stream
+    stream.on('data', (chunk: Buffer) => {
+      bytesProcessed += chunk.length;
+    });
+    
+    // Detect header on first data event
+    let isFirstRecord = true;
+    
+    // Track pending async operations to prevent race condition
+    let pendingOperations = 0;
+    let streamEnded = false;
+    
+    const checkCompletion = () => {
+      if (streamEnded && pendingOperations === 0) {
+        // Add 1 to linesProcessed for the header row that was consumed by csv-parse
+        const totalLines = linesProcessed + (headerDetected ? 1 : 0);
+        console.log(`[Contra Costa Import] Complete: ${processed} processed, ${errors} errors, ${skipped} skipped, ${totalLines} total lines`);
+        resolve({ success: errors === 0, processed, errors, bytesProcessed, linesProcessed: totalLines, headerDetected });
+      }
+    };
+    
     stream.pipe(parser);
     
     parser.on('data', async (record: ContraCostaVoterRecord) => {
+      pendingOperations++;
       try {
         // Pause stream while processing
         parser.pause();
+        
+        // Track lines (including header which was already parsed)
+        linesProcessed++;
+        
+        // Detect header on first record
+        if (isFirstRecord) {
+          headerDetected = true; // csv-parse with columns:true means header was found
+          isFirstRecord = false;
+        }
         
         await processVoterRecord(record, importType, {
           residenceLocationId: residenceLocation.id,
@@ -226,7 +261,7 @@ export async function importContraCostaFile(
         processed++;
         
         if (onProgress && processed % 100 === 0) {
-          onProgress(processed, 0, errors);
+          onProgress(processed, 0, errors, bytesProcessed);
         }
         
         // Resume stream
@@ -235,12 +270,15 @@ export async function importContraCostaFile(
         console.error(`[Import Error] Row ${processed + 1}:`, error);
         errors++;
         parser.resume();
+      } finally {
+        pendingOperations--;
+        checkCompletion();
       }
     });
     
     parser.on('end', () => {
-      console.log(`[Contra Costa Import] Complete: ${processed} processed, ${errors} errors, ${skipped} skipped`);
-      resolve({ success: errors === 0, processed, errors });
+      streamEnded = true;
+      checkCompletion();
     });
     
     parser.on('error', (error: Error) => {
@@ -588,6 +626,7 @@ export class ContraCostaImporter implements VoterImporter {
     const result = await importContraCostaFile({
       filePath: options.filePath,
       importType: options.importType,
+      fileSize: options.fileSize,
       jobId: options.jobId,
       onProgress: options.onProgress,
     });
@@ -600,6 +639,8 @@ export class ContraCostaImporter implements VoterImporter {
       skipped: 0, // TODO: Track separately
       errors: result.errors,
       message: result.message,
+      linesProcessed: result.linesProcessed,
+      headerDetected: result.headerDetected,
     };
   }
   

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
+import { formatOutputStats, getProgressFromStats, type OutputStats } from '@/lib/queue/types';
 
 interface Job {
   id: string;
@@ -13,6 +14,7 @@ interface Job {
   progress: number;
   totalItems?: number;
   processedItems?: number;
+  outputStats?: OutputStats;
   data?: any;
   errorLog?: any[];
   createdAt: string;
@@ -134,6 +136,14 @@ export default function JobDetailPage() {
     return `${Math.round(duration / 3600)}h`;
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
   if (!user) {
     return <Marshmallow />;
   }
@@ -187,10 +197,10 @@ export default function JobDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">
-                    Job {job.id.substring(0, 8)}
+                    {job.type === 'voter_import' ? 'Voter Import' : job.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </h1>
-                  <p className="text-cocoa-600 dark:text-cocoa-400 text-sm mt-1">
-                    {job.type === 'voter_import' ? 'Voter Import' : job.type}
+                  <p className="text-cocoa-600 dark:text-cocoa-400 text-sm mt-1 font-mono">
+                    Job ID: {job.id}
                   </p>
                 </div>
                 <div className={`px-4 py-2 rounded-lg font-semibold ${getStatusBgColor(job.status)} ${getStatusColor(job.status)}`}>
@@ -201,7 +211,7 @@ export default function JobDetailPage() {
 
             {/* Progress Bar */}
             {job.status === 'processing' && (
-              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 space-y-2">
+              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-cocoa-700 dark:text-cocoa-300">Progress</span>
                   <span className="text-sm font-semibold text-cocoa-900 dark:text-cream-50">{Math.round(job.progress)}%</span>
@@ -212,7 +222,21 @@ export default function JobDetailPage() {
                     style={{ width: `${job.progress}%` }}
                   />
                 </div>
-                {job.totalItems && (
+                {job.outputStats && (
+                  <div className="text-sm text-cocoa-600 dark:text-cocoa-400 space-y-1">
+                    {job.outputStats.bytesProcessed !== undefined && job.outputStats.fileSize !== undefined && (
+                      <p>
+                        📁 {formatBytes(job.outputStats.bytesProcessed)} of {formatBytes(job.outputStats.fileSize)}
+                      </p>
+                    )}
+                    {job.outputStats.recordsProcessed !== undefined && (
+                      <p>
+                        📊 {job.outputStats.recordsProcessed.toLocaleString()} records processed
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!job.outputStats && job.totalItems && (
                   <p className="text-sm text-cocoa-600 dark:text-cocoa-400">
                     {job.processedItems || 0} of {job.totalItems} items processed
                   </p>
@@ -220,54 +244,162 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Job Details */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Created</p>
-                <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.createdAt)}</p>
-              </div>
-              <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
-                <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Duration</p>
-                <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{calculateDuration(job.startedAt, job.completedAt)}</p>
-              </div>
-              {job.startedAt && (
-                <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
-                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Started</p>
-                  <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.startedAt)}</p>
+            {/* Job Timeline */}
+            <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
+              <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Timeline</h3>
+              <dl className="space-y-4">
+                <div>
+                  <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Created</dt>
+                  <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.createdAt)}</dd>
                 </div>
-              )}
-              {job.completedAt && (
-                <div className="bg-white dark:bg-cocoa-800 p-4 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700">
-                  <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Completed</p>
-                  <p className="mt-2 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.completedAt)}</p>
+                {job.startedAt && (
+                  <div>
+                    <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Started</dt>
+                    <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.startedAt)}</dd>
+                  </div>
+                )}
+                {job.completedAt && (
+                  <div>
+                    <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Completed</dt>
+                    <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{formatDate(job.completedAt)}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Duration</dt>
+                  <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{calculateDuration(job.startedAt, job.completedAt)}</dd>
                 </div>
-              )}
+              </dl>
             </div>
+
+            {/* Output Statistics */}
+            {job.outputStats && (
+              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
+                <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Output Statistics</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {job.outputStats.recordsProcessed !== undefined && (
+                    <div className="bg-cocoa-50 dark:bg-cocoa-900/50 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-cocoa-600 dark:text-cocoa-400 uppercase tracking-wide">Records Processed</p>
+                      <p className="mt-2 text-2xl font-bold text-cocoa-900 dark:text-cream-50">{job.outputStats.recordsProcessed.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.recordsCreated !== undefined && (
+                    <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">Created</p>
+                      <p className="mt-2 text-2xl font-bold text-green-800 dark:text-green-300">{job.outputStats.recordsCreated.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.recordsUpdated !== undefined && (
+                    <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Updated</p>
+                      <p className="mt-2 text-2xl font-bold text-blue-800 dark:text-blue-300">{job.outputStats.recordsUpdated.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.recordsSkipped !== undefined && job.outputStats.recordsSkipped > 0 && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide">Skipped</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-800 dark:text-yellow-300">{job.outputStats.recordsSkipped.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.totalErrors !== undefined && job.outputStats.totalErrors > 0 && (
+                    <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide">Errors</p>
+                      <p className="mt-2 text-2xl font-bold text-red-800 dark:text-red-300">{job.outputStats.totalErrors.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.fileSize !== undefined && (
+                    <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide">File Size</p>
+                      <p className="mt-2 text-2xl font-bold text-purple-800 dark:text-purple-300">{formatBytes(job.outputStats.fileSize)}</p>
+                    </div>
+                  )}
+                  {job.outputStats.householdsProcessed !== undefined && (
+                    <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Households</p>
+                      <p className="mt-2 text-2xl font-bold text-indigo-800 dark:text-indigo-300">{job.outputStats.householdsProcessed.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.householdsGeocoded !== undefined && (
+                    <div className="bg-teal-50 dark:bg-teal-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wide">Geocoded</p>
+                      <p className="mt-2 text-2xl font-bold text-teal-800 dark:text-teal-300">{job.outputStats.householdsGeocoded.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.linesProcessed !== undefined && (
+                    <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Lines Processed</p>
+                      <p className="mt-2 text-2xl font-bold text-amber-800 dark:text-amber-300">{job.outputStats.linesProcessed.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.headerDetected !== undefined && (
+                    <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-400 uppercase tracking-wide">Header Row</p>
+                      <p className="mt-2 text-2xl font-bold text-cyan-800 dark:text-cyan-300">{job.outputStats.headerDetected ? '✓ Detected' : '✗ Not Found'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Import Job Details */}
             {job.type === 'voter_import' && job.data && (
               <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
                 <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Import Details</h3>
-                <dl className="space-y-4">
-                  {job.data.format && (
-                    <div>
-                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Format</dt>
-                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.format}</dd>
+                <div className="space-y-6">
+                  {/* File Information */}
+                  {(job.data.fileName || job.data.fileSize !== undefined) && (
+                    <div className="border-b border-cocoa-200 dark:border-cocoa-700 pb-4">
+                      <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">File Information</h4>
+                      <dl className="space-y-3">
+                        {job.data.fileName && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">File Name</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50 font-mono">{job.data.fileName}</dd>
+                          </div>
+                        )}
+                        {job.data.fileSize !== undefined && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">File Size</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{formatBytes(job.data.fileSize)}</dd>
+                          </div>
+                        )}
+                      </dl>
                     </div>
                   )}
-                  {job.data.importType && (
-                    <div>
-                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Import Type</dt>
-                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.importType === 'full' ? 'Full Import' : 'Merge with Existing'}</dd>
+                  
+                  {/* Format Information */}
+                  {(job.data.format || job.data.importType) && (
+                    <div className="border-b border-cocoa-200 dark:border-cocoa-700 pb-4">
+                      <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">Format Information</h4>
+                      <dl className="space-y-3">
+                        {job.data.format && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Format</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.format}</dd>
+                          </div>
+                        )}
+                        {job.data.importType && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Import Type</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.importType === 'full' ? 'Full Import' : 'Incremental Import'}</dd>
+                          </div>
+                        )}
+                      </dl>
                     </div>
                   )}
-                  {job.totalItems && (
+                  
+                  {/* User Information */}
+                  {job.createdBy && (
                     <div>
-                      <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Total Items</dt>
-                      <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.totalItems}</dd>
+                      <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">User Information</h4>
+                      <dl>
+                        <div>
+                          <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Uploaded By</dt>
+                          <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.createdBy.name} ({job.createdBy.email})</dd>
+                        </div>
+                      </dl>
                     </div>
                   )}
-                </dl>
+                </div>
               </div>
             )}
 
@@ -295,7 +427,27 @@ export default function JobDetailPage() {
             {job.status === 'completed' && (
               <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-100 rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold mb-2">✓ Job Completed Successfully</h3>
-                {job.type === 'voter_import' && (
+                {job.type === 'voter_import' && job.outputStats && (
+                  <div className="space-y-2">
+                    <p>Your voter import has been completed successfully.</p>
+                    {job.outputStats.recordsCreated !== undefined && (
+                      <p className="font-medium">
+                        • {job.outputStats.recordsCreated.toLocaleString()} new record(s) created
+                      </p>
+                    )}
+                    {job.outputStats.recordsUpdated !== undefined && job.outputStats.recordsUpdated > 0 && (
+                      <p className="font-medium">
+                        • {job.outputStats.recordsUpdated.toLocaleString()} record(s) updated
+                      </p>
+                    )}
+                    {job.outputStats.recordsSkipped !== undefined && job.outputStats.recordsSkipped > 0 && (
+                      <p className="font-medium opacity-75">
+                        • {job.outputStats.recordsSkipped.toLocaleString()} record(s) skipped
+                      </p>
+                    )}
+                  </div>
+                )}
+                {job.type === 'voter_import' && !job.outputStats && (
                   <p>Your voter import has been completed. The voters have been added to the system.</p>
                 )}
               </div>

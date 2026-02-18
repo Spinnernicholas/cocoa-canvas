@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
+import { formatOutputStats, getProgressFromStats } from '@/lib/queue/types';
 
 interface Job {
   id: string;
@@ -13,6 +14,7 @@ interface Job {
   progress: number;
   totalItems?: number;
   processedItems?: number;
+  outputStats?: any;
   data?: any;
   errorLog?: any[];
   createdAt: string;
@@ -347,6 +349,7 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Type</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Status</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Progress</th>
+                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Output</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Duration</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created By</th>
@@ -386,6 +389,20 @@ export default function JobsPage() {
                         ) : (
                           <span className="text-cocoa-700 dark:text-cocoa-300">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-cocoa-600 dark:text-cocoa-400 max-w-sm">
+                          {job.outputStats ? (
+                            (() => {
+                              const stats = typeof job.outputStats === 'string' 
+                                ? JSON.parse(job.outputStats) 
+                                : job.outputStats;
+                              return formatOutputStats(stats);
+                            })()
+                          ) : (
+                            <span className="text-cocoa-500 dark:text-cocoa-500">No statistics</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
                         {formatDate(job.createdAt)}

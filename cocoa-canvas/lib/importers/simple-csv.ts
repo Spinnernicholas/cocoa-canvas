@@ -36,7 +36,7 @@ export class SimpleCsvImporter implements VoterImporter {
   readonly supportsIncremental = false; // No unique ID to match on
   
   async importFile(options: VoterImportOptions): Promise<VoterImportResult> {
-    const { filePath, importType, onProgress } = options;
+    const { filePath, importType, fileSize, onProgress } = options;
     
     if (importType === 'incremental') {
       return {
@@ -70,6 +70,7 @@ export class SimpleCsvImporter implements VoterImporter {
     let processed = 0;
     let created = 0;
     let skipped = 0;
+    let bytesProcessed = 0;
     const errors: Array<{ row: number; field?: string; message: string }> = [];
     
     return new Promise((resolve) => {
@@ -82,6 +83,12 @@ export class SimpleCsvImporter implements VoterImporter {
       });
       
       const stream = createReadStream(filePath);
+      
+      // Track bytes read from stream
+      stream.on('data', (chunk: Buffer) => {
+        bytesProcessed += chunk.length;
+      });
+      
       stream.pipe(parser);
       
       parser.on('data', async (record: any) => {
@@ -194,7 +201,7 @@ export class SimpleCsvImporter implements VoterImporter {
           processed++;
           
           if (onProgress && processed % 100 === 0) {
-            onProgress(processed, 0, errors.length);
+            onProgress(processed, 0, errors.length, bytesProcessed);
           }
           
           parser.resume();

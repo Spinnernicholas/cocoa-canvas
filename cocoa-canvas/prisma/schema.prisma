@@ -104,6 +104,11 @@ model Job {
   // Error tracking
   errorLog String? // JSON array of errors (stored as text)
 
+  // Output statistics (stored as JSON text for flexibility)
+  // Track job-specific metrics like records processed, bytes processed, etc.
+  outputStats String?
+  // Example: { recordsProcessed: 100, recordsCreated: 50, bytesProcessed: 45000, percentComplete: 45 }
+
   // Job-specific data (stored as JSON text for flexibility)
   data String?
   // Example: { filePath: "/uploads/voters.txt", importType: "contra_costa", action: "merge" }
