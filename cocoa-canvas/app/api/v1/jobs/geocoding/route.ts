@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { createJob } from '@/lib/queue/runner';
 import { getGeocodeQueue } from '@/lib/queue/bullmq';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: GeocodeJobRequest = await request.json();
+
+    // Check if at least one geocoding provider is configured and enabled
+    const providers = await prisma.geocoderProvider.findMany({
+      where: { isEnabled: true },
+    });
+
+    if (providers.length === 0) {
+      return NextResponse.json(
+        { error: 'No geocoding providers configured. Please add a provider in the admin settings.' },
+        { status: 400 }
+      );
+    }
 
     // Create job in database
     const job = await createJob('geocoding', user.userId, {

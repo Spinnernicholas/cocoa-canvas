@@ -23,6 +23,8 @@ export default function RunJobPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [hasProviders, setHasProviders] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(true);
 
   // Geocoding filters
   const [geocodeFilters, setGeocodeFilters] = useState<GeocodeFilters>({
@@ -33,7 +35,7 @@ export default function RunJobPage() {
     limit: 10000,
   });
 
-  // Load user
+  // Load user and check for providers
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('authToken');
@@ -46,6 +48,28 @@ export default function RunJobPage() {
     try {
       const userData = JSON.parse(userStr);
       setUser(userData);
+      
+      // Fetch providers to check if any are configured
+      const fetchProviders = async () => {
+        try {
+          const response = await fetch('/api/v1/admin/geocoders', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const enabledProviders = (data.providers || []).filter((p: any) => p.isEnabled);
+            setHasProviders(enabledProviders.length > 0);
+          }
+        } catch (err) {
+          console.error('Error fetching providers:', err);
+          setHasProviders(false);
+        } finally {
+          setProvidersLoading(false);
+        }
+      };
+      
+      fetchProviders();
     } catch (error) {
       console.error('Error parsing user data:', error);
       router.push('/login');
@@ -290,6 +314,18 @@ export default function RunJobPage() {
                     </div>
                   </div>
 
+                  {!hasProviders && !providersLoading && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        <span className="font-semibold">No geocoding providers configured.</span> You must{' '}
+                        <Link href="/admin/geocoders" className="font-semibold underline hover:no-underline">
+                          add a geocoding provider
+                        </Link>
+                        {' '}before you can start a geocoding job.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
                       <span className="font-semibold">Note:</span> Geocoding jobs are processed asynchronously. You can monitor progress on the Jobs page.
@@ -299,10 +335,10 @@ export default function RunJobPage() {
                   <div className="flex gap-3">
                     <button
                       onClick={handleStartGeocoding}
-                      disabled={loading}
+                      disabled={loading || !hasProviders || providersLoading}
                       className="flex-1 px-6 py-3 bg-cinnamon-500 hover:bg-cinnamon-600 disabled:bg-cinnamon-400 text-cream-50 font-medium rounded-lg transition-colors"
                     >
-                      {loading ? 'Starting Job...' : 'Start Geocoding Job'}
+                      {loading ? 'Starting Job...' : !hasProviders ? 'Configure a Provider First' : 'Start Geocoding Job'}
                     </button>
                     <button
                       onClick={() => setSelectedJob(null)}
