@@ -2,9 +2,14 @@
 
 **An open-source, self-hosted voter database and canvassing platform that gives political campaigns and community organizations a modern alternative to expensive proprietary platforms.**
 
+[![Tests](https://github.com/Spinnernicholas/cocoa-canvas/actions/workflows/test.yml/badge.svg)](https://github.com/Spinnernicholas/cocoa-canvas/actions/workflows/test.yml)
+[![Docs](https://github.com/Spinnernicholas/cocoa-canvas/actions/workflows/deploy-docs.yml/badge.svg)](https://spinnernicholas.github.io/cocoa-canvas/)
+
 ## Overview
 
 Cocoa Canvas is a tool for managing voter data, conducting targeted outreach campaigns, and coordinating field operations—all while maintaining complete control over your data and operations. Built for transparency, privacy, and ease of use.
+
+📖 **[View Full Documentation](https://spinnernicholas.github.io/cocoa-canvas/)** - Complete guides, architecture docs, and planning information
 
 ## ✨ Features
 
@@ -17,11 +22,17 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 ## 🚀 Quick Start
 
-**New to the project?** Start here: [**QUICK_START.md**](docs/QUICK_START.md) (5 minutes to running locally)
+**New to the project?** Start here:
+- 📖 [**Full Documentation Site**](https://spinnernicholas.github.io/cocoa-canvas/) - Browse all guides and docs
+- 🏃 [**Quick Start Guide**](docs/QUICK_START.md) - 5 minutes to running locally
 
 **Local Development:**
 ```bash
-cd cocoa-canvas
+# Clone the repository
+git clone https://github.com/Spinnernicholas/cocoa-canvas.git
+cd cocoa-canvas/cocoa-canvas
+
+# Install dependencies and start dev server
 npm install
 npm run dev
 ```
@@ -29,6 +40,8 @@ Visit http://localhost:3000
 
 **Production Deployment (with Auto-Setup):**
 ```bash
+# From the cocoa-canvas directory
+cd cocoa-canvas
 docker-compose up -d
 ```
 
@@ -39,7 +52,7 @@ ADMIN_PASSWORD=SecurePass123!
 ADMIN_NAME=Administrator
 ```
 
-See [DOCKER_SETUP.md](docs/admin/DOCKER_SETUP.md) for production configuration and [AUTO_SETUP.md](docs/admin/AUTO_SETUP.md) for detailed auto-setup documentation.
+See [DOCKER_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/docker_setup/) for production configuration and [AUTO_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/auto_setup/) for detailed auto-setup documentation.
 
 ## 📁 Project Structure
 
@@ -52,20 +65,29 @@ See [DOCKER_SETUP.md](docs/admin/DOCKER_SETUP.md) for production configuration a
 │   ├── prisma/         # Database schema and migrations
 │   ├── package.json
 │   └── ...
-├── docs/               # Documentation
+├── docs/               # Documentation source (Markdown)
 │   ├── QUICK_START.md
 │   ├── admin/          # Deployment & configuration guides
 │   ├── developer/      # Architecture & technical docs
 │   └── planning/       # Project planning docs
+├── docs-site/          # Documentation website (Astro Starlight)
+│   └── ...             # Built with custom Cocoa Canvas theme
+├── .github/
+│   └── workflows/      # CI/CD automation
+│       ├── test.yml          # Run tests on push
+│       └── deploy-docs.yml   # Auto-deploy docs to GitHub Pages
 └── README.md           # You are here
 ```
 
 ## 🏗️ Stack
 
-- **Frontend/Backend**: Next.js (React + TypeScript)
-- **Database**: Prisma (SQLite dev, PostgreSQL production)
+- **Frontend/Backend**: Next.js 16 (React + TypeScript)
+- **Database**: Prisma ORM (SQLite dev, PostgreSQL production)
+- **Testing**: Vitest with 101 tests and coverage reporting
 - **Auth**: Local email/password (Phase 1), OAuth/MFA planned
 - **Maps**: Leaflet + OpenStreetMap
+- **Documentation**: Astro Starlight with custom theme
+- **CI/CD**: GitHub Actions (automated testing & docs deployment)
 - **Deployment**: Docker Compose
 
 ## 📋 Implementation Roadmap
@@ -79,15 +101,18 @@ Cocoa Canvas is built in 4 phases over 8 weeks to MVP:
 
 ## 📚 Documentation
 
-All planning and architectural documentation lives in the [`docs/planning/`](docs/planning/) directory:
+**📖 [Full Documentation Site](https://spinnernicholas.github.io/cocoa-canvas/)** - Auto-deployed from `docs/` directory
 
-- **[PROJECT_PLAN.md](docs/planning/PROJECT_PLAN.md)** - Vision, tech stack, deployment scenarios
-- **[PHASE_PLAN.md](docs/planning/PHASE_PLAN.md)** - Detailed 4-phase implementation roadmap (START HERE)
-- **[DATABASE_SCHEMA.md](docs/planning/DATABASE_SCHEMA.md)** - Complete Prisma schema design
-- **[API_PLAN.md](docs/planning/API_PLAN.md)** - REST API specification (50+ endpoints)
-- **[AUTH_SECURITY_PLAN.md](docs/planning/AUTH_SECURITY_PLAN.md)** - Authentication & security design
-- **[DATA_INGESTION_PLAN.md](docs/planning/DATA_INGESTION_PLAN.md)** - Data import strategy
-- **[MAP_DISPLAY_PLAN.md](docs/planning/MAP_DISPLAY_PLAN.md)** - Interactive mapping features
+**Key Documentation:**
+
+- **[Quick Start](https://spinnernicholas.github.io/cocoa-canvas/quick_start/)** - Get running in 5 minutes
+- **[Phase Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/phase_plan/)** - Detailed 4-phase implementation roadmap
+- **[Project Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/project_plan/)** - Vision, tech stack, deployment scenarios
+- **[Database Schema](https://spinnernicholas.github.io/cocoa-canvas/planning/database_schema/)** - Complete Prisma schema design
+- **[API Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/api_plan/)** - REST API specification (50+ endpoints)
+- **[Docker Setup](https://spinnernicholas.github.io/cocoa-canvas/admin/docker_setup/)** - Production deployment guide
+
+All documentation source files are in [`docs/`](docs/) and automatically synced to the documentation site.
 
 ## 🔒 Non-Destructive by Design
 
@@ -96,9 +121,32 @@ All planning and architectural documentation lives in the [`docs/planning/`](doc
 - No hard deletes—soft deletion with audit trails
 - File deduplication prevents accidental re-imports
 
+## 🧪 Testing
+
+The project includes comprehensive test coverage with automated CI:
+
+```bash
+cd cocoa-canvas
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:ci
+
+# Run linter
+npm run lint
+```
+
+Tests automatically run on every push via GitHub Actions. Current coverage: 101 tests across authentication, API endpoints, job queue system, and business logic.
 ## 🤝 Contributing
 
 Contributions welcome! (Contributing guide coming soon)
+
+Before submitting:
+1. Ensure all tests pass (`npm test`)
+2. Run Prisma generation if schema changed (`npm run prisma:generate`)
+3. Check the existing documentation in `docs/` for architecture guidelines
 
 ## 📄 License
 
@@ -106,8 +154,10 @@ GNU Affero General Public License v3 (AGPL-3.0)
 
 ## 💬 Questions?
 
-See the planning documentation or open an issue.
+- 📖 Browse the [full documentation site](https://spinnernicholas.github.io/cocoa-canvas/)
+- 🐛 Open an [issue](https://github.com/Spinnernicholas/cocoa-canvas/issues)
+- 💡 Check the [planning docs](https://spinnernicholas.github.io/cocoa-canvas/planning/project_plan/) for architecture details
 
 ---
 
-**Ready to build?** Start with [PHASE_PLAN.md](docs/planning/PHASE_PLAN.md) for the implementation roadmap.
+**Ready to build?** Start with the [Phase Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/phase_plan/) for the implementation roadmap.
