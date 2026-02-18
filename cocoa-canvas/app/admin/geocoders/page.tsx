@@ -138,6 +138,18 @@ export default function GeocodeSettingsPage() {
     });
   };
 
+  const handleStartAdd = () => {
+    setShowAddForm(true);
+    setEditingProvider({
+      providerId: '',
+      providerName: '',
+      description: '',
+      isEnabled: true,
+      priority: 0,
+      tempConfig: {},
+    });
+  };
+
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditingProvider(null);
@@ -147,6 +159,17 @@ export default function GeocodeSettingsPage() {
   const handleSaveProvider = async () => {
     if (!editingProvider) return;
 
+    // Validate required fields
+    if (!editingProvider.providerId?.trim()) {
+      setError('Provider ID is required');
+      return;
+    }
+
+    if (!editingProvider.providerName?.trim()) {
+      setError('Provider Name is required');
+      return;
+    }
+
     try {
       setError('');
       const token = localStorage.getItem('authToken');
@@ -154,12 +177,12 @@ export default function GeocodeSettingsPage() {
       const payload: any = {
         providerId: editingProvider.providerId,
         providerName: editingProvider.providerName,
-        description: editingProvider.description,
-        isEnabled: editingProvider.isEnabled,
-        priority: editingProvider.priority,
+        description: editingProvider.description || null,
+        isEnabled: editingProvider.isEnabled !== false,
+        priority: editingProvider.priority ?? 0,
       };
 
-      if (editingProvider.tempConfig) {
+      if (editingProvider.tempConfig && Object.keys(editingProvider.tempConfig).length > 0) {
         payload.config = JSON.stringify(editingProvider.tempConfig);
       }
 
@@ -201,7 +224,7 @@ export default function GeocodeSettingsPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error('Error saving provider:', err);
-      setError('Failed to save provider');
+      setError(err instanceof Error ? err.message : 'Failed to save provider');
     }
   };
 
@@ -315,7 +338,7 @@ export default function GeocodeSettingsPage() {
         {!showAddForm && !editingId && (
           <div className="mb-6">
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={handleStartAdd}
               className="px-4 py-2 bg-cinnamon-500 hover:bg-cinnamon-600 text-cream-50 rounded-lg font-medium transition-colors"
             >
               + Add Provider
