@@ -1,8 +1,8 @@
 # Docker Setup Guide
 
-This guide explains how to run Cocoa Canvas using Docker for **production deployments**.
+This guide explains how to run Cocoa Canvas using Docker for both **development** and **production** deployments.
 
-**For local development**, see [QUICK_START.md](../QUICK_START.md) - just run `cd webapp && npm run dev` from the project root.
+**For local development**, see [QUICK_START.md](../QUICK_START.md) - use `npm run docker:dev:up` to start PostgreSQL, Redis, and the Next.js app with hot reload.
 
 ## Prerequisites
 
@@ -29,6 +29,25 @@ Visit: `http://localhost:3000`
 
 ## Environment Setup
 
+### Development
+
+For local development with Docker (PostgreSQL + Redis + App):
+
+```bash
+cd cocoa-canvas
+npm run docker:dev:up
+```
+
+The `.env.development` file is pre-configured with:
+
+```env
+NODE_ENV=development
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cocoa_canvas_dev
+REDIS_URL=redis://localhost:6379
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=dev-secret-only-for-development-not-secure
+```
+
 ### Production
 
 Create a `.env` file for production:
@@ -41,10 +60,12 @@ cp .env.example .env
 
 ```env
 NODE_ENV=production
-DATABASE_URL=file:./data/cocoa_canvas.db  # SQLite database (relative to prisma/schema.prisma)
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cocoa_canvas
 NEXTAUTH_URL=https://your-domain.com
 NEXTAUTH_SECRET=<generate-with: openssl rand -base64 32>
 ```
+
+**Note**: For production, use a properly secured PostgreSQL instance with strong credentials.
 
 For auto-setup (create admin account automatically):
 
@@ -75,23 +96,32 @@ docker-compose down -v
 
 ## Using PostgreSQL
 
-By default, production uses SQLite. To switch to PostgreSQL for better scalability:
+PostgreSQL is the default database for both development and production.
 
-### Option 1: Use Docker Compose Profile
+### Development (Local Docker)
+
+You get PostgreSQL automatically with:
 
 ```bash
-docker-compose --profile postgres up -d
+npm run docker:dev:up
 ```
 
-Then update `.env`:
+This starts:
+- PostgreSQL on localhost:5432
+- Redis on localhost:6379
+- Next.js app on localhost:3000
 
+### Production (Docker Compose)
+
+The production `docker-compose.yml` includes PostgreSQL by default:
+
+```bash
+docker-compose up -d
 ```
-DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cocoa_canvas
-```
 
-### Option 2: External PostgreSQL
+### External PostgreSQL
 
-Use a managed PostgreSQL service or local installation:
+To use a managed PostgreSQL service or external server:
 
 ```
 DATABASE_URL=postgresql://user:password@your-host:5432/cocoa_canvas
@@ -99,13 +129,9 @@ DATABASE_URL=postgresql://user:password@your-host:5432/cocoa_canvas
 
 ## Database Management
 
-### View Database (SQLite)
-
-```bash
-sqlite3 data/cocoa_canvas.db
-```
-
 ### Prisma Studio (Interactive GUI)
+
+Best way to view and edit data:
 
 ```bash
 docker-compose exec web npx prisma studio

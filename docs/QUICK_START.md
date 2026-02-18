@@ -4,19 +4,22 @@
 
 ## Step 1: Prerequisites
 
-You need Node.js 22 LTS installed.
+You need:
+- **Docker** and **Docker Compose** (for PostgreSQL and Redis)
+- **Git**
 
-**Check if you have it:**
+**Check if you have Docker:**
 ```bash
-node --version  # Should show v22.x.x
+docker --version
+docker-compose --version
 ```
 
-**Don't have Node 22?**
-- **Windows/Mac**: Download from https://nodejs.org (choose LTS version)
+**Don't have Docker?**
+- **Windows/Mac**: Download [Docker Desktop](https://www.docker.com/products/docker-desktop)
 - **Linux**: 
   ```bash
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt-get install -y nodejs
+  curl -fsSL https://get.docker.com -o get-docker.sh
+  sudo sh get-docker.sh
   ```
 
 ## Step 2: Clone the Project
@@ -27,86 +30,93 @@ cd cocoa-canvas
 cd cocoa-canvas
 ```
 
-## Step 3: Install Dependencies
+## Step 3: Start Docker Development Environment
+
+**This single command starts everything:**
+- PostgreSQL database
+- Redis (job queue)
+- Next.js app with hot reload
 
 ```bash
-npm install
+npm run docker:dev:up
 ```
 
-## Step 4: Set Up Environment
+Wait 30 seconds for containers to start and app to install dependencies.
 
-Create a `.env` file for local development:
-
-```bash
-echo "DATABASE_URL=file:./data/cocoa_canvas.db
-NEXTAUTH_SECRET=dev-secret-only-for-development-not-secure
-NEXTAUTH_URL=http://localhost:3000" > .env
-```
-
-## Step 5: Initialize the Database
+## Step 4: View Logs (Optional)
 
 ```bash
-npx prisma generate
-npx prisma db push
-```
+# See all logs
+npm run docker:dev:logs
 
-## Step 6: Start Development Server
-
-```bash
-npm run dev
+# Follow app logs only
+docker logs -f cocoa-canvas-app-dev
 ```
 
 The app will be running at:
 
 👉 **http://localhost:3000**
 
-## Step 7: Create Your Admin Account
+## Step 5: Login
 
-1. You'll see the setup wizard
-2. Enter an email and password (this is your admin account)
-3. Fill in basic campaign info (name, dates, target area)
-4. Done! You're in
+An admin account is automatically created:
+- **Email**: admin@example.com
+- **Password**: password
+
+(You can change these in `.env` before starting)
 
 ## Making Changes
 
-Now you can edit files and see changes instantly:
+Your source code is mounted into the Docker container:
 - Edit React components in `app/` folder
 - Edit backend logic in `lib/` folder
 - Changes appear automatically (hot reload)
-- No need to restart the server
+- No need to restart containers
 
 ## Stop the App
 
-Press **Ctrl+C** in the terminal where `npm run dev` is running.
+```bash
+npm run docker:dev:down
+```
+
+This stops and removes containers (database data is preserved).
 
 ---
 
 ## ❓ Troubleshooting
 
-### Port 3000 already in use?
-Another app is using port 3000. Change it:
+### Port conflicts?
+If ports 3000, 5432, or 6379 are already in use:
 ```bash
-npm run dev -- -p 3001
+# Find what's using the port
+lsof -i :3000
+lsof -i :5432
+lsof -i :6379
+
+# Stop conflicting services or change ports in docker-compose.dev.yml
 ```
-Then visit http://localhost:3001
 
 ### Database errors?
 Reset the database:
 ```bash
-rm -rf data/cocoa_canvas.db
-npx prisma db push
+npm run docker:dev:down -- -v  # Removes volumes
+npm run docker:dev:up          # Fresh start
 ```
 
 ### Changes not showing up?
-- Refresh your browser (sometimes needed)
-- Check the terminal for errors
-- If stuck, stop (`Ctrl+C`) and restart (`npm run dev`)
+- Refresh your browser
+- Check logs: `docker logs -f cocoa-canvas-app-dev`
+- Restart app: `docker-compose -f docker-compose.dev.yml restart app`
 
-### Module not found errors?
-Reinstall dependencies:
+### Container won't start?
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+# View container logs
+docker logs cocoa-canvas-app-dev
+docker logs cocoa-canvas-postgres-dev
+
+# Rebuild from scratch
+npm run docker:dev:down -- -v
+npm run docker:dev:up
 ```
 
 ---

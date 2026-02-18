@@ -61,21 +61,9 @@ PORT=3000
 **Purpose**: Database connection string for Prisma ORM  
 **Type**: String (Connection URL)  
 **Required**: Yes  
-**Default**: `file:./data/cocoa_canvas.db` (SQLite)
+**Default**: `postgresql://postgres:postgres@localhost:5432/cocoa_canvas_dev`
 
-#### SQLite (Phase 1 - Default)
-
-```env
-DATABASE_URL=file:./data/cocoa_canvas.db
-```
-
-**Notes**:
-- Path is relative to `prisma/schema.prisma`
-- Suitable for development and small-medium deployments
-- File stored at `prisma/data/cocoa_canvas.db`
-- Backup by copying the `.db` file
-
-#### PostgreSQL (Phase 2+ - Recommended for Production)
+#### PostgreSQL (Default for Development and Production)
 
 ```env
 DATABASE_URL=postgresql://username:password@host:port/database
@@ -84,6 +72,9 @@ DATABASE_URL=postgresql://username:password@host:port/database
 **Examples**:
 
 ```env
+# Local development (Docker)
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cocoa_canvas_dev
+
 # Docker Compose (internal network)
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cocoa_canvas
 
@@ -107,6 +98,18 @@ DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
 # With connection pool
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_timeout=10&connection_limit=10
 ```
+
+#### SQLite (Alternative for Simple Deployments)
+
+```env
+DATABASE_URL=file:./data/cocoa_canvas.db
+```
+
+**Notes**:
+- Path is relative to `prisma/schema.prisma`
+- Suitable for very small deployments or testing
+- File stored at `prisma/data/cocoa_canvas.db`
+- Requires changing Prisma schema provider to "sqlite"
 
 ---
 

@@ -26,15 +26,17 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 - 📖 [**Full Documentation Site**](https://spinnernicholas.github.io/cocoa-canvas/) - Browse all guides and docs
 - 🏃 [**Quick Start Guide**](docs/QUICK_START.md) - 5 minutes to running locally
 
-**Local Development:**
+**Local Development (Docker):**
 ```bash
 # Clone the repository
 git clone https://github.com/Spinnernicholas/cocoa-canvas.git
 cd cocoa-canvas/cocoa-canvas
 
-# Install dependencies and start dev server
-npm install
-npm run dev
+# Start PostgreSQL, Redis, and Next.js app in Docker
+npm run docker:dev:up
+
+# View logs
+npm run docker:dev:logs
 ```
 Visit http://localhost:3000
 
@@ -82,7 +84,8 @@ See [DOCKER_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/docke
 ## 🏗️ Stack
 
 - **Frontend/Backend**: Next.js 16 (React + TypeScript)
-- **Database**: Prisma ORM (SQLite dev, PostgreSQL production)
+- **Database**: Prisma ORM with PostgreSQL (dev and production)
+- **Job Queue**: BullMQ with Redis
 - **Testing**: Vitest with 101 tests and coverage reporting
 - **Auth**: Local email/password (Phase 1), OAuth/MFA planned
 - **Maps**: Leaflet + OpenStreetMap
