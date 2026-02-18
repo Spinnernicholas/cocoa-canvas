@@ -53,4 +53,4 @@ prisma/prisma/  # Nested prisma directory (should not exist, but ignore if it do
 .turbo
 dist
 # Temporary
-tmp/
+tmp/dev.log
