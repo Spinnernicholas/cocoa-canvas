@@ -16,8 +16,13 @@ Cocoa Canvas is an open-source voter database and canvassing platform built with
 
 **Monorepo structure**:
 - `cocoa-canvas/` - Main Next.js application (work here)
-- `docs/` - Markdown documentation source
-- `docs-site/` - Astro Starlight documentation site
+- `docs-site/` - **Public documentation** (Astro Starlight site, deployed to GitHub Pages)
+- `docker/` - Docker & Docker Compose configuration for deployment
+- `scripts/` - Build and utility scripts
+
+**Documentation strategy**:
+- **Public docs** (user & developer guides): `docs-site/src/content/docs/`
+- **GitHub-specific docs** (API specs, architecture details): README.md files in respective folders
 
 **Path alias**: `@/` maps to `cocoa-canvas/` root (e.g., `@/lib/prisma`, `@/components/Map`)
 
@@ -25,7 +30,7 @@ Cocoa Canvas is an open-source voter database and canvassing platform built with
 
 ### 1. Single Campaign Model
 
-All voters belong to THE campaign (no `campaignId` fields). See [docs/developer/SINGLE_CAMPAIGN_ARCHITECTURE.md](docs/developer/SINGLE_CAMPAIGN_ARCHITECTURE.md).
+All voters belong to THE campaign (no `campaignId` fields). See the developer docs for architecture details.
 
 ```typescript
 // ✅ Correct: All voters are implicitly part of THE campaign
@@ -194,7 +199,7 @@ Required for development and production:
 Optional auto-setup:
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` - Creates admin on first boot
 
-See: [docs/admin/ENVIRONMENT_VARIABLES.md](docs/admin/ENVIRONMENT_VARIABLES.md)
+See: `docs-site/src/content/docs/admin/environment-variables.md`
 
 ## Common Tasks
 
@@ -229,8 +234,9 @@ npm run docker:prod:logs | grep -i worker
 - Job system: [lib/queue/runner.ts](cocoa-canvas/lib/queue/runner.ts), [lib/queue/bullmq.ts](cocoa-canvas/lib/queue/bullmq.ts), [lib/queue/worker.ts](cocoa-canvas/lib/queue/worker.ts)
 - Importers: [lib/importers/registry.ts](cocoa-canvas/lib/importers/registry.ts), [lib/importers/types.ts](cocoa-canvas/lib/importers/types.ts)
 - Database: [prisma/schema.prisma](cocoa-canvas/prisma/schema.prisma), [lib/prisma.ts](cocoa-canvas/lib/prisma.ts)
-- Core docs: [docs/developer/DATABASE_SCHEMA_MASTER.md](docs/developer/DATABASE_SCHEMA_MASTER.md), [docs/developer/IMPORT_ARCHITECTURE.md](docs/developer/IMPORT_ARCHITECTURE.md), [docs/developer/JOB_SYSTEM_VERIFICATION.md](docs/developer/JOB_SYSTEM_VERIFICATION.md)
+- Public docs: `docs-site/src/content/docs/` (developer, admin, getting-started guides)
+- Technical specifications: See README.md files in respective `cocoa-canvas/lib/` subdirectories
 
 ---
 
-*For questions about specific features or architecture decisions, search `docs/developer/` for detailed technical documentation.*
+*For questions about specific features, see the public documentation at `docs-site/src/content/docs/developer/` or check README.md files in the codebase for technical specifications.*
