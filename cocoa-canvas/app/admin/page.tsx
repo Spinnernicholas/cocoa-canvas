@@ -34,6 +34,13 @@ export default function AdminPage() {
       description: 'Manage system data and settings',
       items: [
         {
+          title: 'Campaign Settings',
+          description: 'Configure campaign details, timeline, and target area',
+          icon: '🎯',
+          route: '/admin/campaign',
+          color: 'from-cinnamon-500 to-cinnamon-600',
+        },
+        {
           title: 'Option Groups',
           description: 'Manage customizable lists like parties, location types, and other reference data',
           icon: '📋',
