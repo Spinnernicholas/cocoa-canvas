@@ -354,22 +354,56 @@ export default function GeocodeSettingsPage() {
             </h2>
 
             <div className="space-y-4">
-              {/* Provider ID */}
-              <div>
-                <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
-                  Provider ID *
-                </label>
-                <input
-                  type="text"
-                  value={editingProvider.providerId || ''}
-                  onChange={(e) =>
-                    setEditingProvider({ ...editingProvider, providerId: e.target.value })
-                  }
-                  disabled={!!editingId}
-                  placeholder="e.g., nominatim"
-                  className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
-                />
-              </div>
+              {/* Provider Selection */}
+              {showAddForm && !editingId ? (
+                <div>
+                  <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
+                    Select Provider *
+                  </label>
+                  <select
+                    value={editingProvider.providerId || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selectedProvider = providerInfo.get(selectedId);
+                      if (selectedProvider) {
+                        setEditingProvider({
+                          ...editingProvider,
+                          providerId: selectedId,
+                          providerName: selectedProvider.providerName,
+                          tempConfig: {},
+                        });
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                  >
+                    <option value="">Choose a provider...</option>
+                    {Array.from(providerInfo.values()).map((provider) => (
+                      <option key={provider.providerId} value={provider.providerId}>
+                        {provider.providerName} ({provider.providerId})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-2">
+                    Select a registered provider to configure it for this deployment
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
+                    Provider ID *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingProvider.providerId || ''}
+                    onChange={(e) =>
+                      setEditingProvider({ ...editingProvider, providerId: e.target.value })
+                    }
+                    disabled={!!editingId}
+                    placeholder="e.g., nominatim"
+                    className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
+                  />
+                </div>
+              )}
 
               {/* Provider Name */}
               <div>
@@ -382,9 +416,15 @@ export default function GeocodeSettingsPage() {
                   onChange={(e) =>
                     setEditingProvider({ ...editingProvider, providerName: e.target.value })
                   }
+                  disabled={showAddForm && !editingId}
                   placeholder="e.g., Nominatim"
-                  className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                  className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
                 />
+                {showAddForm && !editingId && (
+                  <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
+                    Auto-populated from selected provider
+                  </p>
+                )}
               </div>
 
               {/* Description */}
