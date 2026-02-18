@@ -1,3 +1,7 @@
+---
+title: Voter File Architecture (Person-Centric)
+---
+
 # Voter File Architecture (Person-Centric)
 
 ## Overview: From File to Database

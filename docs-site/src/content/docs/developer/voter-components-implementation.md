@@ -1,3 +1,7 @@
+---
+title: Advanced Filtering and Voter Components - Implementation Summary
+---
+
 # Advanced Filtering and Voter Components - Implementation Summary
 
 **Date**: February 16, 2026  

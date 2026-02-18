@@ -1,3 +1,7 @@
+---
+title: Docker Setup Guide
+---
+
 # Docker Setup Guide
 
 This guide explains how to run Cocoa Canvas using Docker for both **development** and **production** deployments.

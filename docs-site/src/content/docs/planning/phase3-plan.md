@@ -1,3 +1,7 @@
+---
+title: "Phase 3: Campaign Management & Map Visualization"
+---
+
 # Phase 3: Campaign Management & Map Visualization
 
 **Goal**: Single campaign setup and household map visualization with parcel data integration

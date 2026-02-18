@@ -1,3 +1,7 @@
+---
+title: Environment Variables Reference
+---
+
 # Environment Variables Reference
 
 This document describes all environment variables used by Cocoa Canvas for configuration and deployment.

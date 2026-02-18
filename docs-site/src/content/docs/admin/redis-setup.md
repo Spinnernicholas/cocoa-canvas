@@ -1,3 +1,7 @@
+---
+title: Redis Setup Guide
+---
+
 # Redis Setup Guide
 
 This application uses Redis for job queues, caching, and scheduled tasks.

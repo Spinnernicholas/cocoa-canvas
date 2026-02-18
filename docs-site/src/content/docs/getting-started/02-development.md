@@ -1,3 +1,7 @@
+---
+title: Development Guide
+---
+
 # Development Guide
 
 **Working with Cocoa Canvas locally and making changes to the codebase.**

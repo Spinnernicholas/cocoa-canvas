@@ -1,3 +1,7 @@
+---
+title: Production Deployment
+---
+
 # Production Deployment
 
 **Deploy Cocoa Canvas to production with Docker.**

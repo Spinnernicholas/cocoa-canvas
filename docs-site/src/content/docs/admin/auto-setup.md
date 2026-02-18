@@ -1,3 +1,7 @@
+---
+title: Auto-Setup Feature Documentation
+---
+
 # Auto-Setup Feature Documentation
 
 ## Overview

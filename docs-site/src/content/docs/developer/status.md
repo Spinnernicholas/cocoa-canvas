@@ -1,3 +1,7 @@
+---
+title: Project Status
+---
+
 # Project Status
 
 **Last Updated**: February 17, 2026  

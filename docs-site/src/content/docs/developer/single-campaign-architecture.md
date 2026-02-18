@@ -1,3 +1,7 @@
+---
+title: Single Campaign Per Deployment Architecture
+---
+
 # Single Campaign Per Deployment Architecture
 
 **Effective Date**: February 16, 2026  

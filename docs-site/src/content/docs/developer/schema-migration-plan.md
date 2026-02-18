@@ -1,3 +1,7 @@
+---
+title: Schema Migration Plan (Legacy to Person-Centric)
+---
+
 # Schema Migration Plan (Legacy to Person-Centric)
 
 **Date**: February 16, 2026

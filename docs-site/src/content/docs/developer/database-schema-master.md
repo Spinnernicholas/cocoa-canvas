@@ -1,3 +1,7 @@
+---
+title: Master Database Schema (Developer Reference)
+---
+
 # Master Database Schema (Developer Reference)
 
 ## Purpose

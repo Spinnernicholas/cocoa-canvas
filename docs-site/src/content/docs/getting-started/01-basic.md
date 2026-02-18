@@ -1,3 +1,7 @@
+---
+title: Quick Start
+---
+
 # Quick Start
 
 **Get Cocoa Canvas running locally with Docker.**

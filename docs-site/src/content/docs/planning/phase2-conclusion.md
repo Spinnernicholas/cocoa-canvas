@@ -1,3 +1,7 @@
+---
+title: "Phase 2 Conclusion: Voter Management System"
+---
+
 # Phase 2 Conclusion: Voter Management System
 
 **Project Status**: ✅ COMPLETE  
