@@ -202,6 +202,6 @@ npm run dev
 
 ## Related Documentation
 
-- [VOTER_FILE_FORMATS.md](../../docs/developer/VOTER_FILE_FORMATS.md) - Import format specifications
+- [Voter File Formats](../../../docs-site/src/content/docs/developer/voter-file-formats.md) - Import format specifications
 - [lib/importers/](../../lib/importers/) - Importer implementations
 - [prisma/schema.prisma](../../prisma/schema.prisma) - Database schema
