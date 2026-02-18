@@ -205,23 +205,29 @@ See: `docs-site/src/content/docs/admin/environment-variables.md`
 
 **IMPORTANT: Always ask the user before committing changes.** Do not automatically commit without explicit user consent.
 
-When changes are complete, always ask the user one of these three options:
+When changes are complete, use the `ask_questions` tool to ask the user one of these three options:
 1. **Commit only** - `git add` and `git commit` (no push)
 2. **Commit and push** - `git add`, `git commit`, and `git push`
 3. **Do nothing** - Leave changes uncommitted for the user to handle manually
 
-Example interaction:
-```
-User task completed. Changes made to:
-- file1.ts
-- file2.tsx
+**Implementation example:**
+```javascript
+await ask_questions({
+  questions: [{
+    header: "Git Action",
+    question: "Changes made to file1.ts and file2.tsx. How would you like to proceed?",
+    options: [
+      { label: "Commit only (no push)" },
+      { label: "Commit and push" },
+      { label: "Do nothing" }
+    ]
+  }]
+});
 
-Would you like to:
-1. Commit only (no push)
-2. Commit and push
-3. Do nothing
-
-Please choose an option (1-3):
+// Then handle the response to execute the corresponding git commands
+// if answer is "Commit only": run git add + git commit
+// if answer is "Commit and push": run git add + git commit + git push
+// if answer is "Do nothing": stop
 ```
 
 This applies to:
