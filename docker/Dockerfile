@@ -7,13 +7,13 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 # Copy package files
-COPY package.json package-lock.json* yarn.lock* ./
+COPY cocoa-canvas/package.json cocoa-canvas/package-lock.json* cocoa-canvas/yarn.lock* ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY cocoa-canvas/ .
 
 # Ensure public directory exists
 RUN mkdir -p public
@@ -30,7 +30,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 # Copy package files from builder
-COPY package.json package-lock.json* yarn.lock* ./
+COPY cocoa-canvas/package.json cocoa-canvas/package-lock.json* cocoa-canvas/yarn.lock* ./
 
 # Install production dependencies only
 RUN npm ci --production

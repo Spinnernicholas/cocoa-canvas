@@ -1,10 +1,12 @@
 # Production Docker Compose configuration
-# For local development, use: npm run dev
+# For local development, use docker-compose.dev.yml
 
 services:
   # Main Next.js application
   web:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -20,7 +22,7 @@ services:
       # AUTO_SETUP_ENABLED: ${AUTO_SETUP_ENABLED:-true}
     volumes:
       # SQLite database persistence
-      - ./prisma/data:/app/prisma/data
+      - ./cocoa-canvas/prisma/data:/app/prisma/data
       # Volume for node_modules to avoid conflicts
       - /app/node_modules
     depends_on:
@@ -80,4 +82,3 @@ volumes:
 
 networks:
   cocoa-network:
-    driver: bridge

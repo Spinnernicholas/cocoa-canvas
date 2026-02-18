@@ -16,14 +16,14 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "prisma:generate": "prisma generate",
-    "docker:dev:up": "docker-compose -f docker-compose.dev.yml up -d",
-    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
-    "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
-    "docker:dev:restart": "docker-compose -f docker-compose.dev.yml restart",
-    "docker:prod:up": "docker-compose up -d",
-    "docker:prod:down": "docker-compose down",
-    "docker:prod:logs": "docker-compose logs -f",
-    "docker:prod:build": "docker-compose build"
+    "docker:dev:up": "docker-compose -f ../docker/docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker-compose -f ../docker/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f ../docker/docker-compose.dev.yml logs -f",
+    "docker:dev:restart": "docker-compose -f ../docker/docker-compose.dev.yml restart",
+    "docker:prod:up": "docker-compose -f ../docker/docker-compose.yml up -d",
+    "docker:prod:down": "docker-compose -f ../docker/docker-compose.yml down",
+    "docker:prod:logs": "docker-compose -f ../docker/docker-compose.yml logs -f",
+    "docker:prod:build": "docker-compose -f ../docker/docker-compose.yml build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
