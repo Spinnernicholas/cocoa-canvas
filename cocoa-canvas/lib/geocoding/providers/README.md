@@ -22,6 +22,7 @@ This directory contains geocoding provider implementations for Cocoa Canvas. Pro
 **Configuration:**
 ```json
 {
+  "batchSize": 1000,
   "baseUrl": "https://geocoding.geo.census.gov/geocoder",
   "benchmark": "Public_AR_Current",
   "vintage": "Current_Current",
@@ -29,10 +30,14 @@ This directory contains geocoding provider implementations for Cocoa Canvas. Pro
 }
 ```
 
+**Custom Properties:**
+- `batchSize` (number, default: 1000): Controls how many addresses are processed per API request. Supported range: 1-10,000. Smaller batches reduce memory usage but increase API calls. Default of 1,000 is recommended for most setups.
+
 **Usage:**
 - No setup required - works out of the box
 - Best for US-based political campaigns
 - Recommended as primary provider for US addresses
+- Batch size can be adjusted via admin interface under "Provider Settings"
 
 ### Nominatim (OpenStreetMap) - Coming Soon
 
@@ -54,7 +59,7 @@ To add a new geocoding provider:
 
 1. **Create provider file** in `providers/` directory:
    ```typescript
-   import { GeocoderProvider, GeocodeRequest, GeocodeResult } from '../types';
+   import { GeocoderProvider, GeocodeRequest, GeocodeResult, CustomProperty } from '../types';
    
    export class MyGeocoderProvider implements GeocoderProvider {
      providerId = 'my-geocoder';
@@ -72,10 +77,40 @@ To add a new geocoding provider:
      async batchGeocode?(requests: GeocodeRequest[]): Promise<(GeocodeResult | null)[]> {
        // Optional: Implement batch geocoding
      }
+     
+     getCustomProperties?(): CustomProperty[] {
+       // Optional: Expose configurable properties
+       return [
+         {
+           name: 'apiKey',
+           label: 'API Key',
+           type: 'string',
+           description: 'Your API key for the geocoding service',
+           default: '',
+           required: true,
+         },
+         {
+           name: 'maxRequests',
+           label: 'Max Requests per Second',
+           type: 'number',
+           description: 'Rate limit for API requests',
+           default: 10,
+           min: 1,
+           max: 100,
+         },
+       ];
+     }
    }
    
    export const myGeocoder = new MyGeocoderProvider();
    ```
+
+   **Custom Properties:**
+   - Providers can expose configuration options via `getCustomProperties()`
+   - Defined properties appear as structured form fields in the Admin UI under "Provider Settings"
+   - Values are stored in the `config` JSON field in the database
+   - Types supported: `number`, `string`, `boolean`, `select`
+   - The Census provider exposes `batchSize` as an example custom property
 
 2. **Register provider** in `registry.ts`:
    ```typescript
@@ -105,6 +140,7 @@ To add a new geocoding provider:
        config: JSON.stringify({
          apiKey: 'your-api-key',
          baseUrl: 'https://api.example.com',
+         maxRequests: 10,
        }),
      },
    });

@@ -11,7 +11,7 @@
  * - Limited to US addresses only
  */
 
-import { GeocoderProvider, GeocodeRequest, GeocodeResult } from '../types';
+import { GeocoderProvider, GeocodeRequest, GeocodeResult, CustomProperty } from '../types';
 
 export class CensusGeocoderProvider implements GeocoderProvider {
   providerId = 'census';
@@ -145,6 +145,21 @@ export class CensusGeocoderProvider implements GeocoderProvider {
       console.error('[Census Geocoder] Batch geocoding error:', error);
       return requests.map(() => null);
     }
+  }
+
+  getCustomProperties(): CustomProperty[] {
+    return [
+      {
+        name: 'batchSize',
+        label: 'Batch Size',
+        type: 'number',
+        description:
+          'Number of addresses to geocode per API request. Census API supports up to 10,000 addresses per batch.',
+        default: 1000,
+        min: 1,
+        max: 10000,
+      },
+    ];
   }
 
   private parseBatchResponse(

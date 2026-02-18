@@ -26,10 +26,29 @@ interface EditingProvider extends Partial<GeocoderProvider> {
   tempConfig?: Record<string, any>;
 }
 
+interface CustomProperty {
+  name: string;
+  label: string;
+  type: 'number' | 'string' | 'boolean' | 'select';
+  description: string;
+  default: any;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  options?: Array<{ label: string; value: any }>;
+}
+
+interface ProviderInfo {
+  providerId: string;
+  providerName: string;
+  customProperties: CustomProperty[];
+}
+
 export default function GeocodeSettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [providers, setProviders] = useState<GeocoderProvider[]>([]);
+  const [providerInfo, setProviderInfo] = useState<Map<string, ProviderInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -55,7 +74,7 @@ export default function GeocodeSettingsPage() {
     }
   }, [router]);
 
-  // Fetch providers
+  // Fetch providers and provider info
   useEffect(() => {
     if (!user) return;
 
@@ -82,6 +101,24 @@ export default function GeocodeSettingsPage() {
 
         const data = await response.json();
         setProviders(data.providers || []);
+
+        // Fetch provider info with custom properties
+        try {
+          const infoResponse = await fetch('/api/v1/admin/geocoders/info', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          });
+
+          if (infoResponse.ok) {
+            const infoData = await infoResponse.json();
+            const infoMap = new Map<string, ProviderInfo>();
+            infoData.providers.forEach((p: ProviderInfo) => {
+              infoMap.set(p.providerId, p);
+            });
+            setProviderInfo(infoMap);
+          }
+        } catch (err) {
+          console.warn('Error fetching provider info:', err);
+        }
       } catch (err) {
         console.error('Error fetching providers:', err);
         setError('Failed to load geocoder settings');
@@ -373,6 +410,102 @@ export default function GeocodeSettingsPage() {
                   Enabled
                 </label>
               </div>
+
+              {/* Custom Properties */}
+              {editingProvider.providerId &&
+                providerInfo.get(editingProvider.providerId)?.customProperties &&
+                providerInfo.get(editingProvider.providerId)!.customProperties.length > 0 && (
+                  <div className="border-t border-cocoa-200 dark:border-cocoa-600 pt-4">
+                    <h3 className="text-sm font-semibold text-cocoa-900 dark:text-cream-50 mb-4">
+                      Provider Settings
+                    </h3>
+                    {providerInfo.get(editingProvider.providerId)!.customProperties.map((prop) => (
+                      <div key={prop.name} className="mb-4">
+                        <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
+                          {prop.label}
+                          {prop.required && <span className="text-red-600">*</span>}
+                        </label>
+                        <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mb-2">
+                          {prop.description}
+                        </p>
+                        {prop.type === 'number' && (
+                          <input
+                            type="number"
+                            value={editingProvider.tempConfig?.[prop.name] ?? prop.default}
+                            onChange={(e) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                tempConfig: {
+                                  ...editingProvider.tempConfig,
+                                  [prop.name]: e.target.value ? parseInt(e.target.value) : prop.default,
+                                },
+                              })
+                            }
+                            min={prop.min}
+                            max={prop.max}
+                            placeholder={prop.default?.toString()}
+                            className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                          />
+                        )}
+                        {prop.type === 'string' && (
+                          <input
+                            type="text"
+                            value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
+                            onChange={(e) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                tempConfig: {
+                                  ...editingProvider.tempConfig,
+                                  [prop.name]: e.target.value,
+                                },
+                              })
+                            }
+                            placeholder={prop.default?.toString()}
+                            className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                          />
+                        )}
+                        {prop.type === 'boolean' && (
+                          <input
+                            type="checkbox"
+                            checked={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? false}
+                            onChange={(e) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                tempConfig: {
+                                  ...editingProvider.tempConfig,
+                                  [prop.name]: e.target.checked,
+                                },
+                              })
+                            }
+                            className="h-4 w-4 text-cinnamon-600 border-cocoa-300 rounded"
+                          />
+                        )}
+                        {prop.type === 'select' && prop.options && (
+                          <select
+                            value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
+                            onChange={(e) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                tempConfig: {
+                                  ...editingProvider.tempConfig,
+                                  [prop.name]: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                          >
+                            <option value="">Select an option</option>
+                            {prop.options.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
               {/* Config JSON */}
               <div>

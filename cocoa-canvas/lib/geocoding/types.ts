@@ -2,6 +2,18 @@
  * Geocoding Service Types
  */
 
+export interface CustomProperty {
+  name: string; // e.g., "batchSize"
+  label: string; // e.g., "Batch Size"
+  type: 'number' | 'string' | 'boolean' | 'select';
+  description: string;
+  default: any;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  options?: Array<{ label: string; value: any }>;
+}
+
 export interface GeocodeResult {
   address: string;
   latitude: number;
@@ -41,4 +53,5 @@ export interface GeocoderProvider {
   batchGeocode?(
     requests: GeocodeRequest[]
   ): Promise<(GeocodeResult | null)[]>;
+  getCustomProperties?(): CustomProperty[];
 }

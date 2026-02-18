@@ -28,16 +28,17 @@ interface Bounds {
 
 interface Household {
   id: string;
-  address: {
-    street: string;
-    city?: string;
-    zipCode?: string;
-  };
-  location: {
-    lat: number;
-    lng: number;
-  };
-  memberCount: number;
+  houseNumber?: string;
+  streetName: string;
+  streetSuffix?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  fullAddress: string;
+  latitude?: number;
+  longitude?: number;
+  personCount: number;
+  geocoded: boolean;
 }
 
 interface HouseholdStats {
@@ -296,16 +297,16 @@ export default function CampaignMapPage() {
               )}
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {households.map((h) => (
-                  <Link key={h.id} href={`/api/v1/gis/households/${h.id}`}>
+                  <Link key={h.id} href={`/households/${h.id}`}>
                     <div className="p-3 bg-white dark:bg-cocoa-700 rounded-lg hover:bg-cocoa-50 dark:hover:bg-cocoa-600 cursor-pointer transition-colors border border-cocoa-200 dark:border-cocoa-600">
                       <p className="font-medium text-cocoa-900 dark:text-cream-50 text-sm">
-                        {h.address.street}
+                        {h.fullAddress}
                       </p>
                       <p className="text-xs text-cocoa-600 dark:text-cocoa-300">
-                        {h.address.city}, {h.address.zipCode}
+                        {h.city}, {h.state} {h.zipCode}
                       </p>
                       <p className="text-xs text-cocoa-500 dark:text-cocoa-400 mt-1">
-                        {h.memberCount} member{h.memberCount !== 1 ? 's' : ''}
+                        {h.personCount} person{h.personCount !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </Link>

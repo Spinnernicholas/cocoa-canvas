@@ -6,8 +6,9 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { VoterImportJobData, ScheduledJobData, JobData } from './bullmq';
+import { VoterImportJobData, ScheduledJobData, GeocodeJobData, JobData } from './bullmq';
 import { processImportJob } from '@/lib/importers/job-processor';
+import { processGeocodeJob } from '@/lib/gis/geocode-job-processor';
 import { prisma } from '@/lib/prisma';
 
 const redisConnection = {
@@ -183,7 +184,45 @@ export async function startWorkers() {
     console.error(`[Worker] Scheduled job failed: ${job?.id}`, error?.message);
   });
 
-  workers.push(voterImportWorker, scheduledJobsWorker);
+  // Household Geocoding Worker
+  const geocodeWorker = new Worker<GeocodeJobData>(
+    'geocode-households',
+    async (job: Job<GeocodeJobData>) => {
+      console.log(`[Worker] Processing geocode job: ${job.id}`);
+      try {
+        // Find the corresponding database job record
+        const dbJob = await prisma.job.findUnique({
+          where: { id: job.id },
+        });
+
+        if (!dbJob) {
+          throw new Error(`No database job record found for ${job.id}`);
+        }
+
+        // Process the geocoding job
+        await processGeocodeJob(dbJob.id, job.data, dbJob.createdById);
+
+        return { success: true, jobId: job.id };
+      } catch (error) {
+        console.error(`[Worker] Error processing geocode job ${job.id}:`, error);
+        throw error;
+      }
+    },
+    {
+      connection: redisConnection,
+      concurrency: 1, // Process one geocoding job at a time
+    }
+  );
+
+  geocodeWorker.on('completed', (job) => {
+    console.log(`[Worker] Geocode job completed: ${job?.id}`);
+  });
+
+  geocodeWorker.on('failed', (job, error) => {
+    console.error(`[Worker] Geocode job failed: ${job?.id}`, error?.message);
+  });
+
+  workers.push(voterImportWorker, scheduledJobsWorker, geocodeWorker);
 
   console.log('[Worker] All workers started');
   return workers;

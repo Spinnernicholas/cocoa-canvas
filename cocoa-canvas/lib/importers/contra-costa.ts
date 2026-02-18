@@ -12,6 +12,7 @@ import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import { LOCATION_TYPES } from '@/prisma/seeds/seed-locations';
 import { prisma } from '@/lib/prisma';
+import { ensureHouseholdForPerson } from './household-helper';
 import { 
   VoterImporter, 
   VoterImportOptions, 
@@ -386,6 +387,26 @@ async function processVoterRecord(
   const resAddress = buildResidenceAddress(record);
   
   if (resAddress) {
+    // Create household and link person to it
+    try {
+      await ensureHouseholdForPerson(person.id, {
+        houseNumber: resAddress.houseNumber,
+        preDirection: resAddress.preDirection,
+        streetName: resAddress.streetName,
+        streetSuffix: resAddress.streetSuffix,
+        postDirection: resAddress.postDirection,
+        unitAbbr: resAddress.unitAbbr,
+        unitNumber: resAddress.unitNumber,
+        city: resAddress.city,
+        state: resAddress.state,
+        zipCode: resAddress.zipCode,
+      });
+    } catch (householdError) {
+      console.warn(`Could not create household for ${resAddress.fullAddress}: ${householdError}`);
+      // Continue - household creation is not critical for the import
+    }
+    
+    // Create address record
     await prisma.address.create({
       data: {
         personId: person.id,

@@ -8,6 +8,8 @@ import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { auditLog } from '@/lib/audit/logger';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,53 +23,76 @@ export async function GET(
 
     const { id: householdId } = await params;
 
+    if (!householdId) {
+      return NextResponse.json({ error: 'Household ID is required' }, { status: 400 });
+    }
+
     const household = await prisma.household.findUnique({
       where: { id: householdId },
       include: {
         people: {
-          include: {
-            addresses: true,
-            phones: true,
-            emails: true,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
             voter: true,
             volunteer: true,
             donor: true,
           },
         },
-        parcel: true,
       },
     });
 
     if (!household) {
+      console.warn(`Household not found: ${householdId}`);
       return NextResponse.json({ error: 'Household not found' }, { status: 404 });
     }
 
-    // Transform people to show roles
-    const peopleWithRoles = household.people.map((p: any) => ({
-      ...p,
-      roles: [
-        p.voter ? 'voter' : null,
-        p.volunteer ? 'volunteer' : null,
-        p.donor ? 'donor' : null,
-      ].filter(Boolean),
+    // Transform people to include roles
+    const peopleWithRoles = (household as any).people.map((p: any) => ({
+      id: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      email: p.email,
+      phone: p.phone,
+      voter: !!p.voter,
+      volunteer: !!p.volunteer,
+      donor: !!p.donor,
     }));
 
     const response = {
-      ...household,
-      people: peopleWithRoles,
-      memberCount: household.people.length,
+      household: {
+        id: household.id,
+        houseNumber: household.houseNumber,
+        streetName: household.streetName,
+        streetSuffix: household.streetSuffix,
+        city: household.city,
+        state: household.state,
+        zipCode: household.zipCode,
+        county: household.county || undefined,
+        fullAddress: household.fullAddress,
+        latitude: household.latitude,
+        longitude: household.longitude,
+        geocoded: household.geocoded,
+        geocodedAt: household.geocodedAt?.toISOString(),
+        geocodingProvider: household.geocodingProvider,
+        createdAt: household.createdAt.toISOString(),
+        updatedAt: household.updatedAt.toISOString(),
+        people: peopleWithRoles,
+      },
     };
 
     // Log audit event
     await auditLog(authResult.user?.userId || 'Unknown', 'HOUSEHOLD_VIEW', request, 'household', householdId, {
-      memberCount: household.people.length,
+      memberCount: peopleWithRoles.length,
     });
 
     return NextResponse.json(response);
   } catch (err) {
     console.error('Household fetch error:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch household';
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to fetch household' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

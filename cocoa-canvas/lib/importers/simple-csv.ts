@@ -17,6 +17,7 @@ import {
   VoterImportResult,
 } from './types';
 import { prisma } from '@/lib/prisma';
+import { ensureHouseholdForPerson } from './household-helper';
 
 /**
  * Normalize string field
@@ -128,7 +129,22 @@ export class SimpleCsvImporter implements VoterImporter {
             },
           });
           
-          // Step 3: Create address (linked to Person)
+          // Step 3: Create household and link person (if address provided)
+          if (address && city && zipCode) {
+            try {
+              await ensureHouseholdForPerson(person.id, {
+                streetName: address,
+                city,
+                state,
+                zipCode,
+              });
+            } catch (householdError) {
+              console.warn(`Could not create household for ${address}: ${householdError}`);
+              // Continue - household creation is not critical for the import
+            }
+          }
+          
+          // Step 4: Create address record (linked to Person)
           if (address && city && zipCode) {
             await prisma.address.create({
               data: {
@@ -146,7 +162,7 @@ export class SimpleCsvImporter implements VoterImporter {
             });
           }
           
-          // Step 4: Create phone (linked to Person)
+          // Step 5: Create phone (linked to Person)
           if (phone) {
             await prisma.phone.create({
               data: {
@@ -160,7 +176,7 @@ export class SimpleCsvImporter implements VoterImporter {
             });
           }
           
-          // Step 5: Create email (linked to Person)
+          // Step 6: Create email (linked to Person)
           if (email) {
             await prisma.email.create({
               data: {
