@@ -82,7 +82,7 @@ ADMIN_PASSWORD=SecurePass123!
 ADMIN_NAME=Administrator
 ```
 
-See [DOCKER_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/docker_setup/) for production configuration and [AUTO_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/auto_setup/) for detailed auto-setup documentation.
+See [DOCKER_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/docker-setup/) for production configuration and [AUTO_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/auto-setup/) for detailed auto-setup documentation.
 
 ## 📁 Project Structure
 
@@ -134,7 +134,7 @@ Cocoa Canvas is built in 4 phases to MVP:
 
 ## 📚 Documentation
 
-**📖 [Full Documentation Site](https://spinnernicholas.github.io/cocoa-canvas/)** - Auto-deployed from `docs/` directory
+**📖 [Full Documentation Site](https://spinnernicholas.github.io/cocoa-canvas/)** - Auto-deployed from `docs-site/` directory
 
 **Key Documentation:**
 
