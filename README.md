@@ -33,6 +33,20 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 - **Role-Based Access Control** - User permissions and data security
 - **Privacy-First** - No hard deletes, soft deletion with audit trails
 
+### Feature Status at a Glance
+
+| Feature | Status |
+|---------|--------|
+| **Authentication & Users** | ✅ Complete |
+| **Person/Voter Database** | ✅ Complete |
+| **CSV Import** | ✅ Complete |
+| **Search & Filter** | ✅ Complete |
+| **Campaign Management** | ✅ Complete |
+| **GIS & Geocoding** | ✅ Complete |
+| **Interactive Maps** | 🔄 In Progress |
+| **Team Assignments** | 📋 Planned |
+| **Field Canvassing** | 📋 Planned |
+
 ## 🚀 Quick Start
 
 **New to the project?** Start here:
