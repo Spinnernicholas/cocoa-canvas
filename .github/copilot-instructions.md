@@ -201,6 +201,38 @@ Optional auto-setup:
 
 See: `docs-site/src/content/docs/admin/environment-variables.md`
 
+## Git Workflow & Commits
+
+**IMPORTANT: Always ask the user before committing changes.** Do not automatically commit without explicit user consent.
+
+When changes are complete, always ask the user one of these three options:
+1. **Commit only** - `git add` and `git commit` (no push)
+2. **Commit and push** - `git add`, `git commit`, and `git push`
+3. **Do nothing** - Leave changes uncommitted for the user to handle manually
+
+Example interaction:
+```
+User task completed. Changes made to:
+- file1.ts
+- file2.tsx
+
+Would you like to:
+1. Commit only (no push)
+2. Commit and push
+3. Do nothing
+
+Please choose an option (1-3):
+```
+
+This applies to:
+- New files created
+- Files edited/modified
+- Configuration changes
+- Documentation updates
+- Any other git-tracked changes
+
+The only exception is when explicitly told "commit and push" or similar by the user in the request itself.
+
 ## Common Tasks
 
 **Add new API endpoint**:
