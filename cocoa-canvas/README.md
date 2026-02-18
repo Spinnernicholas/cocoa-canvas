@@ -23,7 +23,7 @@ npm run prisma:generate
 
 ### Development Environment
 
-Start the full development stack with Docker:
+Start the full development stack with Docker (from the cocoa-canvas/ folder):
 
 ```bash
 npm run docker:dev:up
@@ -174,10 +174,11 @@ npm run build
 # Start production server
 npm start
 
-# Using Docker
-npm run docker:prod:up
-npm run docker:prod:logs
-npm run docker:prod:down
+# Using Docker (run from the repository root)
+cd ..
+docker compose up -d
+docker compose logs -f web
+docker compose down
 ```
 
 ## API Endpoints

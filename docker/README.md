@@ -72,7 +72,8 @@ NEXTAUTH_URL=https://your-domain.com
 ### Start Production
 
 ```bash
-npm run docker:prod:up
+cd ..
+docker compose up -d
 ```
 
 This builds and starts the application with:
@@ -83,19 +84,19 @@ This builds and starts the application with:
 ### View Logs
 
 ```bash
-npm run docker:prod:logs
+docker compose logs -f web
 ```
 
 ### Stop Services
 
 ```bash
-npm run docker:prod:down
+docker compose down
 ```
 
 ### Rebuild Image
 
 ```bash
-npm run docker:prod:build
+docker compose build
 ```
 
 ## Environment Variables

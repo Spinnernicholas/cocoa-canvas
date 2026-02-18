@@ -70,9 +70,9 @@ Visit http://localhost:3000
 
 **Production Deployment (with Auto-Setup):**
 ```bash
-# From the cocoa-canvas directory
+# From the repository root (where docker-compose.yml lives)
 cd cocoa-canvas
-docker-compose up -d
+docker compose up -d
 ```
 
 The app automatically creates an admin user if you provide environment variables:

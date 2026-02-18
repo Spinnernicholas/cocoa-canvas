@@ -6,7 +6,7 @@ title: Docker Setup Guide
 
 This guide explains how to run Cocoa Canvas using Docker for both **development** and **production** deployments.
 
-**For local development**, see [QUICK_START.md](../QUICK_START.md) - use `npm run docker:dev:up` to start PostgreSQL, Redis, and the Next.js app with hot reload.
+**For local development**, see [QUICK_START.md](../QUICK_START.md) - use `npm run docker:dev:up` from the `cocoa-canvas/` folder to start PostgreSQL, Redis, and the Next.js app with hot reload.
 
 ## Prerequisites
 
@@ -15,11 +15,11 @@ This guide explains how to run Cocoa Canvas using Docker for both **development*
 
 ## Quick Start - Production
 
-Run from the `cocoa-canvas/` directory (where the docker-compose files are located):
+Run from the repository root (where `docker-compose.yml` is located):
 
 ```bash
 cd cocoa-canvas
-docker-compose up -d
+docker compose up -d
 ```
 
 Features:
@@ -35,7 +35,7 @@ Visit: `http://localhost:3000`
 
 ### Development
 
-For local development with Docker (PostgreSQL + Redis + App):
+For local development with Docker (PostgreSQL + Redis + App) from the `cocoa-canvas/` folder:
 
 ```bash
 cd cocoa-canvas
@@ -82,20 +82,20 @@ AUTO_SETUP_ENABLED=true
 
 ## First Time Setup
 
-1. **Start the app**: `docker-compose up -d`
+1. **Start the app**: `docker compose up -d`
 2. **Create Admin Account**: Visit `http://localhost:3000` and complete the setup wizard
 3. **Create Campaign**: Set up your first campaign with dates and target area
 
 ## Stopping
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 To also remove data:
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Using PostgreSQL
@@ -120,7 +120,7 @@ This starts:
 The production `docker-compose.yml` includes PostgreSQL by default:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### External PostgreSQL
@@ -138,7 +138,7 @@ DATABASE_URL=postgresql://user:password@your-host:5432/cocoa_canvas
 Best way to view and edit data:
 
 ```bash
-docker-compose exec web npx prisma studio
+docker compose exec web npx prisma studio
 ```
 
 Access at `http://localhost:5555`
@@ -148,7 +148,7 @@ Access at `http://localhost:5555`
 Create a new migration:
 
 ```bash
-docker-compose exec web npx prisma migrate dev --name migration_name
+docker compose exec web npx prisma migrate dev --name migration_name
 ```
 
 ## Health Check
@@ -174,14 +174,14 @@ Response:
 ### View Logs
 
 ```bash
-docker-compose logs -f web
+docker compose logs -f web
 ```
 
 ### Execute Commands in Container
 
 ```bash
-docker-compose exec web npm run build
-docker-compose exec web npx prisma db seed
+docker compose exec web npm run build
+docker compose exec web npx prisma db seed
 ```
 
 ## Build Configuration
