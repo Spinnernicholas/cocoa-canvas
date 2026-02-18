@@ -59,8 +59,12 @@ function syncDocs() {
   const destRoot = path.join(__dirname, '../src/content/docs');
   
   const mapping = [
-    // Getting started
-    { src: 'QUICK_START.md', dest: 'getting-started/quick-start.md' },
+    // Getting started - Quick start guides
+    { src: 'QUICK_START.md', dest: 'getting-started/01-basic.md' },
+    { src: 'DEVELOPMENT.md', dest: 'getting-started/02-development.md' },
+    { src: 'PRODUCTION.md', dest: 'getting-started/03-production.md' },
+    { src: 'TROUBLESHOOTING.md', dest: 'getting-started/troubleshooting.md' },
+    { src: 'IMPLEMENTATION.md', dest: 'getting-started/implementation.md' },
     
     // Admin
     { src: 'admin/DOCKER_SETUP.md', dest: 'admin/docker-setup.md' },
@@ -70,6 +74,7 @@ function syncDocs() {
     { src: 'admin/OPTION_GROUPS.md', dest: 'admin/option-groups.md' },
     
     // Developer
+    { src: 'developer/STATUS.md', dest: 'developer/status.md' },
     { src: 'developer/DATABASE_SCHEMA_MASTER.md', dest: 'developer/database-schema-master.md' },
     { src: 'developer/SCHEMA_MIGRATION_PLAN.md', dest: 'developer/schema-migration-plan.md' },
     { src: 'developer/JOB_SYSTEM_VERIFICATION.md', dest: 'developer/job-system-verification.md' },
@@ -81,16 +86,8 @@ function syncDocs() {
     { src: 'developer/SINGLE_CAMPAIGN_ARCHITECTURE.md', dest: 'developer/single-campaign-architecture.md' },
     
     // Planning
-    { src: 'planning/PROJECT_PLAN.md', dest: 'planning/project-plan.md' },
-    { src: 'planning/PHASE_PLAN.md', dest: 'planning/phase-plan.md' },
     { src: 'planning/PHASE2_CONCLUSION.md', dest: 'planning/phase2-conclusion.md' },
     { src: 'planning/PHASE3_PLAN.md', dest: 'planning/phase3-plan.md' },
-    { src: 'planning/DATABASE_SCHEMA.md', dest: 'planning/database-schema.md' },
-    { src: 'planning/API_PLAN.md', dest: 'planning/api-plan.md' },
-    { src: 'planning/AUTH_SECURITY_PLAN.md', dest: 'planning/auth-security-plan.md' },
-    { src: 'planning/DATA_INGESTION_PLAN.md', dest: 'planning/data-ingestion-plan.md' },
-    { src: 'planning/MAP_DISPLAY_PLAN.md', dest: 'planning/map-display-plan.md' },
-    { src: 'planning/DOCUMENTATION_REVIEW.md', dest: 'planning/documentation-review.md' },
   ];
   
   console.log('🔄 Syncing documentation from ../docs to src/content/docs...\n');
