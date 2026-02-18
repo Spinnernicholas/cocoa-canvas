@@ -37,6 +37,13 @@ export default function AdminPage() {
       color: 'from-blue-500 to-blue-600',
     },
     {
+      title: 'Geocoder Settings',
+      description: 'Configure address geocoding providers and API keys',
+      icon: '🗺️',
+      route: '/admin/geocoders',
+      color: 'from-green-500 to-green-600',
+    },
+    {
       title: 'User Management',
       description: 'Manage user accounts, roles, and permissions',
       icon: '👥',

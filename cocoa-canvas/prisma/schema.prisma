@@ -158,6 +158,41 @@ model ScheduledJob {
 }
 
 // ============================================================================
+// GEOCODING PROVIDERS (Address geocoding service configuration)
+// ============================================================================
+
+model GeocoderProvider {
+  id String @id @default(cuid())
+
+  // Provider identification
+  providerId String @unique // e.g., "nominatim", "locationiq", "opencage"
+  providerName String // Human-readable: "Nominatim", "LocationIQ", etc.
+  description String?
+
+  // Configuration
+  isEnabled Boolean @default(true)
+  isPrimary Boolean @default(false) // Only one provider can be primary
+  priority Int @default(0) // For sorting/fallback order
+
+  // API Configuration (stored as JSON for flexibility)
+  // Example: { "apiKey": "xxx", "baseUrl": "https://api.provider.com", "rateLimit": 1000 }
+  config String? // JSON object with provider-specific settings
+
+  // Usage tracking
+  requestsProcessed Int @default(0)
+  requestsFailed Int @default(0)
+  lastUsedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([isEnabled])
+  @@index([isPrimary])
+}
+
+// ============================================================================
 // AUDIT LOGGING (Phase 1)
 // ============================================================================
 
@@ -357,10 +392,11 @@ model Household {
   maxVotingScore Int?
 
   // Geolocation
-  latitude   Float?
-  longitude  Float?
-  geocoded   Boolean   @default(false)
-  geocodedAt DateTime?
+  latitude             Float?
+  longitude            Float?
+  geocoded             Boolean   @default(false)
+  geocodedAt           DateTime?
+  geocodingProvider    String?   // Which service geocoded this (e.g., "nominatim", "locationiq")
 
   // Relations
   people Person[]
