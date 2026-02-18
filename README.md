@@ -51,7 +51,8 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 **New to the project?** Start here:
 - 📖 [**Full Documentation Site**](https://spinnernicholas.github.io/cocoa-canvas/) - Browse all guides and docs
-- 🏃 [**Quick Start Guide**](docs/QUICK_START.md) - 5 minutes to running locally
+- 🏃 [**Quick Start Guide**](docs/QUICK_START.md) - Set up locally with Docker
+- 🔧 [**Troubleshooting**](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 **Local Development (Docker):**
 ```bash
