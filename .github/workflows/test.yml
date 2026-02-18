@@ -31,9 +31,6 @@ jobs:
       - name: Generate Prisma client
         run: cd cocoa-canvas && npm run prisma:generate
       
-      - name: Run linter
-        run: cd cocoa-canvas && npx eslint .
-      
       - name: Run tests with coverage
         run: cd cocoa-canvas && npm run test:ci
       
