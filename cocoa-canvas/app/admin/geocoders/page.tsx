@@ -621,7 +621,7 @@ export default function GeocodeSettingsPage() {
               <div className="bg-cocoa-50 dark:bg-cocoa-800 rounded-lg p-8 text-center border border-cocoa-200 dark:border-cocoa-700">
                 <p className="text-cocoa-600 dark:text-cocoa-300 mb-4">No geocoding providers configured yet</p>
                 <button
-                  onClick={() => setShowAddForm(true)}
+                  onClick={handleStartAdd}
                   className="px-4 py-2 bg-cinnamon-500 hover:bg-cinnamon-600 text-cream-50 rounded-lg font-medium transition-colors"
                 >
                   Add First Provider
