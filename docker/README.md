@@ -148,7 +148,6 @@ Services communicate via these networks internally.
 
 - `postgres_data` - PostgreSQL database persistence
 - `redis_data` - Redis data persistence
-- `./cocoa-canvas/prisma/data` - SQLite (if using SQLite instead of PostgreSQL)
 
 ## Building the Image
 

@@ -50,36 +50,13 @@ export async function initializeDatabase(): Promise<{
         message: 'Database initialized successfully',
       };
     } catch (execError) {
-      // If direct exec fails, try using Node API through Prisma CLI
-      // This is a fallback for environments where execSync might not work
-      console.error('[DB Init] execSync failed, checking if database file exists', execError);
+      // If direct exec fails, return error for PostgreSQL
+      console.error('[DB Init] execSync failed', execError);
       
-      // For SQLite, check if the database file exists
-      const dbUrl = process.env.DATABASE_URL || 'file:./data/cocoa_canvas.db';
-      const dbPath = dbUrl.replace('file:', '');
-      
-      // If database file doesn't exist and we can't run migrations, return error
-      if (!fs.existsSync(dbPath)) {
-        return {
-          success: false,
-          message: 'Failed to initialize database - database file could not be created',
-          error: 'Database initialization requires running: npx prisma db push',
-        };
-      }
-
-      // Database file exists, try to verify tables
-      const isNowInitialized = await isDatabaseInitialized();
-      if (isNowInitialized) {
-        return {
-          success: true,
-          message: 'Database is initialized',
-        };
-      }
-
       return {
         success: false,
-        message: 'Database file exists but schema is not initialized',
-        error: 'Please run: npx prisma db push',
+        message: 'Failed to initialize database',
+        error: 'Database initialization requires running: npx prisma db push',
       };
     }
   } catch (error) {

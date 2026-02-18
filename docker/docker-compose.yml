@@ -10,10 +10,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-file:./data/cocoa_canvas.db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/cocoa_canvas}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # PostgreSQL credentials
+      POSTGRES_DB: ${POSTGRES_DB:-cocoa_canvas}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       # Auto-setup credentials (optional)
       # Uncomment and set to enable automatic admin user creation
       # ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -21,8 +25,8 @@ services:
       # ADMIN_NAME: ${ADMIN_NAME}
       # AUTO_SETUP_ENABLED: ${AUTO_SETUP_ENABLED:-true}
     volumes:
-      # SQLite database persistence
-      - ./cocoa-canvas/prisma/data:/app/prisma/data
+      # Database migrations
+      - ./cocoa-canvas/prisma/migrations:/app/prisma/migrations
       # Volume for node_modules to avoid conflicts
       - /app/node_modules
     depends_on:
@@ -54,8 +58,7 @@ services:
     networks:
       - cocoa-network
 
-  # PostgreSQL (optional, commented out by default for Phase 1)
-  # Uncomment to use PostgreSQL instead of SQLite
+  # PostgreSQL (required)
   postgres:
     image: postgres:15-alpine
     environment:
@@ -73,8 +76,6 @@ services:
       retries: 5
     networks:
       - cocoa-network
-    # Uncomment the below section to enable PostgreSQL for Phase 1
-    profiles: ["postgres"]
 
 volumes:
   redis_data:
