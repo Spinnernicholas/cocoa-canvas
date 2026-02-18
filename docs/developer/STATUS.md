@@ -217,17 +217,18 @@ Cocoa Canvas is built in 4 phases to MVP. This document provides a live status o
 
 ## Documentation
 
-- **[PHASE2_CONCLUSION.md](PHASE2_CONCLUSION.md)** - Detailed Phase 2 completion report
-- **[PHASE3_PLAN.md](PHASE3_PLAN.md)** - Current work in progress
+- **[PHASE2_CONCLUSION.md](../planning/PHASE2_CONCLUSION.md)** - Detailed Phase 2 completion report
+- **[PHASE3_PLAN.md](../planning/PHASE3_PLAN.md)** - Current work in progress
 - **[Quick Start](../QUICK_START.md)** - Getting started guide
-- **[Full Documentation](../README.md)** - Complete project overview
+- **[Implementation Status](../IMPLEMENTATION.md)** - Feature implementation overview
+- **[Full Documentation](../../README.md)** - Complete project overview
 
 ---
 
 ## How to Contribute
 
 Current phase 3 work:
-1. Check [PHASE3_PLAN.md](PHASE3_PLAN.md) for detailed tasks
+1. Check [PHASE3_PLAN.md](../planning/PHASE3_PLAN.md) for detailed tasks
 2. Review code in `cocoa-canvas/lib/gis/` for GIS utilities
 3. See API patterns in `cocoa-canvas/app/api/v1/`
 4. Run tests with `npm test`

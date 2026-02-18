@@ -20,7 +20,7 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 🔄 **In Development**: Campaign Dashboard, Parcel Data Integration, GIS Services  
 📋 **Planned**: Interactive Maps, Household Clustering, Team Assignments
 
-👉 **[See Full Status & Roadmap](docs/STATUS.md)**
+👉 **[See Full Status & Roadmap](docs/developer/STATUS.md)**
 
 ## ✨ Currently Implemented Features
 
@@ -137,7 +137,7 @@ Cocoa Canvas is built in 4 phases to MVP:
 
 **Key Documentation:**
 
-- **[Status & Roadmap](docs/STATUS.md)** - Current implementation status and feature matrix
+- **[Status & Roadmap](docs/developer/STATUS.md)** - Current implementation status and feature matrix
 - **[Quick Start](https://spinnernicholas.github.io/cocoa-canvas/quick_start/)** - Get running in 5 minutes
 - **[Phase 2 Completion](docs/planning/PHASE2_CONCLUSION.md)** - Person-centric architecture details
 - **[Phase 3 Plan](docs/planning/PHASE3_PLAN.md)** - Current work in progress

@@ -169,7 +169,7 @@
 
 ## See Also
 
-- **[Full Status & Roadmap](STATUS.md)** - Detailed phase breakdown and technical achievements
+- **[Full Status & Roadmap](developer/STATUS.md)** - Detailed phase breakdown and technical achievements
 - **[Quick Start](QUICK_START.md)** - Get running in 5 minutes
 - **[Phase 2 Completion Report](planning/PHASE2_CONCLUSION.md)** - Architecture decisions and innovations
 - **[Phase 3 Plan](planning/PHASE3_PLAN.md)** - Current development work
