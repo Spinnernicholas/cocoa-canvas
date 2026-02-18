@@ -15,7 +15,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const providerId = params.id;
+    const providerId = (await params).id ?? params.id;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({
@@ -64,7 +64,7 @@ export async function DELETE(
   }
 
   try {
-    const providerId = params.id;
+    const providerId = (await params).id ?? params.id;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({

@@ -14,7 +14,7 @@ export async function POST(
   }
 
   try {
-    const providerId = params.id;
+    const providerId = (await params).id ?? params.id;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({
