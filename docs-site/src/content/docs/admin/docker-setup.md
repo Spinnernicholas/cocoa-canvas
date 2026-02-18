@@ -197,22 +197,6 @@ The Dockerfile uses a **multi-stage build** for optimal production images:
 - Final runtime image: ~500 MB
 
 ## Data Persistence
-
-### SQLite
-
-Data stored in `./data/cocoa_canvas.db` (mounted volume):
-
-```yaml
-volumes:
-  - ./data:/app/data
-```
-
-Backups:
-
-```bash
-cp data/cocoa_canvas.db data/cocoa_canvas.db.backup
-```
-
 ### PostgreSQL
 
 Data stored in `postgres_data` volume:
@@ -230,7 +214,7 @@ This section covers production-grade deployment strategies using Docker.
 
 Before deploying to production:
 
-- [ ] PostgreSQL configured (recommended over SQLite)
+- [ ] PostgreSQL database configured and accessible
 - [ ] Strong `NEXTAUTH_SECRET` generated (32+ characters)
 - [ ] `NEXTAUTH_URL` set to production domain
 - [ ] Redis secured with password
@@ -715,17 +699,6 @@ curl http://localhost:3000/api/health
 ### Backup & Recovery
 
 #### Database Backups
-
-**SQLite**:
-
-```bash
-# Backup
-docker-compose exec web cp /app/prisma/data/cocoa_canvas.db /app/prisma/data/backup-$(date +%Y%m%d).db
-
-# Restore
-docker-compose exec web cp /app/prisma/data/backup-20240116.db /app/prisma/data/cocoa_canvas.db
-docker-compose restart web
-```
 
 **PostgreSQL**:
 

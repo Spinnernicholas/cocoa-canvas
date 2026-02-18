@@ -168,10 +168,7 @@ From verification tests:
    - This is expected for Phase 1
    - Job runner provides the API and functions for external workers to call
 
-2. **SQLite Based**: Currently uses SQLite for development
-   - Switch to PostgreSQL for production
-
-3. **No Real-time Updates**: Progress is polled, not pushed
+2. **No Real-time Updates**: Progress is polled, not pushed
    - WebSocket support could be added in Phase 2
 
 ### Recommended Future Work:

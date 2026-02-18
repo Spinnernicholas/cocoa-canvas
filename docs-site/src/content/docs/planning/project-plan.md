@@ -27,9 +27,8 @@ Cocoa Canvas is an open-source voter information and canvassing application desi
   - Tailwind CSS for styling
 
 ### Database
-- **Primary**: PostgreSQL (production deployments)
-- **Alternative**: SQLite (standalone, development, small deployments)
-- **ORM**: Prisma (supports both SQLite and PostgreSQL seamlessly)
+- **PostgreSQL** (required for all deployments)
+- **ORM**: Prisma (database abstraction and migrations)
 
 ### Containerization & Deployment
 - **Docker** (container images)

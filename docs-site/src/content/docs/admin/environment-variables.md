@@ -103,18 +103,6 @@ DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_timeout=10&connection_limit=10
 ```
 
-#### SQLite (Alternative for Simple Deployments)
-
-```env
-DATABASE_URL=file:./data/cocoa_canvas.db
-```
-
-**Notes**:
-- Path is relative to `prisma/schema.prisma`
-- Suitable for very small deployments or testing
-- File stored at `prisma/data/cocoa_canvas.db`
-- Requires changing Prisma schema provider to "sqlite"
-
 ---
 
 ## Redis Configuration
@@ -510,32 +498,6 @@ AUTO_SETUP_ENABLED=true
 ADMIN_EMAIL=admin@localhost
 ADMIN_PASSWORD=ChangeMe123!
 ADMIN_NAME=Local Admin
-```
-
----
-
-### Production (SQLite)
-
-**.env.production**:
-```env
-NODE_ENV=production
-PORT=3000
-DATABASE_URL=file:./data/cocoa_canvas.db
-REDIS_URL=redis://:your-redis-password@redis.example.com:6379
-NEXTAUTH_URL=https://cocoa-canvas.example.com
-NEXTAUTH_SECRET=<generated-secure-secret-32-chars-minimum>
-JWT_EXPIRY=30m
-SESSION_TIMEOUT=1800
-LOG_LEVEL=info
-ENABLE_OAUTH=false
-ENABLE_MFA=false
-ENABLE_LDAP=false
-
-# Auto-setup for initial deployment
-AUTO_SETUP_ENABLED=true
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=<generated-secure-password>
-ADMIN_NAME=Administrator
 ```
 
 ---
