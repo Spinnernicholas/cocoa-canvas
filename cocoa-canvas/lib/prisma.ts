@@ -5,11 +5,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
  * Prisma Client instantiation for Prisma 7
  * Uses the PrismaPg adapter for direct PostgreSQL connections
  *
- * Uses lazy initialization with PoolConfig to avoid creating connections during build.
- * The actual pool is created on first database access.
+ * Uses lazy initialization to avoid creating connections during build.
+ * The actual connection pool is created on first database access.
  *
  * Learn more about Prisma adapters:
- * https://pris.ly/d/client-constructor
+ * https://pris.ly/d/adapter-pg
  */
 
 declare global {
@@ -24,11 +24,15 @@ function getPrismaClient(): PrismaClient {
   }
 
   if (!client) {
-    // Use PoolConfig instead of Pool to defer connection creation
+    // Ensure DATABASE_URL is set
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+
+    // Create Prisma Client with pg adapter (Prisma 7 pattern)
     client = new PrismaClient({
-      adapter: new PrismaPg({
-        connectionString: process.env.DATABASE_URL || '',
-      } as any), // Cast to any since PoolConfig should also be accepted
+      adapter: new PrismaPg({ connectionString }),
       log: process.env.NODE_ENV === 'development' ? ['query'] : [],
     });
 

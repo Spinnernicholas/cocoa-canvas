@@ -23,23 +23,37 @@ npm run prisma:generate
 
 ### Development Environment
 
-Start the full development stack with Docker (from the cocoa-canvas/ folder):
+Start the development stack with Docker (from the cocoa-canvas/ folder):
 
 ```bash
+# Start dev services (postgres, redis, app)
 npm run docker:dev:up
+
+# Start test services (postgres-test, redis-test)
+npm run docker:test:up
+
+# Start all services (dev + test)
+npm run docker:all:up
 ```
 
-This starts:
-- PostgreSQL database
-- Redis for job queues
-- Next.js app with hot reload
+**Dev services:**
+- PostgreSQL database (port 5432)
+- Redis for job queues (port 6379)
+- Next.js app with hot reload (port 3000)
+
+**Test services:**
+- PostgreSQL test database (port 5433)
+- Redis test instance (port 6380)
 
 The app will be available at http://localhost:3000
 
 View logs:
 ```bash
-npm run docker:dev:logs
+npm run docker:dev:logs   # Dev services
+npm run docker:test:logs  # Test services
 ```
+
+See [DOCKER-PROFILES.md](./DOCKER-PROFILES.md) for detailed Docker usage.
 
 ### Environment Setup
 
@@ -94,25 +108,31 @@ cocoa-canvas/
 
 ## Common Commands
 
-### Development
+### Docker Services
 
 ```bash
-# Start dev environment (Docker)
-npm run docker:dev:up
+# Development services (postgres, redis, app)
+npm run docker:dev:up          # Start
+npm run docker:dev:down        # Stop
+npm run docker:dev:logs        # View logs
+npm run docker:dev:restart     # Restart
 
-# Stop dev environment (keep data)
-npm run docker:dev:down
+# Test services (postgres-test, redis-test)
+npm run docker:test:up         # Start
+npm run docker:test:down       # Stop
+npm run docker:test:logs       # View logs
+
+# All services (dev + test)
+npm run docker:all:up          # Start everything
+npm run docker:all:down        # Stop everything
 
 # Reset environment (delete all data)
-npm run docker:dev:down -- -v
+npm run docker:all:down
+docker-compose -f docker-compose.dev.yml down -v
 npm run docker:dev:up
-
-# View logs
-npm run docker:dev:logs
-
-# Restart services
-npm run docker:dev:restart
 ```
+
+See [DOCKER-PROFILES.md](./DOCKER-PROFILES.md) for detailed Docker usage.
 
 ### Database
 
@@ -136,6 +156,11 @@ npm run prisma:generate
 ### Testing
 
 ```bash
+# Setup test database (first time only)
+npm run docker:test:up
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/cocoa_canvas_test \
+  npm run test:db:setup
+
 # Run all tests
 npm test
 
@@ -153,7 +178,12 @@ npm test lib/auth/jwt.test.ts
 
 # Watch mode
 npm test -- --watch
+
+# Stop test services
+npm run docker:test:down
 ```
+
+See [Testing Guide](../docs-site/src/content/docs/developer/testing-guide.md) for comprehensive testing strategy.
 
 ### Code Quality
 
