@@ -1,4 +1,3 @@
-const nextPlugin = require('@next/eslint-plugin');
 const js = require('@eslint/js');
 
 module.exports = [
@@ -14,13 +13,10 @@ module.exports = [
           jsx: true,
         },
       },
-    },
-    plugins: {
-      '@next/next': nextPlugin,
-    },
-    rules: {
-      ...nextPlugin.rules,
-      '@next/next/no-img-element': 'off',
+      globals: {
+        React: 'readonly',
+        JSX: 'readonly',
+      },
     },
   },
   js.configs.recommended,
