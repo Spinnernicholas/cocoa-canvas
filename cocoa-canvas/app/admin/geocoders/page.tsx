@@ -416,13 +416,12 @@ export default function GeocodeSettingsPage() {
                   onChange={(e) =>
                     setEditingProvider({ ...editingProvider, providerName: e.target.value })
                   }
-                  disabled={showAddForm && !editingId}
                   placeholder="e.g., Nominatim"
-                  className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
+                  className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
                 />
                 {showAddForm && !editingId && (
                   <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
-                    Auto-populated from selected provider
+                    Pre-populated from the provider. Customize if running multiple instances.
                   </p>
                 )}
               </div>
