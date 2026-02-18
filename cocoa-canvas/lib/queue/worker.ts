@@ -8,9 +8,7 @@
 import { Worker, Job } from 'bullmq';
 import { VoterImportJobData, ScheduledJobData, JobData } from './bullmq';
 import { processImportJob } from '@/lib/importers/job-processor';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 const redisConnection = {
   url: process.env.REDIS_URL!,

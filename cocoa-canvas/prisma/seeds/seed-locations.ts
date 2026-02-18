@@ -5,10 +5,8 @@
  * Or call `seedLocations()` from the application
  */
 
-import { PrismaClient } from '@prisma/client';
 import { seedParties } from './seed-parties.ts';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export const LOCATION_TYPES = {
   HOME: {
@@ -44,7 +42,6 @@ export const LOCATION_TYPES = {
 } as const;
 
 export async function seedLocations(verbose = true) {
-  const prisma = new PrismaClient();
   if (verbose) {
     console.log('[Seed] Initializing Location types...');
   }
@@ -86,7 +83,6 @@ export async function seedLocations(verbose = true) {
 }
 
 async function main() {
-  const prisma = new PrismaClient();
   try {
     await seedLocations();
   } catch (error) {

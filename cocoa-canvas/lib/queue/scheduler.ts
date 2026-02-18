@@ -5,11 +5,9 @@
  * Uses cron expressions to determine next run time
  */
 
-import { PrismaClient } from '@prisma/client';
 import { Cron } from 'croner';
 import { getScheduledJobsQueue } from './bullmq';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // Map to track active cron jobs
 const cronJobs = new Map<string, InstanceType<typeof Cron>>();
@@ -43,6 +41,12 @@ async function loadScheduledJobs() {
       setupCronJob(job);
     }
   } catch (error) {
+    const prismaError = error as { code?: string };
+    if (prismaError?.code === 'P2021') {
+      console.warn('[Scheduler] ScheduledJob table missing, skipping load');
+      return;
+    }
+
     console.error('[Scheduler] Error loading scheduled jobs:', error);
   }
 }

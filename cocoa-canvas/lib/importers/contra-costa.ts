@@ -8,17 +8,15 @@
  * See: scripts/data-analysis/analyze_contra_costa.py for field analysis
  */
 
-import { PrismaClient } from '@prisma/client';
 import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import { LOCATION_TYPES } from '@/prisma/seeds/seed-locations';
+import { prisma } from '@/lib/prisma';
 import { 
   VoterImporter, 
   VoterImportOptions, 
   VoterImportResult 
 } from './types';
-
-const prisma = new PrismaClient();
 
 export interface ContraCostaImportOptions {
   filePath: string;

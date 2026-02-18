@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { auditLog } from '@/lib/audit/logger';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // PUT /api/v1/admin/option-groups/locations/[id] - Update location
 export async function PUT(

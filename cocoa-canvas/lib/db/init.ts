@@ -40,9 +40,10 @@ export async function initializeDatabase(): Promise<{
     // Run prisma db push to initialize the schema
     // We need to do this in a way that works in both dev and production
     try {
-      execSync('npx prisma db push --skip-generate', {
+      execSync('npx prisma db push --config ./prisma.config.ts', {
         cwd: process.cwd(),
         stdio: 'pipe',
+        env: { ...process.env },
       });
       console.log('[DB Init] Database successfully initialized');
       return {

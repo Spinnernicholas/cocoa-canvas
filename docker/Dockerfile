@@ -18,6 +18,10 @@ COPY cocoa-canvas/ .
 # Ensure public directory exists
 RUN mkdir -p public
 
+# Prisma 7 config requires DATABASE_URL at generate time
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+ENV DATABASE_URL=$DATABASE_URL
+
 # Generate Prisma client and build Next.js
 RUN npx prisma generate && npm run build
 
@@ -39,6 +43,7 @@ RUN npm ci --production
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Expose port

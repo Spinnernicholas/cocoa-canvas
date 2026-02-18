@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { auditLog } from '@/lib/audit/logger';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // GET /api/v1/admin/option-groups/locations - List all locations
 export async function GET(request: NextRequest) {

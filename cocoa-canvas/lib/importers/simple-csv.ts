@@ -9,7 +9,6 @@
  * county voter file data.
  */
 
-import { PrismaClient } from '@prisma/client';
 import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import {
@@ -17,8 +16,7 @@ import {
   VoterImportOptions,
   VoterImportResult,
 } from './types';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 /**
  * Normalize string field

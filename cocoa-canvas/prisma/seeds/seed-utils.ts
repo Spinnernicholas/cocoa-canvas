@@ -2,20 +2,13 @@
  * Shared seed utilities
  */
 
-import { PrismaClient } from '@prisma/client';
-
-let sharedPrismaClient: PrismaClient | null = null;
+import type { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 export function getPrismaClient(): PrismaClient {
-  if (!sharedPrismaClient) {
-    sharedPrismaClient = new PrismaClient();
-  }
-  return sharedPrismaClient;
+  return prisma;
 }
 
 export async function disconnectPrisma(): Promise<void> {
-  if (sharedPrismaClient) {
-    await sharedPrismaClient.$disconnect();
-    sharedPrismaClient = null;
-  }
+  await prisma.$disconnect();
 }

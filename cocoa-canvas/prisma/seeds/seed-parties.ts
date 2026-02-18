@@ -5,7 +5,7 @@
  * Or call `seedParties()` from the application
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 export const PARTIES = [
   {
@@ -46,7 +46,6 @@ export const PARTIES = [
 ] as const;
 
 export async function seedParties(verbose = true) {
-  const prisma = new PrismaClient();
   if (verbose) {
     console.log('[Seed] Initializing Party types...');
   }
@@ -82,7 +81,6 @@ export async function seedParties(verbose = true) {
 }
 
 async function main() {
-  const prisma = new PrismaClient();
   try {
     await seedParties();
   } catch (error) {
