@@ -11,14 +11,27 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 📖 **[View Full Documentation](https://spinnernicholas.github.io/cocoa-canvas/)** - Complete guides, architecture docs, and planning information
 
-## ✨ Features
+## 📊 Current Status
 
-- **Voter Database Management** - Import, search, and manage voter records
-- **Interactive Mapping** - Leaflet-based maps showing voter locations and precincts
-- **Canvassing Coordination** - Assign voters to teams and track outreach
-- **Data Imports with Audit** - File uploads with validation and full audit trails
-- **Export & Analysis** - Export voter lists and campaign data
-- **Privacy-First** - Role-based access control, encrypted data, audit logging
+**Phase 3 In Progress** 🔄 Campaign Management & Map Visualization  
+**Last Updated**: February 17, 2026
+
+✅ **Implemented**: Authentication, Person Management (Voters/Volunteers/Donors), CSV Import, Search & Filter  
+🔄 **In Development**: Campaign Dashboard, Parcel Data Integration, GIS Services  
+📋 **Planned**: Interactive Maps, Household Clustering, Team Assignments
+
+👉 **[See Full Status & Roadmap](docs/STATUS.md)**
+
+## ✨ Currently Implemented Features
+
+- **Person-Centric Database** - Manage voters, volunteers, and donors in unified system
+- **CSV Import & De-duplication** - Import voter/contact data with automatic de-duplication
+- **Advanced Search & Filtering** - Real-time search by name, email, phone, address
+- **Contact Information Management** - Multiple addresses, phones, and emails per person
+- **Volunteer & Donor Tracking** - Optional volunteer and donor information per person
+- **Full Audit Logging** - Complete audit trail of all changes
+- **Role-Based Access Control** - User permissions and data security
+- **Privacy-First** - No hard deletes, soft deletion with audit trails
 
 ## 🚀 Quick Start
 
@@ -85,22 +98,24 @@ See [DOCKER_SETUP.md](https://spinnernicholas.github.io/cocoa-canvas/admin/docke
 
 - **Frontend/Backend**: Next.js 16 (React + TypeScript)
 - **Database**: Prisma ORM with PostgreSQL (dev and production)
-- **Job Queue**: BullMQ with Redis
+- **Job Queue**: BullMQ with Redis for async operations
 - **Testing**: Vitest with 101 tests and coverage reporting
-- **Auth**: Local email/password (Phase 1), OAuth/MFA planned
-- **Maps**: Leaflet + OpenStreetMap
+- **Auth**: JWT + local email/password (OAuth/MFA planned for future)
+- **Maps**: Leaflet + OpenStreetMap (Phase 3+)
 - **Documentation**: Astro Starlight with custom theme
 - **CI/CD**: GitHub Actions (automated testing & docs deployment)
 - **Deployment**: Docker Compose
 
 ## 📋 Implementation Roadmap
 
-Cocoa Canvas is built in 4 phases over 8 weeks to MVP:
+Cocoa Canvas is built in 4 phases to MVP:
 
-1. **Phase 1 (Weeks 1-2)**: Docker setup, local authentication, campaign management
-2. **Phase 2 (Weeks 3-4)**: Voter import, search/filter, export
-3. **Phase 3 (Weeks 5-6)**: GeoJSON import, address geocoding
-4. **Phase 4 (Weeks 7-8)**: Interactive map, household clustering, assignments — **MVP**
+1. **Phase 1 (Weeks 1-2)** ✅ COMPLETE - Docker setup, local authentication, campaign management
+2. **Phase 2 (Weeks 3-4)** ✅ COMPLETE - Person-centric voter management, import/search/filter
+3. **Phase 3 (Week 5)** 🔄 IN PROGRESS - Campaign dashboard, parcel data integration, GIS services
+4. **Phase 4 (Week 6)** 📋 PLANNED - Interactive maps, household clustering, team assignments — MVP
+
+**[View detailed status and feature matrix](docs/STATUS.md)**
 
 ## 📚 Documentation
 
@@ -108,11 +123,10 @@ Cocoa Canvas is built in 4 phases over 8 weeks to MVP:
 
 **Key Documentation:**
 
+- **[Status & Roadmap](docs/STATUS.md)** - Current implementation status and feature matrix
 - **[Quick Start](https://spinnernicholas.github.io/cocoa-canvas/quick_start/)** - Get running in 5 minutes
-- **[Phase Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/phase_plan/)** - Detailed 4-phase implementation roadmap
-- **[Project Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/project_plan/)** - Vision, tech stack, deployment scenarios
-- **[Database Schema](https://spinnernicholas.github.io/cocoa-canvas/planning/database_schema/)** - Complete Prisma schema design
-- **[API Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/api_plan/)** - REST API specification (50+ endpoints)
+- **[Phase 2 Completion](docs/planning/PHASE2_CONCLUSION.md)** - Person-centric architecture details
+- **[Phase 3 Plan](docs/planning/PHASE3_PLAN.md)** - Current work in progress
 - **[Docker Setup](https://spinnernicholas.github.io/cocoa-canvas/admin/docker_setup/)** - Production deployment guide
 
 All documentation source files are in [`docs/`](docs/) and automatically synced to the documentation site.
