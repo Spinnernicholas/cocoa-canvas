@@ -20,7 +20,7 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 🔄 **In Development**: Campaign Dashboard, Parcel Data Integration, GIS Services  
 📋 **Planned**: Interactive Maps, Household Clustering, Team Assignments
 
-👉 **[See Full Status & Roadmap](docs/developer/STATUS.md)**
+👉 **[See Full Status & Roadmap](https://spinnernicholas.github.io/cocoa-canvas/developer/status/)**
 
 ## ✨ Currently Implemented Features
 
@@ -51,8 +51,8 @@ Cocoa Canvas is a tool for managing voter data, conducting targeted outreach cam
 
 **New to the project?** Start here:
 - 📖 [**Full Documentation Site**](https://spinnernicholas.github.io/cocoa-canvas/) - Browse all guides and docs
-- 🏃 [**Quick Start Guide**](docs/QUICK_START.md) - Set up locally with Docker
-- 🔧 [**Troubleshooting**](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- 🏃 [**Quick Start Guide**](https://spinnernicholas.github.io/cocoa-canvas/getting-started/01-basic/) - Set up locally with Docker
+- 🔧 [**Troubleshooting**](https://spinnernicholas.github.io/cocoa-canvas/getting-started/troubleshooting/) - Common issues and solutions
 
 **Local Development (Docker):**
 ```bash
@@ -130,7 +130,7 @@ Cocoa Canvas is built in 4 phases to MVP:
 3. **Phase 3 (Week 5)** 🔄 IN PROGRESS - Campaign dashboard, parcel data integration, GIS services
 4. **Phase 4 (Week 6)** 📋 PLANNED - Interactive maps, household clustering, team assignments — MVP
 
-**[View detailed status and feature matrix](docs/STATUS.md)**
+**[View detailed status and feature matrix](https://spinnernicholas.github.io/cocoa-canvas/getting-started/implementation/)**
 
 ## 📚 Documentation
 
@@ -138,13 +138,13 @@ Cocoa Canvas is built in 4 phases to MVP:
 
 **Key Documentation:**
 
-- **[Status & Roadmap](docs/developer/STATUS.md)** - Current implementation status and feature matrix
-- **[Quick Start](https://spinnernicholas.github.io/cocoa-canvas/quick_start/)** - Get running in 5 minutes
-- **[Phase 2 Completion](docs/planning/PHASE2_CONCLUSION.md)** - Person-centric architecture details
-- **[Phase 3 Plan](docs/planning/PHASE3_PLAN.md)** - Current work in progress
-- **[Docker Setup](https://spinnernicholas.github.io/cocoa-canvas/admin/docker_setup/)** - Production deployment guide
+- **[Status & Roadmap](https://spinnernicholas.github.io/cocoa-canvas/getting-started/implementation/)** - Current implementation status and feature matrix
+- **[Quick Start](https://spinnernicholas.github.io/cocoa-canvas/getting-started/01-basic/)** - Get running in 5 minutes
+- **[Phase 2 Completion](https://spinnernicholas.github.io/cocoa-canvas/planning/phase2-conclusion/)** - Person-centric architecture details
+- **[Phase 3 Plan](https://spinnernicholas.github.io/cocoa-canvas/planning/phase3-plan/)** - Current work in progress
+- **[Docker Setup](https://spinnernicholas.github.io/cocoa-canvas/admin/docker-setup/)** - Production deployment guide
 
-All documentation source files are in [`docs/`](docs/) and automatically synced to the documentation site.
+All documentation source files are in [`docs-site/src/content/docs/`](docs-site/src/content/docs/) and automatically deployed to the [documentation site](https://spinnernicholas.github.io/cocoa-canvas/).
 
 ## 🔒 Non-Destructive by Design
 

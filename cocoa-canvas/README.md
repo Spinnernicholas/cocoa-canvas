@@ -339,7 +339,7 @@ ports:
 2. Register in `lib/importers/index.ts`
 3. Use unified endpoint: `POST /api/v1/voters/import` with `format` param
 
-See [architecture](/docs-site/src/content/docs/developer/) docs for details.
+See [architecture documentation](https://spinnernicholas.github.io/cocoa-canvas/developer/single-campaign-architecture/) for details.
 
 ## Testing
 
