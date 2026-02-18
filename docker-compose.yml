@@ -5,7 +5,7 @@ services:
   # Main Next.js application
   web:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
     ports:
       - "3000:3000"
@@ -20,10 +20,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       # Auto-setup credentials (optional)
       # Uncomment and set to enable automatic admin user creation
-      # ADMIN_EMAIL: ${ADMIN_EMAIL}
-      # ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      # ADMIN_NAME: ${ADMIN_NAME}
-      # AUTO_SETUP_ENABLED: ${AUTO_SETUP_ENABLED:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME}
+      AUTO_SETUP_ENABLED: ${AUTO_SETUP_ENABLED:-true}
     volumes:
       # Database migrations
       - ./cocoa-canvas/prisma/migrations:/app/prisma/migrations
