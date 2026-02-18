@@ -84,7 +84,29 @@ ADMIN_NAME=Administrator
 
 See [Docker Setup Guide](https://spinnernicholas.github.io/cocoa-canvas/admin/docker-setup/) for production configuration and [Auto-Setup Guide](https://spinnernicholas.github.io/cocoa-canvas/admin/auto-setup/) for detailed auto-setup documentation.
 
-## 📁 Project Structure
+## � Docker Image Releases
+
+Pre-built Docker images are automatically generated for every commit and official release:
+
+```bash
+# Development images (latest dev branch features)
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:dev-latest
+
+# Production images (main branch, ready to deploy)
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:latest
+
+# Official releases (semantic versioned)
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:v1.0.0
+```
+
+**Release Pipeline:**
+- 🔵 **Dev branch commits** → `dev-latest` image
+- 🟢 **Main branch commits** → `latest` image (production-ready)
+- 🔐 **Git tags** (e.g., `v1.0.0`) → versioned releases with GitHub Release
+
+See [Docker Documentation](docker/README.md#automated-docker-image-releases) for the complete release workflow and deployment instructions.
+
+## �📁 Project Structure
 
 ```
 .
@@ -118,7 +140,8 @@ See [Docker Setup Guide](https://spinnernicholas.github.io/cocoa-canvas/admin/do
 - **Auth**: JWT + local email/password (OAuth/MFA planned for future)
 - **Maps**: Leaflet + OpenStreetMap (Phase 3+)
 - **Documentation**: Astro Starlight with custom theme
-- **CI/CD**: GitHub Actions (automated testing & docs deployment)
+- **CI/CD**: GitHub Actions (automated testing, Docker image builds, docs deployment)
+- **Container Registry**: GitHub Container Registry (GHCR)
 - **Deployment**: Docker Compose
 
 ## 📋 Implementation Roadmap

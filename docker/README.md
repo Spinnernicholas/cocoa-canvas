@@ -244,3 +244,102 @@ docker exec cocoa-canvas-app-dev npx prisma migrate status
 ```bash
 docker stats
 ```
+
+## Automated Docker Image Releases
+
+Docker images are automatically built and pushed to GitHub Container Registry (GHCR) via GitHub Actions.
+
+### Release Workflow
+
+#### 1. Development Images (Dev Branch)
+
+When you push to the `dev` branch, GitHub Actions automatically:
+- Builds the Docker image
+- Tags with `dev-latest` and `dev-{git-sha}`
+- Pushes to `ghcr.io/spinnernicholas/cocoa-canvas`
+
+Example:
+```bash
+git checkout dev
+# Make changes to cocoa-canvas/
+git add .
+git commit -m "Add feature"
+git push origin dev
+# GitHub Actions builds and pushes dev-{sha}
+```
+
+Pull the dev image:
+```bash
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:dev-latest
+```
+
+#### 2. Production Images (Main Branch)
+
+When you push to the `main` branch (typically via PR merge), GitHub Actions:
+- Builds the Docker image
+- Tags with `latest` and `prod-{git-sha}`
+- Pushes to GHCR
+
+```bash
+git checkout main
+# (or merge dev PR into main)
+git push origin main
+# GitHub Actions builds and pushes prod-{sha} and latest
+```
+
+Pull the production image:
+```bash
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:latest
+```
+
+#### 3. Official Releases (Tags on Main)
+
+To create an official release (e.g., v1.0.0), create and push a git tag on `main`:
+
+```bash
+git checkout main
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
+# GitHub Actions builds, pushes v1.0.0, updates latest, and creates a GitHub Release
+```
+
+Pull the release image:
+```bash
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:v1.0.0
+```
+
+### Tag Reference
+
+| Branch | Trigger | Tags | Use Case |
+|--------|---------|------|----------|
+| `dev` | Push to dev | `dev-latest`, `dev-{sha}` | Testing latest dev features |
+| `main` | Push to main | `latest`, `prod-{sha}` | Production deployments |
+| Tags (e.g., `v1.0.0`) | Tag on main | `v1.0.0`, `latest` | Official releases, GitHub releases |
+
+### GitHub Actions Setup
+
+The workflows are configured in `.github/workflows/`:
+- **docker-build.yml** - Automatic builds on dev & main branch pushes
+- **docker-release.yml** - Official releases on version tags
+
+No additional configuration needed—uses GitHub's built-in `GITHUB_TOKEN` for authentication.
+
+### Pushing to Production
+
+Once you have a Docker image, deploy with Docker Compose:
+
+```bash
+# Using the latest production image
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:latest
+
+# Or a specific release
+docker pull ghcr.io/spinnernicholas/cocoa-canvas:v1.0.0
+
+# Update docker-compose.yml to reference the image:
+# services:
+#   web:
+#     image: ghcr.io/spinnernicholas/cocoa-canvas:latest
+
+docker-compose -f docker-compose.yml up -d
+```
+
