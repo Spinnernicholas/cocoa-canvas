@@ -96,9 +96,10 @@ export async function DELETE(
       message: 'Provider deleted successfully',
     });
   } catch (error) {
-    console.error('[Geocoders API Error]', error);
+    console.error('[Geocoders API Delete Error]', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete geocoder provider';
     return NextResponse.json(
-      { error: 'Failed to delete geocoder provider' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

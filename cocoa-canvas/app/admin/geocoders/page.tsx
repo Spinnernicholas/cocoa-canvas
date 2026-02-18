@@ -278,8 +278,14 @@ export default function GeocodeSettingsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to delete provider');
+        let errorMessage = 'Failed to delete provider';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If response isn't JSON, use default message
+        }
+        setError(errorMessage);
         return;
       }
 
@@ -297,7 +303,7 @@ export default function GeocodeSettingsPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error('Error deleting provider:', err);
-      setError('Failed to delete provider');
+      setError(err instanceof Error ? err.message : 'Failed to delete provider');
     }
   };
 
