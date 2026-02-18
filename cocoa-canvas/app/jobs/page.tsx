@@ -213,12 +213,20 @@ export default function JobsPage() {
                 Monitor and manage background jobs
               </p>
             </div>
-            <Link
-              href="/dashboard"
-              className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium transition-colors"
-            >
-              ← Back to Dashboard
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/jobs/run"
+                className="px-4 py-2 bg-cinnamon-500 hover:bg-cinnamon-600 text-cream-50 rounded-lg font-medium transition-colors"
+              >
+                + Run Job
+              </Link>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium transition-colors"
+              >
+                ← Back to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
 
