@@ -1,15 +1,19 @@
 # Docker Configuration
 
-This folder contains Docker and Docker Compose configurations for both development and production deployments of Cocoa Canvas.
+This folder contains Docker configuration for production deployment. Development configuration is in the [cocoa-canvas](../cocoa-canvas/) folder.
 
 ## Files
 
 - **Dockerfile** - Multi-stage build for production image
 - **docker-compose.yml** - Production deployment configuration
-- **docker-compose.dev.yml** - Development environment with hot reload
 - **.dockerignore** - Files to exclude from Docker build context
 
+**Development file** (in cocoa-canvas folder):
+- **docker-compose.dev.yml** - Development environment with hot reload
+
 ## Development Environment
+
+The development Docker Compose configuration is in [cocoa-canvas/docker-compose.dev.yml](../cocoa-canvas/docker-compose.dev.yml)
 
 ### Start Development
 

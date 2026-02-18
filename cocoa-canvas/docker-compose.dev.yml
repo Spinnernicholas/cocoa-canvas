@@ -61,8 +61,8 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-secret-only-for-development-not-secure}
     volumes:
-      # Mount source code for hot reload (from cocoa-canvas directory)
-      - ./cocoa-canvas:/app
+      # Mount source code for hot reload
+      - .:/app
       - /app/node_modules
     depends_on:
       postgres:
