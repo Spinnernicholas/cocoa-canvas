@@ -8,6 +8,21 @@ interface MapConfig {
   baseMap?: Array<any>;
   title?: string;
   subtitle?: string;
+  initialExtent?: Extent;
+  initialState?: {
+    viewpoint?: {
+      targetGeometry?: {
+        xmin: number;
+        ymin: number;
+        xmax: number;
+        ymax: number;
+        spatialReference?: {
+          wkid?: number;
+          latestWkid?: number;
+        };
+      };
+    };
+  };
   map?: {
     itemId?: string;
   };
@@ -29,12 +44,23 @@ interface Layer {
   itemUrl?: string;
 }
 
+interface Extent {
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+  spatialReference?: {
+    wkid: number;
+  };
+}
+
 interface MapExploreResult {
   success: boolean;
   mapTitle?: string;
   portalUrl?: string;
   operationalLayers?: Layer[];
   baseLayers?: Layer[];
+  extent?: Extent;
   error?: string;
 }
 
@@ -90,6 +116,7 @@ function extractServiceUrls(webMapConfig: any): {
 async function fetchMapServerHierarchy(serviceUrl: string): Promise<{
   success: boolean;
   layers?: any[];
+  extent?: Extent;
   error?: string;
 }> {
   try {
@@ -105,11 +132,12 @@ async function fetchMapServerHierarchy(serviceUrl: string): Promise<{
 
     const data = await response.json();
 
-    // Return the complete layers array with hierarchy info
+    // Return the complete layers array with hierarchy info and extent
     if (data.layers && Array.isArray(data.layers)) {
       return {
         success: true,
         layers: data.layers,
+        extent: data.extent,
       };
     }
 
@@ -126,6 +154,62 @@ async function fetchMapServerHierarchy(serviceUrl: string): Promise<{
           : 'Unknown error fetching service',
     };
   }
+}
+
+/**
+ * Combine multiple extents into a single bounding extent
+ */
+function combineExtents(extent1: Extent | undefined, extent2: Extent | undefined): Extent {
+  if (!extent1) return extent2 || { xmin: 0, ymin: 0, xmax: 0, ymax: 0 };
+  if (!extent2) return extent1;
+
+  return {
+    xmin: Math.min(extent1.xmin, extent2.xmin),
+    ymin: Math.min(extent1.ymin, extent2.ymin),
+    xmax: Math.max(extent1.xmax, extent2.xmax),
+    ymax: Math.max(extent1.ymax, extent2.ymax),
+    spatialReference: extent1.spatialReference || extent2.spatialReference || { wkid: 4326 },
+  };
+}
+
+/**
+ * Convert Web Mercator coordinates to WGS84 (lat/lon)
+ */
+function webMercatorToWGS84(x: number, y: number): { lon: number; lat: number } {
+  const lon = (x / 20037508.34) * 180;
+  let lat = (y / 20037508.34) * 180;
+  lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((lat * Math.PI) / 180)) - Math.PI / 2);
+  return { lon, lat };
+}
+
+/**
+ * Convert extent from Web Mercator to WGS84 if needed
+ */
+function normalizeExtent(extent: any): Extent {
+  const wkid = extent.spatialReference?.wkid || extent.spatialReference?.latestWkid;
+  
+  // If it's Web Mercator (102100 or 3857), convert to WGS84
+  if (wkid === 102100 || wkid === 3857) {
+    const bottomLeft = webMercatorToWGS84(extent.xmin, extent.ymin);
+    const topRight = webMercatorToWGS84(extent.xmax, extent.ymax);
+    
+    return {
+      xmin: bottomLeft.lon,
+      ymin: bottomLeft.lat,
+      xmax: topRight.lon,
+      ymax: topRight.lat,
+      spatialReference: { wkid: 4326 },
+    };
+  }
+  
+  // Already in WGS84 or unknown - return as is
+  return {
+    xmin: extent.xmin,
+    ymin: extent.ymin,
+    xmax: extent.xmax,
+    ymax: extent.ymax,
+    spatialReference: { wkid: wkid || 4326 },
+  };
 }
 
 /**
@@ -214,6 +298,18 @@ async function fetchMapConfiguration(
     let operationalLayers: any[] = [];
     let baseLayers: any[] = [];
     let portalUrl = config.portalUrl;
+    let webMapExtent: Extent | undefined;
+    let serviceExtent: Extent | undefined;
+
+    // Check if the initial config itself is a web map with initialExtent
+    if (config.initialExtent) {
+      webMapExtent = normalizeExtent(config.initialExtent);
+    }
+    
+    // Check for extent in initialState.viewpoint.targetGeometry (newer format)
+    if (!webMapExtent && config.initialState?.viewpoint?.targetGeometry) {
+      webMapExtent = normalizeExtent(config.initialState.viewpoint.targetGeometry);
+    }
 
     // If this is a Web App AppBuilder config with a referenced Web Map, fetch the Web Map
     if (config.map?.itemId) {
@@ -224,6 +320,16 @@ async function fetchMapConfiguration(
         const webMapResponse = await fetch(webMapUrl);
         if (webMapResponse.ok) {
           const webMapConfig = await webMapResponse.json();
+          
+          // Extract the initial extent from the web map if available (and we haven't already set one)
+          if (!webMapExtent && webMapConfig.initialExtent) {
+            webMapExtent = normalizeExtent(webMapConfig.initialExtent);
+          }
+          
+          // Check for extent in initialState.viewpoint.targetGeometry (newer format)
+          if (!webMapExtent && webMapConfig.initialState?.viewpoint?.targetGeometry) {
+            webMapExtent = normalizeExtent(webMapConfig.initialState.viewpoint.targetGeometry);
+          }
           
           // Extract unique service URLs from the web map
           const { operationalServices, baseServices } = extractServiceUrls(webMapConfig);
@@ -241,7 +347,13 @@ async function fetchMapConfiguration(
                   _hierarchy: hierarchicalLayers,
                   _serviceUrl: serviceUrl,
                   _allLayers: hierarchy.layers,
+                  _extent: hierarchy.extent,
                 });
+
+                // Accumulate service extent (separate from web map extent)
+                if (hierarchy.extent) {
+                  serviceExtent = combineExtents(serviceExtent, hierarchy.extent);
+                }
               }
             } catch (error) {
               console.error(`Error fetching service hierarchy for ${serviceUrl}:`, error);
@@ -260,7 +372,13 @@ async function fetchMapConfiguration(
                   _hierarchy: hierarchicalLayers,
                   _serviceUrl: serviceUrl,
                   _allLayers: hierarchy.layers,
+                  _extent: hierarchy.extent,
                 });
+
+                // Accumulate service extent (separate from web map extent)
+                if (hierarchy.extent) {
+                  serviceExtent = combineExtents(serviceExtent, hierarchy.extent);
+                }
               }
             } catch (error) {
               console.error(`Error fetching service hierarchy for ${serviceUrl}:`, error);
@@ -272,12 +390,16 @@ async function fetchMapConfiguration(
       }
     }
 
+    // Use web map extent if available, fall back to service extent
+    const finalExtent = webMapExtent || serviceExtent;
+
     return {
       success: true,
       mapTitle: config.title || 'Unnamed Map',
       portalUrl,
       operationalLayers: operationalLayers.length > 0 ? operationalLayers : undefined,
       baseLayers: baseLayers.length > 0 ? baseLayers : undefined,
+      extent: finalExtent,
     };
   } catch (error) {
     const errorMessage =
