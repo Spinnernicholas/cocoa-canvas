@@ -3,6 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Header from '@/components/Header';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+}
 
 interface Dataset {
   id: string;
@@ -57,6 +64,7 @@ export default function DatasetDetailPage() {
   const router = useRouter();
   const datasetId = params.id as string;
 
+  const [user, setUser] = useState<User | null>(null);
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [loading, setLoading] = useState(true);
   const [featuresLoading, setFeaturesLoading] = useState(false);
@@ -67,8 +75,29 @@ export default function DatasetDetailPage() {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set());
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
+  // Validate auth and get user
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    const token = localStorage.getItem('authToken');
+
+    if (!userStr || !token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      router.push('/login');
+    }
+  }, [router]);
+
   // Fetch dataset metadata
   useEffect(() => {
+    if (!user) return;
+
     const fetchDataset = async () => {
       try {
         const token = localStorage.getItem('authToken');
@@ -97,7 +126,7 @@ export default function DatasetDetailPage() {
     };
 
     fetchDataset();
-  }, [datasetId, router]);
+  }, [datasetId, router, user]);
 
   // Fetch features
   useEffect(() => {
@@ -207,18 +236,24 @@ export default function DatasetDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-center text-gray-600 dark:text-gray-400">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-cream-50 dark:bg-cocoa-900">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-2 border-cocoa-600 dark:border-cinnamon-400 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-cocoa-600 dark:text-cocoa-300 mt-2">Loading dataset...</p>
         </div>
       </div>
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
   if (error || !dataset) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900">
+        <Header userName={user.name} />
+        <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <h2 className="text-red-800 dark:text-red-300 font-semibold">Error</h2>
             <p className="text-red-600 dark:text-red-400">{error || 'Dataset not found'}</p>
@@ -226,12 +261,12 @@ export default function DatasetDetailPage() {
           <div className="mt-4">
             <Link
               href="/catalog"
-              className="text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300"
             >
               ← Back to Catalog
             </Link>
           </div>
-        </div>
+        </main>
       </div>
     );
   }
@@ -239,29 +274,30 @@ export default function DatasetDetailPage() {
   const storageIndicator = dataset.sourceTable ? '💾 Local' : '📡 Remote';
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900">
+      <Header userName={user.name} />
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <Link
             href="/catalog"
-            className="text-blue-600 dark:text-blue-400 hover:underline mb-4 inline-block"
+            className="text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300 mb-4 inline-block"
           >
             ← Back to Catalog
           </Link>
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50">
                 {dataset.name}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300 mt-1">
                 {dataset.datasetType.name} • {dataset.geometryType} • {storageIndicator}
               </p>
             </div>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {deleting ? 'Deleting...' : 'Delete Dataset'}
             </button>
@@ -269,29 +305,29 @@ export default function DatasetDetailPage() {
         </div>
 
         {/* Dataset Info Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50 mb-4">
             Dataset Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Description</p>
-              <p className="text-gray-900 dark:text-white">
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Description</p>
+              <p className="text-cocoa-900 dark:text-cream-50">
                 {dataset.description || 'No description'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Feature Count</p>
-              <p className="text-gray-900 dark:text-white font-semibold">
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Feature Count</p>
+              <p className="text-cocoa-900 dark:text-cream-50 font-semibold">
                 {dataset.recordCount !== null ? dataset.recordCount.toLocaleString() : 'Unknown'} features
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Category</p>
-              <p className="text-gray-900 dark:text-white">{dataset.datasetType.category}</p>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Category</p>
+              <p className="text-cocoa-900 dark:text-cream-50">{dataset.datasetType.category}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Status</p>
               <div className="flex gap-2">
                 {dataset.isActive && (
                   <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs rounded">
@@ -308,14 +344,14 @@ export default function DatasetDetailPage() {
             {dataset.sourceRemoteDataset && (
               <>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Remote Service</p>
-                  <p className="text-gray-900 dark:text-white">
+                  <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Remote Service</p>
+                  <p className="text-cocoa-900 dark:text-cream-50">
                     {dataset.sourceRemoteDataset.serviceName}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Remote Layer</p>
-                  <p className="text-gray-900 dark:text-white">
+                  <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Remote Layer</p>
+                  <p className="text-cocoa-900 dark:text-cream-50">
                     {dataset.sourceRemoteDataset.layerName}
                   </p>
                 </div>
@@ -323,21 +359,21 @@ export default function DatasetDetailPage() {
             )}
             {dataset.sourceTable && (
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">PostGIS Table</p>
-                <p className="text-gray-900 dark:text-white font-mono text-sm">
+                <p className="text-sm text-cocoa-600 dark:text-cocoa-300">PostGIS Table</p>
+                <p className="text-cocoa-900 dark:text-cream-50 font-mono text-sm">
                   {dataset.sourceTable}
                 </p>
               </div>
             )}
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Created</p>
-              <p className="text-gray-900 dark:text-white">
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Created</p>
+              <p className="text-cocoa-900 dark:text-cream-50">
                 {new Date(dataset.createdAt).toLocaleString()}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Last Updated</p>
-              <p className="text-gray-900 dark:text-white">
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Last Updated</p>
+              <p className="text-cocoa-900 dark:text-cream-50">
                 {new Date(dataset.updatedAt).toLocaleString()}
               </p>
             </div>
@@ -345,9 +381,9 @@ export default function DatasetDetailPage() {
         </div>
 
         {/* Feature Browser */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50">
               Feature Browser
             </h2>
             
@@ -355,17 +391,17 @@ export default function DatasetDetailPage() {
               <div className="relative column-menu-container">
                 <button
                   onClick={() => setShowColumnMenu(!showColumnMenu)}
-                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+                  className="px-4 py-2 bg-cocoa-100 dark:bg-cocoa-700 text-cocoa-700 dark:text-cocoa-200 rounded-lg hover:bg-cocoa-200 dark:hover:bg-cocoa-600 flex items-center gap-2 transition-colors"
                 >
                   <span>⚙️ Columns ({visibleColumns.size})</span>
                 </button>
 
                 {showColumnMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-10 max-h-96 overflow-y-auto">
-                    <div className="p-3 border-b border-gray-200 dark:border-gray-600 flex justify-between">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-cocoa-800 rounded-lg shadow-md border border-cocoa-200 dark:border-cocoa-700 z-10 max-h-96 overflow-y-auto">
+                    <div className="p-3 border-b border-cocoa-200 dark:border-cocoa-700 flex justify-between">
                       <button
                         onClick={selectAllColumns}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-xs text-cocoa-700 dark:text-cinnamon-400 hover:text-cocoa-900 dark:hover:text-cinnamon-300"
                       >
                         Select All
                       </button>
@@ -380,15 +416,15 @@ export default function DatasetDetailPage() {
                       {featuresData.fields.map((field) => (
                         <label
                           key={field}
-                          className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer"
+                          className="flex items-center gap-2 p-2 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded cursor-pointer"
                         >
                           <input
                             type="checkbox"
                             checked={visibleColumns.has(field)}
                             onChange={() => toggleColumn(field)}
-                            className="rounded border-gray-300 dark:border-gray-500"
+                            className="rounded border-cocoa-300 dark:border-cocoa-500"
                           />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-cocoa-900 dark:text-cream-50">
                             {field}
                           </span>
                         </label>
@@ -401,17 +437,17 @@ export default function DatasetDetailPage() {
           </div>
 
           {featuresLoading ? (
-            <p className="text-center text-gray-600 dark:text-gray-400 py-8">
+            <p className="text-center text-cocoa-600 dark:text-cocoa-300 py-8">
               Loading features...
             </p>
           ) : featuresData && featuresData.features.length > 0 ? (
             <>
               {visibleColumns.size === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                  <p className="text-cocoa-600 dark:text-cocoa-300 mb-2">
                     No columns selected
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">
+                  <p className="text-sm text-cocoa-500 dark:text-cocoa-400">
                     Use the "⚙️ Columns" menu above to select columns to display
                   </p>
                 </div>
@@ -419,32 +455,32 @@ export default function DatasetDetailPage() {
                 <>
                   {/* Features Table */}
                   <div className="overflow-x-auto mb-4">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-900">
+                <table className="min-w-full divide-y divide-cocoa-200 dark:divide-cocoa-700">
+                  <thead className="bg-cocoa-50 dark:bg-cocoa-900">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-cocoa-600 dark:text-cocoa-300 uppercase tracking-wider">
                         Feature ID
                       </th>
                       {Array.from(visibleColumns).map((field) => (
                         <th
                           key={field}
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-cocoa-600 dark:text-cocoa-300 uppercase tracking-wider"
                         >
                           {field}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-white dark:bg-cocoa-800 divide-y divide-cocoa-200 dark:divide-cocoa-700">
                     {featuresData.features.map((feature) => (
-                      <tr key={feature.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
+                      <tr key={feature.id} className="hover:bg-cocoa-50 dark:hover:bg-cocoa-700">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-cocoa-900 dark:text-cream-50">
                           {feature.id}
                         </td>
                         {Array.from(visibleColumns).map((field) => (
                           <td
                             key={field}
-                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
+                            className="px-4 py-3 whitespace-nowrap text-sm text-cocoa-900 dark:text-cream-50"
                           >
                             {feature.properties[field] !== null &&
                             feature.properties[field] !== undefined
@@ -459,8 +495,8 @@ export default function DatasetDetailPage() {
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
-                <div className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="flex items-center justify-between border-t border-cocoa-200 dark:border-cocoa-700 pt-4">
+                <div className="text-sm text-cocoa-700 dark:text-cocoa-300">
                   Showing{' '}
                   <span className="font-medium">
                     {(featuresData.pagination.page - 1) * featuresData.pagination.limit + 1}
@@ -479,17 +515,17 @@ export default function DatasetDetailPage() {
                   <button
                     onClick={() => setCurrentPage((p) => p - 1)}
                     disabled={!featuresData.pagination.hasPrevPage}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 text-cocoa-700 dark:text-cocoa-300 rounded-lg hover:bg-cocoa-50 dark:hover:bg-cocoa-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Previous
                   </button>
-                  <span className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                  <span className="px-4 py-2 text-cocoa-700 dark:text-cocoa-300">
                     Page {featuresData.pagination.page} of {featuresData.pagination.totalPages}
                   </span>
                   <button
                     onClick={() => setCurrentPage((p) => p + 1)}
                     disabled={!featuresData.pagination.hasNextPage}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 text-cocoa-700 dark:text-cocoa-300 rounded-lg hover:bg-cocoa-50 dark:hover:bg-cocoa-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Next
                   </button>
@@ -499,12 +535,12 @@ export default function DatasetDetailPage() {
               )}
             </>
           ) : (
-            <p className="text-center text-gray-600 dark:text-gray-400 py-8">
+            <p className="text-center text-cocoa-600 dark:text-cocoa-300 py-8">
               No features found
             </p>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
