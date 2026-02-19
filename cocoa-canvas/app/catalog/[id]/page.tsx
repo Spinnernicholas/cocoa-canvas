@@ -64,6 +64,8 @@ export default function DatasetDetailPage() {
   const [featuresData, setFeaturesData] = useState<FeaturesResponse | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [deleting, setDeleting] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set());
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
 
   // Fetch dataset metadata
   useEffect(() => {
@@ -125,6 +127,11 @@ export default function DatasetDetailPage() {
 
         const result = await response.json();
         setFeaturesData(result.data);
+        
+        // Initialize visible columns with first 5 fields if not already set
+        if (result.data.fields.length > 0 && visibleColumns.size === 0) {
+          setVisibleColumns(new Set(result.data.fields.slice(0, Math.min(5, result.data.fields.length))));
+        }
       } catch (err) {
         console.error('Error fetching features:', err);
       } finally {
@@ -134,6 +141,19 @@ export default function DatasetDetailPage() {
 
     fetchFeatures();
   }, [dataset, datasetId, currentPage, router]);
+
+  // Close column menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showColumnMenu && !target.closest('.column-menu-container')) {
+        setShowColumnMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showColumnMenu]);
 
   const handleDelete = async () => {
     if (!dataset) return;
@@ -163,6 +183,26 @@ export default function DatasetDetailPage() {
       alert(`Error deleting dataset: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setDeleting(false);
     }
+  };
+
+  const toggleColumn = (field: string) => {
+    const newColumns = new Set(visibleColumns);
+    if (newColumns.has(field)) {
+      newColumns.delete(field);
+    } else {
+      newColumns.add(field);
+    }
+    setVisibleColumns(newColumns);
+  };
+
+  const selectAllColumns = () => {
+    if (featuresData) {
+      setVisibleColumns(new Set(featuresData.fields));
+    }
+  };
+
+  const deselectAllColumns = () => {
+    setVisibleColumns(new Set());
   };
 
   if (loading) {
@@ -306,9 +346,59 @@ export default function DatasetDetailPage() {
 
         {/* Feature Browser */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Feature Browser
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Feature Browser
+            </h2>
+            
+            {featuresData && featuresData.fields.length > 0 && (
+              <div className="relative column-menu-container">
+                <button
+                  onClick={() => setShowColumnMenu(!showColumnMenu)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <span>⚙️ Columns ({visibleColumns.size})</span>
+                </button>
+
+                {showColumnMenu && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-10 max-h-96 overflow-y-auto">
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-600 flex justify-between">
+                      <button
+                        onClick={selectAllColumns}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllColumns}
+                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="p-2">
+                      {featuresData.fields.map((field) => (
+                        <label
+                          key={field}
+                          className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={visibleColumns.has(field)}
+                            onChange={() => toggleColumn(field)}
+                            className="rounded border-gray-300 dark:border-gray-500"
+                          />
+                          <span className="text-sm text-gray-900 dark:text-white">
+                            {field}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {featuresLoading ? (
             <p className="text-center text-gray-600 dark:text-gray-400 py-8">
@@ -316,15 +406,26 @@ export default function DatasetDetailPage() {
             </p>
           ) : featuresData && featuresData.features.length > 0 ? (
             <>
-              {/* Features Table */}
-              <div className="overflow-x-auto mb-4">
+              {visibleColumns.size === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                    No columns selected
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500">
+                    Use the "⚙️ Columns" menu above to select columns to display
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Features Table */}
+                  <div className="overflow-x-auto mb-4">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Feature ID
                       </th>
-                      {featuresData.fields.slice(0, 5).map((field) => (
+                      {Array.from(visibleColumns).map((field) => (
                         <th
                           key={field}
                           className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
@@ -332,11 +433,6 @@ export default function DatasetDetailPage() {
                           {field}
                         </th>
                       ))}
-                      {featuresData.fields.length > 5 && (
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          ...
-                        </th>
-                      )}
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -345,7 +441,7 @@ export default function DatasetDetailPage() {
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
                           {feature.id}
                         </td>
-                        {featuresData.fields.slice(0, 5).map((field) => (
+                        {Array.from(visibleColumns).map((field) => (
                           <td
                             key={field}
                             className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
@@ -356,11 +452,6 @@ export default function DatasetDetailPage() {
                               : '-'}
                           </td>
                         ))}
-                        {featuresData.fields.length > 5 && (
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            +{featuresData.fields.length - 5} more
-                          </td>
-                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -404,6 +495,8 @@ export default function DatasetDetailPage() {
                   </button>
                 </div>
               </div>
+                </>
+              )}
             </>
           ) : (
             <p className="text-center text-gray-600 dark:text-gray-400 py-8">
