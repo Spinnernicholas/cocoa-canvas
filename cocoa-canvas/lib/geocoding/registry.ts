@@ -7,6 +7,7 @@
 
 import { GeocoderProvider } from './types';
 import { censusGeocoder } from './providers/census';
+import { catalogGeocoder } from './providers/catalog';
 
 export class GeocoderRegistry {
   private providers: Map<string, GeocoderProvider> = new Map();
@@ -16,6 +17,7 @@ export class GeocoderRegistry {
   constructor() {
     // Register default providers
     this.register(censusGeocoder);
+    this.register(catalogGeocoder);
   }
 
   register(provider: GeocoderProvider): void {

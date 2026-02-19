@@ -37,16 +37,22 @@ export async function seedDatasetTypes(verbose = true) {
       displayOrder: 5,
     },
     {
+      name: 'Geocoding',
+      description: 'Address points, street centerlines, and geocoding reference data',
+      category: 'Location',
+      displayOrder: 6,
+    },
+    {
       name: 'Tabular',
       description: 'Non-spatial tabular data (lookup tables, election results)',
       category: 'Data',
-      displayOrder: 6,
+      displayOrder: 7,
     },
     {
       name: 'Custom',
       description: 'Custom dataset type',
       category: 'Other',
-      displayOrder: 7,
+      displayOrder: 8,
     },
   ];
 

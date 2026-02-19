@@ -21,6 +21,7 @@ interface ImportRemoteDatasetRequest {
   tags?: string[];
   category?: string;
   isPublic?: boolean;
+  importMode?: 'remote' | 'local'; // 'remote' = reference only, 'local' = download and store
 }
 
 export function ImportToCatalogDialog({
@@ -39,6 +40,7 @@ export function ImportToCatalogDialog({
   const [tags, setTags] = useState('');
   const [category, setCategory] = useState('');
   const [isPublic, setIsPublic] = useState(false);
+  const [importMode, setImportMode] = useState<'remote' | 'local'>('remote');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,6 +68,7 @@ export function ImportToCatalogDialog({
           .filter((t) => t),
         category: category || undefined,
         isPublic,
+        importMode,
       });
 
       // Reset form
@@ -74,6 +77,7 @@ export function ImportToCatalogDialog({
       setDatasetTypeId('');
       setTags('');
       setCategory('');
+      setImportMode('remote');
       setIsPublic(false);
       onClose();
     } catch (err) {
@@ -84,7 +88,7 @@ export function ImportToCatalogDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-screen overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-cocoa-900 dark:text-white">
@@ -120,6 +124,54 @@ export function ImportToCatalogDialog({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Import Mode Selection */}
+          <div className="bg-cocoa-100 dark:bg-cocoa-700 rounded-lg p-4 border-2 border-cocoa-300 dark:border-cocoa-600">
+            <label className="block text-sm font-semibold text-cocoa-900 dark:text-cocoa-100 mb-3">
+              Import Method *
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="remote"
+                  checked={importMode === 'remote'}
+                  onChange={(e) => setImportMode('remote')}
+                  disabled={isLoading}
+                  className="mt-1 w-4 h-4"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-cocoa-900 dark:text-white">
+                    📡 Remote Reference
+                  </div>
+                  <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
+                    Create a catalog entry that references the external service. Data remains on the remote server and is fetched on-demand. Best for large datasets or when you want live data.
+                  </div>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="local"
+                  checked={importMode === 'local'}
+                  onChange={(e) => setImportMode('local')}
+                  disabled={isLoading}
+                  className="mt-1 w-4 h-4"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-cocoa-900 dark:text-white">
+                    💾 Local Import
+                  </div>
+                  <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
+                    Download all features from the service and store them in your local database. Data is copied once and becomes independent. Best for datasets you'll query frequently or modify.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* onSubmit={handleSubmit} className="space-y-4">
           {/* Catalog Name */}
           <div>
             <label className="block text-sm font-semibold text-cocoa-900 dark:text-cocoa-100 mb-2">
@@ -245,7 +297,9 @@ export function ImportToCatalogDialog({
               disabled={isLoading}
               className="px-4 py-2 rounded bg-cocoa-600 dark:bg-cocoa-700 text-white hover:bg-cocoa-700 dark:hover:bg-cocoa-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Importing...' : 'Import to Catalog'}
+              {isLoading 
+                ? (importMode === 'local' ? 'Downloading & Importing...' : 'Importing...') 
+                : (importMode === 'local' ? '💾 Import Locally' : '📡 Add Remote Reference')}
             </button>
           </div>
         </form>

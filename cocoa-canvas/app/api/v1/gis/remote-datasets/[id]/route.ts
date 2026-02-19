@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await validateProtectedRoute(request);
@@ -21,7 +21,7 @@ export async function DELETE(
       return authResult.response;
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Check if the dataset exists
     const dataset = await prisma.remoteGISDataset.findUnique({

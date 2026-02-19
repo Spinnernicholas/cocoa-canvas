@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const datasetTypeId = searchParams.get('datasetTypeId');
+    const datasetTypeName = searchParams.get('datasetTypeName');
     const category = searchParams.get('category');
     const isActive = searchParams.get('isActive') === 'true';
     const syncedToApp = searchParams.get('syncedToApp') === 'true';
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
     const where: any = {};
     if (datasetTypeId) {
       where.datasetTypeId = datasetTypeId;
+    }
+    if (datasetTypeName) {
+      where.datasetType = {
+        name: datasetTypeName,
+      };
     }
     if (category) {
       where.category = category;

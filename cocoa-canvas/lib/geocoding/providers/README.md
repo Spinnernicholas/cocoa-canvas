@@ -39,6 +39,49 @@ This directory contains geocoding provider implementations for Cocoa Canvas. Pro
 - Recommended as primary provider for US addresses
 - Batch size can be adjusted via admin interface under "Provider Settings"
 
+### Catalog Geocoding Dataset (`catalog`)
+
+**Status:** ✅ Implemented
+
+- **Provider:** Internal Catalog Dataset
+- **API:** Queries local PostGIS tables or remote ESRI services
+- **Cost:** Free (uses your own data)
+- **Coverage:** Depends on your dataset
+- **Features:**
+  - Geocode from local PostGIS tables
+  - Geocode from remote ESRI services
+  - Configurable field mapping
+  - Fuzzy or exact matching
+- **Rate Limits:** None for local, depends on remote service
+- **Implementation:** `providers/catalog.ts`
+
+**Configuration:**
+```json
+{
+  "datasetId": "dataset-id-from-catalog",
+  "addressField": "address",
+  "cityField": "city",
+  "stateField": "state",
+  "zipCodeField": "zipcode",
+  "matchTolerance": "fuzzy"
+}
+```
+
+**Custom Properties:**
+- `datasetId` (string, required): ID of the Geocoding dataset from the catalog
+- `addressField` (string, required): Field name for street address
+- `cityField` (string, optional): Field name for city
+- `stateField` (string, optional): Field name for state
+- `zipCodeField` (string, optional): Field name for zip code
+- `matchTolerance` (select, default: "fuzzy"): Match type - "exact" or "fuzzy"
+
+**Usage:**
+- First, import a Geocoding dataset via the GIS Catalog
+- Configure the provider in admin settings
+- Select field mappings to match your dataset schema
+- Works with both locally stored and remotely referenced datasets
+- Ideal for using county/city address point data
+
 ### Nominatim (OpenStreetMap) - Coming Soon
 
 - **Provider:** OpenStreetMap

@@ -55,6 +55,11 @@ export default function GeocodeSettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingProvider, setEditingProvider] = useState<EditingProvider | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Catalog provider specific state
+  const [catalogDatasets, setCatalogDatasets] = useState<Array<{ id: string; name: string; description?: string }>>([]);
+  const [catalogFields, setCatalogFields] = useState<string[]>([]);
+  const [loadingCatalogData, setLoadingCatalogData] = useState(false);
 
   // Load user
   useEffect(() => {
@@ -129,6 +134,84 @@ export default function GeocodeSettingsPage() {
 
     fetchProviders();
   }, [user, router]);
+
+  // Fetch catalog datasets when editing catalog provider
+  useEffect(() => {
+    if (!editingProvider || editingProvider.providerId !== 'catalog') {
+      setCatalogDatasets([]);
+      return;
+    }
+
+    const fetchCatalogDatasets = async () => {
+      try {
+        setLoadingCatalogData(true);
+        const token = localStorage.getItem('authToken');
+        
+        // Fetch datasets filtered by Geocoding type
+        const response = await fetch('/api/v1/gis/datasets?datasetTypeName=Geocoding&isActive=true', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch catalog datasets');
+          return;
+        }
+
+        const data = await response.json();
+        const datasets = (data.data || []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description,
+        }));
+        setCatalogDatasets(datasets);
+      } catch (err) {
+        console.error('Error fetching catalog datasets:', err);
+      } finally {
+        setLoadingCatalogData(false);
+      }
+    };
+
+    fetchCatalogDatasets();
+  }, [editingProvider?.providerId]);
+
+  // Fetch fields when a catalog dataset is selected
+  useEffect(() => {
+    if (!editingProvider || editingProvider.providerId !== 'catalog') {
+      setCatalogFields([]);
+      return;
+    }
+
+    const datasetId = editingProvider.tempConfig?.datasetId;
+    if (!datasetId) {
+      setCatalogFields([]);
+      return;
+    }
+
+    const fetchCatalogFields = async () => {
+      try {
+        setLoadingCatalogData(true);
+        const token = localStorage.getItem('authToken');
+        
+        const response = await fetch(`/api/v1/gis/datasets/${datasetId}/fields`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch dataset fields');
+          return;
+        }
+
+        const data = await response.json();
+        setCatalogFields(data.data?.fields || []);
+      } catch (err) {
+        console.error('Error fetching dataset fields:', err);
+      } finally {
+        setLoadingCatalogData(false);
+      }
+    };
+
+    fetchCatalogFields();
+  }, [editingProvider?.providerId, editingProvider?.tempConfig?.datasetId]);
 
   const handleStartEdit = (provider: GeocoderProvider) => {
     setEditingId(provider.id);
@@ -516,21 +599,82 @@ export default function GeocodeSettingsPage() {
                           />
                         )}
                         {prop.type === 'string' && (
-                          <input
-                            type="text"
-                            value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
-                            onChange={(e) =>
-                              setEditingProvider({
-                                ...editingProvider,
-                                tempConfig: {
-                                  ...editingProvider.tempConfig,
-                                  [prop.name]: e.target.value,
-                                },
-                              })
-                            }
-                            placeholder={prop.default?.toString()}
-                            className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
-                          />
+                          <>
+                            {/* Special handling for catalog provider dataset selection */}
+                            {editingProvider.providerId === 'catalog' && prop.name === 'datasetId' ? (
+                              <select
+                                value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
+                                onChange={(e) =>
+                                  setEditingProvider({
+                                    ...editingProvider,
+                                    tempConfig: {
+                                      ...editingProvider.tempConfig,
+                                      [prop.name]: e.target.value,
+                                    },
+                                  })
+                                }
+                                disabled={loadingCatalogData}
+                                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
+                              >
+                                <option value="">
+                                  {loadingCatalogData ? 'Loading datasets...' : 'Select a dataset'}
+                                </option>
+                                {catalogDatasets.map((dataset) => (
+                                  <option key={dataset.id} value={dataset.id}>
+                                    {dataset.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : /* Special handling for catalog provider field selections */
+                            editingProvider.providerId === 'catalog' && 
+                            ['addressField', 'cityField', 'stateField', 'zipCodeField'].includes(prop.name) ? (
+                              <select
+                                value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
+                                onChange={(e) =>
+                                  setEditingProvider({
+                                    ...editingProvider,
+                                    tempConfig: {
+                                      ...editingProvider.tempConfig,
+                                      [prop.name]: e.target.value,
+                                    },
+                                  })
+                                }
+                                disabled={!editingProvider.tempConfig?.datasetId || loadingCatalogData}
+                                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 disabled:opacity-50"
+                              >
+                                <option value="">
+                                  {!editingProvider.tempConfig?.datasetId 
+                                    ? 'Select a dataset first' 
+                                    : loadingCatalogData 
+                                    ? 'Loading fields...' 
+                                    : prop.required 
+                                    ? 'Select a field' 
+                                    : '(Optional)'}
+                                </option>
+                                {catalogFields.map((field) => (
+                                  <option key={field} value={field}>
+                                    {field}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : /* Default string input */ (
+                              <input
+                                type="text"
+                                value={editingProvider.tempConfig?.[prop.name] ?? prop.default ?? ''}
+                                onChange={(e) =>
+                                  setEditingProvider({
+                                    ...editingProvider,
+                                    tempConfig: {
+                                      ...editingProvider.tempConfig,
+                                      [prop.name]: e.target.value,
+                                    },
+                                  })
+                                }
+                                placeholder={prop.default?.toString()}
+                                className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                              />
+                            )}
+                          </>
                         )}
                         {prop.type === 'boolean' && (
                           <input

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ImportToCatalogDialog } from '@/components/ImportToCatalogDialog';
 import ExplorerMap from '@/components/ExplorerMap';
@@ -196,11 +196,31 @@ export default function MapExplorer() {
   const [zoomToLayerId, setZoomToLayerId] = useState<string | undefined>(undefined);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // Memoized callback to handle features loaded from map
+  const handleFeaturesLoad = useCallback((layerId: string, features: GeoJSONFeature[]) => {
+    setMapFeaturesByLayer(prev => {
+      const newMap = new Map(prev);
+      newMap.set(layerId, features);
+      return newMap;
+    });
+  }, []);
+
+  // Memoized callback to clear zoom state after completing
+  const handleZoomComplete = useCallback(() => {
+    setZoomToLayerId(undefined);
+  }, []);
+
   // Fetch dataset types on component mount
   useEffect(() => {
     const fetchDatasetTypes = async () => {
       try {
-        const response = await fetch('/api/v1/gis/dataset-types');
+        const token = localStorage.getItem('authToken');
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch('/api/v1/gis/dataset-types', { headers });
         if (response.ok) {
           const data = await response.json();
           if (data.success && Array.isArray(data.data)) {
@@ -375,9 +395,18 @@ export default function MapExplorer() {
 
     // First, save this layer as a remote dataset if not already done
     try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        alert('You must be logged in to add layers to the catalog');
+        return;
+      }
+      
       const response = await fetch('/api/v1/gis/remote-datasets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           serviceUrl: serviceUrl,
           layerId: parseInt(firstLayer.id),
@@ -412,10 +441,18 @@ export default function MapExplorer() {
 
     setImportLoading(true);
     try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('You must be logged in to import layers');
+      }
+      
       // First save the remote dataset
       const remoteDatasetResponse = await fetch('/api/v1/gis/remote-datasets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           serviceUrl: serviceUrl,
           layerId: parseInt(firstLayer.id),
@@ -442,7 +479,10 @@ export default function MapExplorer() {
       // Now import to catalog
       const importResponse = await fetch('/api/v1/gis/remote-datasets/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           remoteDatasetId,
           catalogName: formData.catalogName,
@@ -451,6 +491,7 @@ export default function MapExplorer() {
           tags: formData.tags,
           category: formData.category,
           isPublic: formData.isPublic,
+          importMode: formData.importMode,
         }),
       });
 
@@ -463,7 +504,7 @@ export default function MapExplorer() {
         throw new Error(importData.error || 'Failed to import to catalog');
       }
 
-      setImportSuccess(`Successfully imported "${formData.catalogName}" to catalog!`);
+      setImportSuccess(`Successfully imported "${formData.catalogName}" to catalog${formData.importMode === 'local' ? ' (local storage)' : ' (remote reference)'}!`);
       setImportDialogOpen(false);
 
       // Clear success message after 3 seconds
@@ -747,12 +788,8 @@ export default function MapExplorer() {
                 layerServiceMap={layerServiceMap}
                 extent={mapConfig.extent}
                 zoomToLayerId={zoomToLayerId}
-                onFeaturesLoad={(layerId, features) => {
-                  const newMapFeatures = new Map(mapFeaturesByLayer);
-                  newMapFeatures.set(layerId, features);
-                  setMapFeaturesByLayer(newMapFeatures);
-                }}
-                onZoomComplete={() => setZoomToLayerId(undefined)}
+                onFeaturesLoad={handleFeaturesLoad}
+                onZoomComplete={handleZoomComplete}
               />
             ) : (
               <ExplorerMap
