@@ -164,7 +164,7 @@ export function ImportToCatalogDialog({
                     💾 Local Import
                   </div>
                   <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
-                    Download all features from the service and store them in your local database. Data is copied once and becomes independent. Best for datasets you'll query frequently or modify.
+                    Download all features from the service and store them in your local database. Data is copied once and becomes independent. Best for datasets you&apos;ll query frequently or modify.
                   </div>
                 </div>
               </label>

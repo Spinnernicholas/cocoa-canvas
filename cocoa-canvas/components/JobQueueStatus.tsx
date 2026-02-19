@@ -74,7 +74,7 @@ export default function JobQueueStatus() {
     fetchJobStats();
     const interval = setInterval(fetchJobStats, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [router]);
 
   return (
     <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-6 border border-cocoa-200 dark:border-cocoa-700">

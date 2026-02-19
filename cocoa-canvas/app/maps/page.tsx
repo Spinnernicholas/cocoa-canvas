@@ -14,25 +14,26 @@ interface User {
 
 export default function MapsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    const token = localStorage.getItem('authToken');
-
-    if (!userStr || !token) {
-      router.push('/login');
-      return;
+  const [user] = useState<User | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
     }
 
     try {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
-    } catch (error) {
-      console.error('Error parsing user data:', error);
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+
+    if (!user || !token) {
       router.push('/login');
     }
-  }, [router]);
+  }, [router, user]);
 
   if (!user) {
     return null;
@@ -148,7 +149,7 @@ export default function MapsPage() {
                   Open the Explorer
                 </h3>
                 <p className="text-cocoa-600 dark:text-cocoa-300">
-                  Navigate to Explore & Import and paste a public ArcGIS Web App URL
+                  Navigate to Explore &amp; Import and paste a public ArcGIS Web App URL
                 </p>
               </div>
             </div>
@@ -161,7 +162,7 @@ export default function MapsPage() {
                   Discover Layers
                 </h3>
                 <p className="text-cocoa-600 dark:text-cocoa-300">
-                  Click "Explore Map" to discover all layers and services automatically
+                  Click &quot;Explore Map&quot; to discover all layers and services automatically
                 </p>
               </div>
             </div>
@@ -174,7 +175,7 @@ export default function MapsPage() {
                   Select & Import
                 </h3>
                 <p className="text-cocoa-600 dark:text-cocoa-300">
-                  Click on any layer and use "Add to Catalog" to import with metadata
+                  Click on any layer and use &quot;Add to Catalog&quot; to import with metadata
                 </p>
               </div>
             </div>

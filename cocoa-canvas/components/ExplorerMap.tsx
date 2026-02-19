@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -198,7 +198,7 @@ export default function ExplorerMap({
   }, [layerServiceMap, onFeaturesLoad]);
 
   // Validate and clean coordinates recursively
-  const cleanCoordinates = (coords: any): any => {
+  const cleanCoordinates = useCallback(function cleanCoordinatesInner(coords: any): any {
     if (!Array.isArray(coords)) return null;
 
     // For a single coordinate [lng, lat]
@@ -211,9 +211,9 @@ export default function ExplorerMap({
 
     // For nested arrays (rings, paths, etc.)
     return coords
-      .map((coord: any) => cleanCoordinates(coord))
+      .map((coord: any) => cleanCoordinatesInner(coord))
       .filter((c: any) => c !== null);
-  };
+  }, []);
 
   // Validate GeoJSON geometry
   const isValidGeometry = (geometry: any): boolean => {
@@ -462,7 +462,7 @@ export default function ExplorerMap({
 
       layerIndex++;
     }
-  }, [featuresByLayer]);
+  }, [featuresByLayer, cleanCoordinates]);
 
   // Zoom to map extent when extent prop is available
   useEffect(() => {

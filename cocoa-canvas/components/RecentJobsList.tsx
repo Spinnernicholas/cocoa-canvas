@@ -54,7 +54,7 @@ export default function RecentJobsList() {
     fetchJobs();
     const interval = setInterval(fetchJobs, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [router]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

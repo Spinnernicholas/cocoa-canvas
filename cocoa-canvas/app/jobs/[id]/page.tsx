@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -39,7 +39,7 @@ export default function JobDetailPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [actionLoading, setActionLoading] = useState<'pause' | 'resume' | 'cancel' | null>(null);
 
-  const fetchJob = async () => {
+  const fetchJob = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`/api/v1/jobs/${jobId}`, {
@@ -75,7 +75,7 @@ export default function JobDetailPage() {
       setError('Failed to load job details');
       setLoading(false);
     }
-  };
+  }, [jobId, router]);
 
   const handleJobControl = async (action: 'pause' | 'resume' | 'cancel') => {
     if (!job) return;
@@ -135,7 +135,7 @@ export default function JobDetailPage() {
       const interval = setInterval(fetchJob, 2000);
       return () => clearInterval(interval);
     }
-  }, [user, jobId, autoRefresh, router, job?.status]);
+  }, [user, jobId, autoRefresh, router, job?.status, fetchJob]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

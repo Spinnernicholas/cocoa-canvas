@@ -201,7 +201,7 @@ export default function PersonDetailPage() {
     };
 
     fetchPerson();
-  }, [user, personId]);
+  }, [user, personId, router]);
 
   const handleSavePerson = async (e: React.FormEvent) => {
     e.preventDefault();

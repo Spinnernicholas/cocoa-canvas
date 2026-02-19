@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -40,7 +40,7 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -82,7 +82,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, router, statusFilter, typeFilter]);
 
   // Load user
   useEffect(() => {
@@ -110,7 +110,7 @@ export default function JobsPage() {
     fetchJobs();
     const interval = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, [user, statusFilter, typeFilter, limit, router]);
+  }, [user, fetchJobs]);
 
   const handleJobControl = async (
     event: React.MouseEvent,

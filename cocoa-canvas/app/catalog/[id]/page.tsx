@@ -169,7 +169,7 @@ export default function DatasetDetailPage() {
     };
 
     fetchFeatures();
-  }, [dataset, datasetId, currentPage, router]);
+  }, [dataset, datasetId, currentPage, router, visibleColumns.size]);
 
   // Close column menu when clicking outside
   useEffect(() => {
@@ -448,7 +448,7 @@ export default function DatasetDetailPage() {
                     No columns selected
                   </p>
                   <p className="text-sm text-cocoa-500 dark:text-cocoa-400">
-                    Use the "⚙️ Columns" menu above to select columns to display
+                    Use the ⚙️ Columns menu above to select columns to display
                   </p>
                 </div>
               ) : (

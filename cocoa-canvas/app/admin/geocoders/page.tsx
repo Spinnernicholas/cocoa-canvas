@@ -172,7 +172,7 @@ export default function GeocodeSettingsPage() {
     };
 
     fetchCatalogDatasets();
-  }, [editingProvider?.providerId]);
+  }, [editingProvider]);
 
   // Fetch fields when a catalog dataset is selected
   useEffect(() => {
@@ -211,7 +211,7 @@ export default function GeocodeSettingsPage() {
     };
 
     fetchCatalogFields();
-  }, [editingProvider?.providerId, editingProvider?.tempConfig?.datasetId]);
+  }, [editingProvider]);
 
   const handleStartEdit = (provider: GeocoderProvider) => {
     setEditingId(provider.id);

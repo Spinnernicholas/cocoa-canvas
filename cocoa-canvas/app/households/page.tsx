@@ -116,7 +116,7 @@ export default function HouseholdsPage() {
     };
 
     fetchHouseholds();
-  }, [user, page, filters, searchQuery, router]);
+  }, [user, page, filters, searchQuery, router, limit]);
 
   const handleFilterChange = (key: keyof HouseholdFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));

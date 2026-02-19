@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
@@ -48,13 +48,7 @@ export default function OptionGroupsPage() {
     }
   }, [router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchItems();
-    }
-  }, [user, activeGroup]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -71,7 +65,13 @@ export default function OptionGroupsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeGroup]);
+
+  useEffect(() => {
+    if (user) {
+      fetchItems();
+    }
+  }, [user, activeGroup, fetchItems]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +274,7 @@ export default function OptionGroupsPage() {
             </div>
           ) : items.length === 0 ? (
             <p className="text-center py-8 text-cocoa-600 dark:text-cocoa-300">
-              No items found. Click "Add New" to create one.
+              No items found. Click &quot;Add New&quot; to create one.
             </p>
           ) : (
             <div className="space-y-2">
