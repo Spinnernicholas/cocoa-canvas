@@ -10,6 +10,8 @@ interface JobStats {
   processing: number;
   completed: number;
   failed: number;
+  paused: number;
+  cancelled: number;
 }
 
 export default function JobQueueStatus() {
@@ -20,6 +22,8 @@ export default function JobQueueStatus() {
     processing: 0,
     completed: 0,
     failed: 0,
+    paused: 0,
+    cancelled: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,6 +58,8 @@ export default function JobQueueStatus() {
           processing: jobs.filter((j: any) => j.status === 'processing').length,
           completed: jobs.filter((j: any) => j.status === 'completed').length,
           failed: jobs.filter((j: any) => j.status === 'failed').length,
+          paused: jobs.filter((j: any) => j.status === 'paused').length,
+          cancelled: jobs.filter((j: any) => j.status === 'cancelled').length,
         };
 
         setStats(newStats);
@@ -92,7 +98,7 @@ export default function JobQueueStatus() {
           <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {/* Total Jobs */}
           <div className="bg-cocoa-50 dark:bg-cocoa-900/50 rounded p-4">
             <p className="text-cocoa-600 dark:text-cocoa-300 text-xs font-medium uppercase">Total</p>
@@ -121,6 +127,18 @@ export default function JobQueueStatus() {
           <div className="bg-red-50 dark:bg-red-900/20 rounded p-4 border border-red-200 dark:border-red-800">
             <p className="text-red-700 dark:text-red-300 text-xs font-medium uppercase">Failed</p>
             <p className="text-2xl font-bold text-red-900 dark:text-red-200 mt-1">{stats.failed}</p>
+          </div>
+
+          {/* Paused */}
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded p-4 border border-amber-200 dark:border-amber-800">
+            <p className="text-amber-700 dark:text-amber-300 text-xs font-medium uppercase">Paused</p>
+            <p className="text-2xl font-bold text-amber-900 dark:text-amber-200 mt-1">{stats.paused}</p>
+          </div>
+
+          {/* Cancelled */}
+          <div className="bg-slate-50 dark:bg-slate-900/20 rounded p-4 border border-slate-200 dark:border-slate-800">
+            <p className="text-slate-700 dark:text-slate-300 text-xs font-medium uppercase">Cancelled</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-200 mt-1">{stats.cancelled}</p>
           </div>
         </div>
       )}

@@ -186,7 +186,27 @@ export async function processGeocodeJob(
     const errorLogs: GeocodeErrorLog[] = [];
     const providersUsed = new Set<string>();
 
+    const getControlStatus = async () => {
+      const current = await prisma.job.findUnique({
+        where: { id: jobId },
+        select: { status: true },
+      });
+
+      if (!current) return 'cancelled';
+      return current.status;
+    };
+
     for (let offset = 0; offset < householdCount; offset += batchSize) {
+      const controlStatus = await getControlStatus();
+      if (controlStatus === 'paused') {
+        await addJobError(jobId, 'Job paused by user during processing');
+        return;
+      }
+      if (controlStatus === 'cancelled') {
+        await addJobError(jobId, 'Job cancelled by user during processing');
+        return;
+      }
+
       const remaining = householdCount - offset;
       const takeCount = Math.min(batchSize, remaining);
 
@@ -314,6 +334,11 @@ export async function processGeocodeJob(
       if (offset + batchSize < householdCount) {
         await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay
       }
+    }
+
+    const finalControlStatus = await getControlStatus();
+    if (finalControlStatus === 'paused' || finalControlStatus === 'cancelled') {
+      return;
     }
 
     // Calculate final statistics

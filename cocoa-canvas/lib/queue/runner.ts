@@ -361,6 +361,57 @@ export async function failJob(jobId: string, errorMessage: string) {
 }
 
 /**
+ * Mark a job as paused
+ */
+export async function pauseJob(jobId: string, reason?: string) {
+  try {
+    if (reason) {
+      await addJobError(jobId, {
+        timestamp: new Date().toISOString(),
+        message: reason,
+        code: 'JOB_PAUSED',
+      });
+    }
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        status: 'paused',
+      },
+    });
+  } catch (error) {
+    console.error('[Pause Job Error]', error);
+    return null;
+  }
+}
+
+/**
+ * Mark a job as cancelled
+ */
+export async function markJobCancelled(jobId: string, reason?: string) {
+  try {
+    if (reason) {
+      await addJobError(jobId, {
+        timestamp: new Date().toISOString(),
+        message: reason,
+        code: 'JOB_CANCELLED',
+      });
+    }
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error('[Cancel Job Error]', error);
+    return null;
+  }
+}
+
+/**
  * Parse job data from stored JSON string
  * 
  * Safely parses JSON with fallback to empty object
@@ -403,7 +454,7 @@ export function getJobProgress(job: {
   processedItems: number;
   outputStats?: string | null;
 }): number {
-  if (job.status === 'completed' || job.status === 'failed') {
+  if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
     return 100;
   }
   

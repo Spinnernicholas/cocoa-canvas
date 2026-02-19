@@ -15,6 +15,7 @@ import {
   addJobError,
 } from '@/lib/queue/runner';
 import { OutputStats } from '@/lib/queue/types';
+import { prisma } from '@/lib/prisma';
 
 export interface ImportJobData {
   filePath: string;
@@ -61,6 +62,19 @@ export async function processImportJob(
       fileSize,
       userId,
       onProgress: async (processed, total, errors, bytesProcessed) => {
+        const currentJob = await prisma.job.findUnique({
+          where: { id: jobId },
+          select: { status: true },
+        });
+
+        if (currentJob?.status === 'paused') {
+          throw new Error('__JOB_PAUSED__');
+        }
+
+        if (currentJob?.status === 'cancelled') {
+          throw new Error('__JOB_CANCELLED__');
+        }
+
         // Build output stats for voter import
         const outputStats: Partial<OutputStats> = {
           type: 'voter_import',
@@ -135,6 +149,13 @@ export async function processImportJob(
 
     console.log(`[Import Job] Completed: ${jobId} - ${result.processed} processed, ${result.errors} errors`);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage === '__JOB_PAUSED__' || errorMessage === '__JOB_CANCELLED__') {
+      console.log(`[Import Job] Interrupted: ${jobId} - ${errorMessage}`);
+      return;
+    }
+
     console.error(`[Import Job Error] ${jobId}:`, error);
     await failJob(
       jobId,

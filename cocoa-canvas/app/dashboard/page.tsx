@@ -7,7 +7,6 @@ import Marshmallow from '@/components/Marshmallow';
 import Header from '@/components/Header';
 import CampaignCard from '@/components/CampaignCard';
 import JobQueueStatus from '@/components/JobQueueStatus';
-import RecentJobsList from '@/components/RecentJobsList';
 
 interface User {
   id: string;
@@ -102,14 +101,9 @@ export default function DashboardPage() {
           <CampaignCard />
         </div>
 
-        {/* Job Queue and Recent Jobs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <JobQueueStatus />
-          </div>
-          <div>
-            <RecentJobsList />
-          </div>
+        {/* Job Queue */}
+        <div className="mb-8">
+          <JobQueueStatus />
         </div>
 
         {/* Navigation Cards */}

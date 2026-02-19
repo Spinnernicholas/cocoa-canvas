@@ -40,6 +40,50 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
 
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const token = localStorage.getItem('authToken');
+
+      const params = new URLSearchParams({
+        limit: (limit * 10).toString(),
+        offset: '0',
+      });
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      if (typeFilter !== 'all') {
+        params.append('type', typeFilter);
+      }
+
+      const response = await fetch(`/api/v1/jobs?${params}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
+        setError('Failed to load jobs');
+        return;
+      }
+
+      const data = await response.json();
+      setJobs(data.jobs || []);
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      setError('Error loading jobs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load user
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -63,54 +107,39 @@ export default function JobsPage() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchJobs = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const token = localStorage.getItem('authToken');
-        
-        const params = new URLSearchParams({
-          limit: (limit * 10).toString(), // Get more for client-side filtering
-          offset: '0',
-        });
-
-        if (statusFilter !== 'all') {
-          params.append('status', statusFilter);
-        }
-
-        if (typeFilter !== 'all') {
-          params.append('type', typeFilter);
-        }
-
-        const response = await fetch(`/api/v1/jobs?${params}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem('user');
-            localStorage.removeItem('authToken');
-            router.push('/login');
-            return;
-          }
-          setError('Failed to load jobs');
-          return;
-        }
-
-        const data = await response.json();
-        setJobs(data.jobs || []);
-      } catch (err) {
-        console.error('Error fetching jobs:', err);
-        setError('Error loading jobs');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchJobs();
     const interval = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
   }, [user, statusFilter, typeFilter, limit, router]);
+
+  const handleJobControl = async (
+    event: React.MouseEvent,
+    jobId: string,
+    action: 'pause' | 'resume' | 'cancel'
+  ) => {
+    event.stopPropagation();
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/v1/jobs/${jobId}/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `Failed to ${action} job`);
+      }
+
+      await fetchJobs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} job`);
+    }
+  };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -122,6 +151,8 @@ export default function JobsPage() {
         return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
       case 'failed':
         return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+      case 'paused':
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
       case 'cancelled':
         return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
       default:
@@ -135,6 +166,7 @@ export default function JobsPage() {
       case 'processing': return '⚙️';
       case 'pending': return '⏳';
       case 'failed': return '❌';
+      case 'paused': return '⏸️';
       case 'cancelled': return '🚫';
       default: return '📊';
     }
@@ -233,7 +265,7 @@ export default function JobsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
             <div className="flex items-center justify-between">
               <div>
@@ -279,6 +311,30 @@ export default function JobsPage() {
               <span className="text-3xl">❌</span>
             </div>
           </div>
+
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Paused</p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {jobs.filter(j => j.status === 'paused').length}
+                </p>
+              </div>
+              <span className="text-3xl">⏸️</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Cancelled</p>
+                <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">
+                  {jobs.filter(j => j.status === 'cancelled').length}
+                </p>
+              </div>
+              <span className="text-3xl">🚫</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -294,6 +350,7 @@ export default function JobsPage() {
               <option value="processing">Processing</option>
               <option value="completed">Completed</option>
               <option value="failed">Failed</option>
+              <option value="paused">Paused</option>
               <option value="cancelled">Cancelled</option>
             </select>
 
@@ -353,6 +410,7 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Duration</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created By</th>
+                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cocoa-200 dark:divide-cocoa-700">
@@ -412,6 +470,34 @@ export default function JobsPage() {
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
                         {job.createdBy?.name || '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {(job.status === 'pending' || job.status === 'processing') && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'pause')}
+                              className="px-2 py-1 text-xs rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                            >
+                              Pause
+                            </button>
+                          )}
+                          {job.status === 'paused' && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'resume')}
+                              className="px-2 py-1 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
+                            >
+                              Resume
+                            </button>
+                          )}
+                          {(job.status === 'pending' || job.status === 'processing' || job.status === 'paused') && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'cancel')}
+                              className="px-2 py-1 text-xs rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

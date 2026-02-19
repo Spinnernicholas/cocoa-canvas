@@ -37,6 +37,79 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [actionLoading, setActionLoading] = useState<'pause' | 'resume' | 'cancel' | null>(null);
+
+  const fetchJob = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/v1/jobs/${jobId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
+        router.push('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        setError('Failed to load job details');
+        return;
+      }
+
+      const data = await response.json();
+      if (data.success && data.job) {
+        setJob(data.job);
+        setLoading(false);
+
+        if (data.job.status === 'completed' || data.job.status === 'failed' || data.job.status === 'cancelled') {
+          setAutoRefresh(false);
+        }
+      } else {
+        setError('Job not found');
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error loading job:', err);
+      setError('Failed to load job details');
+      setLoading(false);
+    }
+  };
+
+  const handleJobControl = async (action: 'pause' | 'resume' | 'cancel') => {
+    if (!job) return;
+
+    try {
+      setActionLoading(action);
+      setError('');
+
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/v1/jobs/${job.id}/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `Failed to ${action} job`);
+      }
+
+      if (action === 'resume') {
+        setAutoRefresh(true);
+      }
+
+      await fetchJob();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} job`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   // Load user
   useEffect(() => {
@@ -55,49 +128,10 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!user || !jobId) return;
 
-    const fetchJob = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`/api/v1/jobs/${jobId}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        });
-
-        if (response.status === 401) {
-          localStorage.removeItem('user');
-          localStorage.removeItem('authToken');
-          router.push('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          setError('Failed to load job details');
-          return;
-        }
-
-        const data = await response.json();
-        if (data.success && data.job) {
-          setJob(data.job);
-          setLoading(false);
-        } else {
-          setError('Job not found');
-          setLoading(false);
-        }
-
-        // Stop auto-refresh if job is completed or failed
-        if (data.status === 'completed' || data.status === 'failed') {
-          setAutoRefresh(false);
-        }
-      } catch (err) {
-        console.error('Error loading job:', err);
-        setError('Failed to load job details');
-        setLoading(false);
-      }
-    };
-
     fetchJob();
 
     // Auto-refresh every 2 seconds if still processing
-    if (autoRefresh && job?.status === 'processing') {
+    if (autoRefresh && (job?.status === 'processing' || job?.status === 'pending')) {
       const interval = setInterval(fetchJob, 2000);
       return () => clearInterval(interval);
     }
@@ -203,8 +237,37 @@ export default function JobDetailPage() {
                     Job ID: {job.id}
                   </p>
                 </div>
-                <div className={`px-4 py-2 rounded-lg font-semibold ${getStatusBgColor(job.status)} ${getStatusColor(job.status)}`}>
-                  {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                <div className="flex items-center gap-3">
+                  <div className={`px-4 py-2 rounded-lg font-semibold ${getStatusBgColor(job.status)} ${getStatusColor(job.status)}`}>
+                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                  </div>
+                  {(job.status === 'pending' || job.status === 'processing') && (
+                    <button
+                      onClick={() => handleJobControl('pause')}
+                      disabled={actionLoading !== null}
+                      className="px-3 py-2 text-sm rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 disabled:opacity-60"
+                    >
+                      {actionLoading === 'pause' ? 'Pausing...' : 'Pause'}
+                    </button>
+                  )}
+                  {job.status === 'paused' && (
+                    <button
+                      onClick={() => handleJobControl('resume')}
+                      disabled={actionLoading !== null}
+                      className="px-3 py-2 text-sm rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 disabled:opacity-60"
+                    >
+                      {actionLoading === 'resume' ? 'Resuming...' : 'Resume'}
+                    </button>
+                  )}
+                  {(job.status === 'pending' || job.status === 'processing' || job.status === 'paused') && (
+                    <button
+                      onClick={() => handleJobControl('cancel')}
+                      disabled={actionLoading !== null}
+                      className="px-3 py-2 text-sm rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 disabled:opacity-60"
+                    >
+                      {actionLoading === 'cancel' ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
