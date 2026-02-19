@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-export async function seedElectionTypes() {
-  console.log('Seeding election types...');
+export async function seedElectionTypes(verbose = true) {
+  if (verbose) {
+    console.log('Seeding election types...');
+  }
 
   const electionTypes = [
     {
@@ -46,16 +46,20 @@ export async function seedElectionTypes() {
     });
   }
 
-  console.log(`✓ Seeded ${electionTypes.length} election types`);
+  if (verbose) {
+    console.log(`✓ Seeded ${electionTypes.length} election types`);
+  }
+}
+
+async function main() {
+  try {
+    await seedElectionTypes();
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
 }
 
 if (require.main === module) {
-  seedElectionTypes()
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
+  main();
 }

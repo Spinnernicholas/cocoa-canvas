@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-export async function seedDatasetTypes() {
-  console.log('Seeding dataset types...');
+export async function seedDatasetTypes(verbose = true) {
+  if (verbose) {
+    console.log('Seeding dataset types...');
+  }
 
   const datasetTypes = [
     {
@@ -58,16 +58,20 @@ export async function seedDatasetTypes() {
     });
   }
 
-  console.log(`✓ Seeded ${datasetTypes.length} dataset types`);
+  if (verbose) {
+    console.log(`✓ Seeded ${datasetTypes.length} dataset types`);
+  }
+}
+
+async function main() {
+  try {
+    await seedDatasetTypes();
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
 }
 
 if (require.main === module) {
-  seedDatasetTypes()
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
+  main();
 }

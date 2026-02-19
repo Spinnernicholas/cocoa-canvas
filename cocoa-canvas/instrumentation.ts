@@ -22,14 +22,19 @@ export async function register() {
         // Check if setup is needed
         const setupNeeded = await isSetupNeeded();
         
-        // Only seed locations during initial setup
+        // Only seed reference data during initial setup
         if (setupNeeded) {
-          console.log('[Startup] Initial setup needed, seeding locations...');
+          console.log('[Startup] Initial setup needed, seeding reference data...');
           try {
             const { seedLocations } = await import('./prisma/seeds/seed-locations');
+            const { seedElectionTypes } = await import('./prisma/seeds/seed-election-types');
+            const { seedDatasetTypes } = await import('./prisma/seeds/seed-dataset-types');
+            
             await seedLocations();
+            await seedElectionTypes();
+            await seedDatasetTypes();
           } catch (error) {
-            console.error('[Startup] Failed to seed locations:', error);
+            console.error('[Startup] Failed to seed reference data:', error);
           }
           
           // Attempt auto-setup
