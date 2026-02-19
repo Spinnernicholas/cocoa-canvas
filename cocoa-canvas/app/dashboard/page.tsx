@@ -152,13 +152,13 @@ export default function DashboardPage() {
               <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage settings</p>
             </Link>
 
-            {/* Data Catalog */}
+            {/* Dataset Catalog */}
             <Link
               href="/catalog"
               className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700 hover:shadow-md hover:border-cocoa-300 dark:hover:border-cocoa-600 transition-all"
             >
-              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">🗄️ Data Catalog</h4>
-              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage GIS datasets</p>
+              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">🗄️ Dataset Catalog</h4>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage spatial datasets</p>
             </Link>
           </div>
         </div>

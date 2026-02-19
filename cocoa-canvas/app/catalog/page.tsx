@@ -63,7 +63,7 @@ export default function CatalogPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50 mb-2">
-                🗄️ GIS Data Catalog
+                🗄️ Dataset Catalog
               </h1>
               <p className="text-cocoa-600 dark:text-cocoa-300">
                 Manage spatial datasets, parcels, precincts, and election results
@@ -98,10 +98,10 @@ export default function CatalogPage() {
           <div className="max-w-2xl mx-auto">
             <div className="text-6xl mb-4">🚧</div>
             <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">
-              Data Catalog Coming Soon
+              Dataset Catalog Coming Soon
             </h2>
             <p className="text-cocoa-600 dark:text-cocoa-300 mb-6">
-              The GIS Data Catalog is currently under development. This feature will allow you to:
+              The Dataset Catalog is currently under development. This feature will allow you to:
             </p>
             <ul className="text-left space-y-3 max-w-lg mx-auto mb-8">
               <li className="flex items-start">
