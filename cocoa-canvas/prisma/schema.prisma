@@ -30,6 +30,7 @@ model User {
   auditLogs     AuditLog[]
   jobsCreated   Job[]
   scheduledJobs ScheduledJob[]
+  gisDatasets   GISDataset[]  // Datasets created by this user
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -259,6 +260,11 @@ model Precinct {
   // Metadata
   description  String?
   pollingPlace String? // Location of polling place
+  
+  // CATALOG SYNC TRACKING - which dataset sourced this precinct (optional)
+  sourceDatasetId String?
+  sourceDataset   GISDataset? @relation("PrecinctsSourcingDataset", fields: [sourceDatasetId], references: [id])
+  syncedAt        DateTime?   // When it was synced from catalog
 
   // Relations
   voters Voter[]
@@ -277,18 +283,37 @@ model Election {
   electionDate DateTime @unique // 2022-11-08, 2024-11-05, etc.
   electionAbbr String?  @unique // "GEN24", "PRI22", "SP23"
   electionDesc String? // "2024 General Election"
-  electionType String? // General, Primary, Special, Recall, etc.
+  electionType String? // General, Primary, Special, Recall, etc. (legacy field for backward compat)
+
+  // NEW FIELDS FOR CATALOG
+  name            String?     // "November 8, 2022 General Election"
+  shortName       String?     // "2022 General"
+  
+  // Link to configurable ElectionType option group
+  electionTypeId  String?
+  electionTypeRef ElectionType? @relation(fields: [electionTypeId], references: [id])
+  
+  jurisdiction    String?     // "California", "Contra Costa County", "Oakland"
+  districtLevel   String?     // "statewide", "county", "city", "district"
+  description     String?     @db.Text
+  isActive        Boolean     @default(true)
 
   // Metadata
   jurisdictionCode String?
 
   // Relations
-  voteHistory VoteHistory[]
+  voteHistory     VoteHistory[]
+  contests        Contest[]          // Races/measures on this election date
+  precinctDatasets PrecinctDataset[]  // Precinct boundaries for this election
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([electionDate])
+  @@index([electionTypeId])
+  @@index([jurisdiction])
 }
+
 
 // Parcel (tax lot / property parcel from GIS)
 model Parcel {
@@ -320,6 +345,11 @@ model Parcel {
   // Import tracking
   importedFrom String?  // Source system or file
   importedAt   DateTime?
+  
+  // CATALOG SYNC TRACKING - which dataset sourced this parcel (optional)
+  sourceDatasetId String?
+  sourceDataset   GISDataset? @relation("ParcelsSourcingDataset", fields: [sourceDatasetId], references: [id])
+  syncedAt        DateTime?   // When it was synced from catalog
 
   // Relations
   households Household[]
@@ -813,6 +843,9 @@ model ElectionType {
   isActive     Boolean @default(true)
   displayOrder Int     @default(0)
 
+  // Relations
+  elections    Election[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -830,6 +863,9 @@ model DatasetType {
   isActive     Boolean @default(true)
   displayOrder Int     @default(0)
 
+  // Relations
+  datasets     GISDataset[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -838,3 +874,291 @@ model DatasetType {
   @@index([category])
   @@map("dataset_types")
 }
+
+// ============================================================================
+// GIS CATALOG (Phase 2 - Spatial Dataset Management)
+// ============================================================================
+// Two-tier architecture:
+// Tier 1: CATALOG (GISDataset + dynamic PostGIS tables) = raw imported data
+// Tier 2: APPLICATION (Parcel, Precinct) = working data linked to entities
+// Sync workflow: Import → Catalog → Validate → "Sync to App" → Application layer
+
+/// PostGIS geometry types (from PostGIS specification)
+enum GeometryType {
+  POINT
+  LINESTRING
+  POLYGON
+  MULTIPOINT
+  MULTILINESTRING
+  MULTIPOLYGON
+  GEOMETRYCOLLECTION
+}
+
+/// Core dataset registry - all GIS and tabular datasets
+/// NOTE: This is CATALOG data (import archive), NOT directly linked to Household/Person
+/// App models (Parcel, Precinct) are populated by "syncing" from catalog
+model GISDataset {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  description     String?       @db.Text
+  
+  // Link to configurable DatasetType option group
+  datasetTypeId   String
+  datasetType     DatasetType   @relation(fields: [datasetTypeId], references: [id])
+  
+  // PostGIS Integration
+  // References dynamically created PostGIS tables (not in Prisma schema)
+  sourceTable     String?       // e.g., "gis_abc123def456" (actual PostGIS table name)
+  geometryColumn  String?       @default("geom")
+  geometryType    GeometryType?
+  srid            Int           @default(4326) // WGS84 by default
+  
+  // Spatial extent (for quick map bounds)
+  boundingBox     Json?         // {minX, minY, maxX, maxY}
+  recordCount     Int?
+  
+  // Organization
+  tags            String[]      // Searchable tags
+  category        String?       // "Property", "Political", "Demographics"
+  isActive        Boolean       @default(true)
+  isPublic        Boolean       @default(false)
+  
+  // Sync tracking (has this been synced to app models?)
+  syncedToApp     Boolean       @default(false)
+  lastSyncedToAppAt DateTime?
+  syncedRecordCount Int?        // How many records synced to app
+  
+  // Metadata (flexible storage for dataset-specific attributes)
+  metadata        Json?
+  
+  // Tracking
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+  createdBy       User?         @relation(fields: [createdById], references: [id])
+  
+  // Relations (one-to-one with type-specific metadata)
+  parcelDataset       ParcelDataset?
+  precinctDataset     PrecinctDataset?
+  demographicDataset  DemographicDataset?
+  
+  // Relations to app models (optional tracking)
+  parcelsSourced      Parcel[] @relation("ParcelsSourcingDataset")      // Parcels that came from this dataset
+  precinctsSourced    Precinct[] @relation("PrecinctsSourcingDataset")  // Precincts that came from this dataset
+  
+  // Relations to contests (geography-specific contests)
+  contestsWithDistrictGeometry Contest[] @relation("ContestDistrictDataset")
+  
+  @@map("gis_datasets")
+  @@index([datasetTypeId])
+  @@index([isActive])
+  @@index([category])
+  @@index([syncedToApp])
+}
+
+/// Parcel-specific metadata and field mappings
+/// Maps to columns in the dynamically-created PostGIS parcel table
+model ParcelDataset {
+  id              String      @id @default(cuid())
+  datasetId       String      @unique
+  dataset         GISDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  // Field mappings (column names in source PostGIS table)
+  apnField            String   @default("apn")        // Assessor Parcel Number
+  addressField        String?  @default("address")
+  cityField           String?  @default("city")
+  zipField            String?  @default("zip")
+  ownerField          String?  @default("owner")
+  assessedValueField  String?  @default("assessed_value")
+  landUseField        String?  @default("land_use")
+  landUseCodeField    String?  @default("land_use_code")
+  yearBuiltField      String?  @default("year_built")
+  squareFeetField     String?  @default("square_feet")
+  lotSizeField        String?  @default("lot_size")
+  bedroomsField       String?  @default("bedrooms")
+  bathroomsField      String?  @default("bathrooms")
+  
+  // Data source information
+  sourceAgency    String?     // "Contra Costa County Assessor"
+  sourceUrl       String?
+  lastUpdated     DateTime?
+  updateFrequency String?     // "quarterly", "annually"
+  licenseInfo     String?     @db.Text
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("parcel_datasets")
+}
+
+/// Precinct-specific metadata - supports election-specific boundaries
+/// Different elections may have different precinct boundaries!
+model PrecinctDataset {
+  id              String      @id @default(cuid())
+  datasetId       String      @unique
+  dataset         GISDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  // Election context (null = current/default precinct boundaries)
+  electionId      String?
+  election        Election?   @relation(fields: [electionId], references: [id])
+  
+  // Field mappings (column names in source PostGIS table)
+  precinctIdField     String  @default("precinct_id")
+  precinctNameField   String? @default("precinct_name")
+  jurisdictionField   String? @default("jurisdiction")
+  
+  // Data source
+  sourceAgency    String?     // "County Registrar of Voters"
+  sourceUrl       String?
+  effectiveDate   DateTime?   // When these boundaries took effect
+  
+  // Relations
+  electionResults ElectionResult[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("precinct_datasets")
+  @@index([electionId])
+}
+
+/// Demographic dataset metadata (Census, ACS, etc.)
+model DemographicDataset {
+  id              String      @id @default(cuid())
+  datasetId       String      @unique
+  dataset         GISDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  // Data source details
+  source          String      // "US Census 2020", "ACS 5-Year 2018-2022"
+  year            Int         // Reference year
+  geographyLevel  String      // "block", "block_group", "tract", "zip", "county"
+  
+  // Field mappings (common demographic fields)
+  geoIdField          String? @default("geoid")
+  populationField     String? @default("total_population")
+  householdsField     String? @default("households")
+  medianIncomeField   String? @default("median_income")
+  medianAgeField      String? @default("median_age")
+  
+  // Race/ethnicity fields
+  whiteField          String? @default("white_pop")
+  blackField          String? @default("black_pop")
+  asianField          String? @default("asian_pop")
+  hispanicField       String? @default("hispanic_pop")
+  
+  // Housing fields
+  ownerOccupiedField  String? @default("owner_occupied")
+  renterOccupiedField String? @default("renter_occupied")
+  medianHomeValueField String? @default("median_home_value")
+  
+  // Additional field mappings in JSON
+  customFields    Json?       // Flexible storage for additional mappings
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("demographic_datasets")
+}
+
+/// Contest within an election (office, ballot measure, etc.)
+/// Contests can have different geographic boundaries than their parent election
+model Contest {
+  id              String      @id @default(cuid())
+  
+  // Which election
+  electionId      String
+  election        Election    @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  
+  // Contest details
+  name            String      // "Governor", "Mayor", "Proposition 1", "District 5 Council"
+  contestType     String      // "office", "ballot_measure", "judicial"
+  district        String?     // "Statewide", "Oakland", "District 5", etc.
+  
+  // Geographic scope (can differ from election)
+  // For statewide: null (uses election boundaries)
+  // For city/district: can link to specific geometry dataset
+  districtDatasetId String?
+  districtDataset   GISDataset? @relation("ContestDistrictDataset", fields: [districtDatasetId], references: [id])
+  
+  // Metadata
+  description     String?     @db.Text
+  seatName        String?     // "Seat A", "Position 3" for multi-seat races
+  isPartisan      Boolean     @default(true)
+  votingMethod    String?     // "plurality", "ranked_choice", "top_two"
+  
+  // Relations
+  choices         ContestChoice[]
+  results         ElectionResult[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@unique([electionId, name, district])
+  @@index([electionId])
+  @@index([contestType])
+  @@map("contests")
+}
+
+/// Choice in a contest (candidate or ballot option)
+model ContestChoice {
+  id              String      @id @default(cuid())
+  
+  // Which contest
+  contestId       String
+  contest         Contest     @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  // Choice details
+  name            String      // "Gavin Newsom", "Yes", "No"
+  choiceType      String      @default("candidate") // "candidate", "yes", "no"
+  partyAffiliation String?    // "Democratic", "Republican", null for non-partisan
+  
+  // Display order
+  displayOrder    Int?
+  
+  // Metadata
+  isIncumbent     Boolean     @default(false)
+  isWinner        Boolean     @default(false) // Overall winner
+  
+  // Relations
+  results         ElectionResult[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@unique([contestId, name])
+  @@index([contestId])
+  @@map("contest_choices")
+}
+
+/// Election results - vote counts by precinct, contest, and choice
+model ElectionResult {
+  id                  String      @id @default(cuid())
+  
+  // Which contest and choice
+  contestId           String
+  contest             Contest     @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  choiceId            String
+  choice              ContestChoice @relation(fields: [choiceId], references: [id], onDelete: Cascade)
+  
+  // Precinct link (to dataset containing geometry)
+  precinctDatasetId   String
+  precinctDataset     PrecinctDataset @relation(fields: [precinctDatasetId], references: [id])
+  precinctIdentifier  String      // Actual precinct ID/number (e.g., "PCT-4201")
+  
+  // Results
+  voteCount           Int
+  totalVotes          Int?        // Total votes cast in this precinct for this contest
+  percentage          Float?      // Calculated: voteCount / totalVotes
+  
+  // Metadata
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  
+  @@unique([contestId, choiceId, precinctIdentifier])
+  @@index([contestId])
+  @@index([choiceId])
+  @@index([precinctDatasetId, precinctIdentifier])
+  @@map("election_results")
+}
+

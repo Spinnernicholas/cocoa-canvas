@@ -4,6 +4,24 @@
 
 This document outlines the required schema changes to support the GIS Dataset Catalog feature. The changes add support for managing spatial datasets (parcels, precincts, demographics), election-specific precinct boundaries, and election results.
 
+## Implementation Status
+
+**Phase 1: Foundation (Completed ✅)**
+- ElectionType option group model
+- DatasetType option group model
+- CRUD API endpoints for both option groups
+- Admin UI with categorized management interface
+- Seed scripts with default values
+- Startup integration for automatic seeding
+
+**Phase 2: GIS Catalog (Pending)**
+- GISDataset catalog registry
+- Contest and ContestChoice models  
+- ParcelDataset, PrecinctDataset, DemographicDataset metadata models
+- ElectionResult tracking
+- Import processors
+- Catalog UI and API
+
 ## Analysis of Existing Schema
 
 ### Existing Models We'll Extend/Connect To:
@@ -21,26 +39,25 @@ This document outlines the required schema changes to support the GIS Dataset Ca
 2. **ParcelDataset** - Field mappings for parcel datasets
 3. **PrecinctDataset** - Links precinct geometries to specific elections
 4. **DemographicDataset** - Census and demographic data metadata
-5. **ElectionResult** - Non-spatial election results linked to precinct geometries
-6. **Enums** - DatasetType, GeometryType, ElectionType
+5. **Contest** - Contests within elections (races, measures)
+6. **ContestChoice** - Choices within contests (candidates, yes/no)
+7. **ElectionResult** - Non-spatial election results linked to precinct geometries
+8. **Enums** - GeometryType only (ElectionType and DatasetType are configurable option groups)
+
+### What Has Been Implemented:
+
+✅ **ElectionType** - Option group model for election types (Primary, General, Special, etc.)
+✅ **DatasetType** - Option group model for dataset types (Parcel, Precinct, Demographic, etc.)
+✅ **API Endpoints** - CRUD operations for both option groups
+✅ **Seed Scripts** - Default values for election types and dataset types
+✅ **Admin UI** - Management interface for both option groups
 
 ## Proposed Schema Additions
 
 ### 1. Add Enums
 
 ```prisma
-// Spatial dataset types
-enum DatasetType {
-  PARCEL
-  PRECINCT
-  DEMOGRAPHIC
-  TABULAR         // Non-spatial (e.g., lookup tables)
-  BOUNDARY        // County/city boundaries
-  INFRASTRUCTURE  // Roads, utilities, etc.
-  CUSTOM
-}
-
-// PostGIS geometry types
+// PostGIS geometry types (fixed values from PostGIS specification)
 enum GeometryType {
   POINT
   LINESTRING
@@ -50,19 +67,63 @@ enum GeometryType {
   MULTIPOLYGON
   GEOMETRYCOLLECTION
 }
+```
 
-// Election types (enhance existing Election model)
-enum ElectionType {
-  PRIMARY
-  GENERAL
-  SPECIAL
-  RUNOFF
-  RECALL
-  LOCAL
+### 2. Option Groups (Already Implemented ✅)
+
+Election Types and Dataset Types are **configurable option groups**, not enums. This allows users to customize these lists through the admin UI.
+
+```prisma
+// Election Types - Configurable option group
+model ElectionType {
+  id           String  @id @default(cuid())
+  name         String  @unique // "Primary", "General", "Special", "Runoff", "Recall", "Local"
+  description  String? @db.Text
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  // Relations
+  elections    Election[] // Elections using this type
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+  @@map("election_types")
+}
+
+// Dataset Types - Configurable option group
+model DatasetType {
+  id           String  @id @default(cuid())
+  name         String  @unique // "Parcel", "Precinct", "Demographic", "Boundary", "Infrastructure", "Tabular", "Custom"
+  description  String? @db.Text
+  category     String? // "vector", "raster", "tabular", "other"
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  // Relations
+  datasets     GISDataset[] // Datasets using this type
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+  @@index([category])
+  @@map("dataset_types")
 }
 ```
 
-### 2. Core Dataset Registry
+**Default Values** (seeded on startup):
+- **Election Types**: Primary, General, Special, Runoff, Recall, Local
+- **Dataset Types**: Parcel, Precinct, Demographic, Boundary, Infrastructure, Tabular, Custom
+
+**Management**:
+- API: `/api/v1/admin/option-groups/election-types` and `/api/v1/admin/option-groups/dataset-types`
+- UI: `/admin/option-groups` (Political & Campaign and Geographic & Spatial categories)
+
+### 3. Core Dataset Registry
 
 ```prisma
 /// Core dataset registry - all GIS and tabular datasets
@@ -72,7 +133,10 @@ model GISDataset {
   id              String        @id @default(cuid())
   name            String        @unique
   description     String?       @db.Text
-  datasetType     DatasetType
+  
+  // Link to configurable DatasetType option group
+  datasetTypeId   String
+  datasetType     DatasetType   @relation(fields: [datasetTypeId], references: [id])
   
   // PostGIS Integration
   // References dynamically created PostGIS tables (not in Prisma schema)
@@ -115,14 +179,14 @@ model GISDataset {
   precinctsSourced    Precinct[]  // Precincts that came from this dataset
   
   @@map("gis_datasets")
-  @@index([datasetType])
+  @@index([datasetTypeId])
   @@index([isActive])
   @@index([category])
   @@index([syncedToApp])
 }
 ```
 
-### 3. Type-Specific Metadata Models
+### 4. Type-Specific Metadata Models
 
 #### Parcel Datasets
 
@@ -231,7 +295,7 @@ model DemographicDataset {
 }
 ```
 
-### 4. Election Structure (Contests & Choices)
+### 5. Election Structure (Contests & Choices)
 
 ```prisma
 /// Contest within an election (office, ballot measure, etc.)
@@ -334,7 +398,7 @@ model ElectionResult {
 }
 ```
 
-### 5. Enhance Existing Election Model
+### 6. Enhance Existing Election Model
 
 ```prisma
 // Add to existing Election model:
@@ -346,13 +410,17 @@ model Election {
   electionDate    DateTime @unique // The actual election date
   electionAbbr    String?  @unique
   electionDesc    String?
-  electionType    String?
+  electionType    String?     // Legacy field - keep for backward compatibility
   jurisdictionCode String?
   
   // NEW FIELDS FOR CATALOG
   name            String?     // "November 8, 2022 General Election"
   shortName       String?     // "2022 General"
-  electionTypeEnum ElectionType? // PRIMARY, GENERAL, SPECIAL, etc.
+  
+  // Link to configurable ElectionType option group
+  electionTypeId  String?
+  electionTypeRef ElectionType? @relation(fields: [electionTypeId], references: [id])
+  
   jurisdiction    String?     // "California", "Contra Costa County", "Oakland"
   districtLevel   String?     // "statewide", "county", "city", "district"
   description     String?     @db.Text
@@ -455,11 +523,16 @@ model Precinct {
 ### Step 1: Import Parcel Dataset (Create Catalog Entry)
 
 ```typescript
+// Get the Parcel dataset type from option groups
+const parcelType = await prisma.datasetType.findUnique({
+  where: { name: "Parcel" }
+});
+
 // Import job creates catalog entry + PostGIS table
 const dataset = await prisma.gISDataset.create({
   data: {
     name: "Contra Costa County Parcels 2024",
-    datasetType: "PARCEL",
+    datasetTypeId: parcelType.id,
     sourceTable: "gis_abc123",  // PostGIS table with 98,432 parcels
     geometryType: "MULTIPOLYGON",
     recordCount: 98432,
@@ -588,9 +661,11 @@ for (const hh of households) {
 - `precincts` - Add `sourceDatasetId`, `syncedAt` to track catalog origin
 
 ### New Enums:
-- `DatasetType`
 - `GeometryType`
-- `ElectionType`
+
+### New Option Group Models (Already Implemented ✅):
+- `ElectionType` - Configurable election types
+- `DatasetType` - Configurable dataset types
 
 ### Dynamic PostGIS Tables (Created by Import Jobs):
 - NOT in Prisma schema
@@ -630,13 +705,18 @@ npm run db:migrate -- --name add_gis_catalog
 ### Election with Multiple Contests (Different Geographies)
 
 ```typescript
+// Get the General election type from option groups
+const generalType = await prisma.electionType.findUnique({
+  where: { name: "General" }
+});
+
 // November 8, 2022 General Election
 const election = await prisma.election.create({
   data: {
     name: "November 8, 2022 General Election",
     shortName: "2022 General",
     electionDate: new Date("2022-11-08"),
-    electionTypeEnum: "GENERAL",
+    electionTypeId: generalType.id,
     jurisdiction: "California",
     districtLevel: "statewide",
     contests: {
@@ -751,12 +831,17 @@ const results = await prisma.electionResult.findMany({
 ### Creating a Parcel Dataset Catalog Entry
 
 ```typescript
+// Get the Parcel dataset type from option groups
+const parcelType = await prisma.datasetType.findUnique({
+  where: { name: "Parcel" }
+});
+
 // After importing Contra Costa parcels into PostGIS table "gis_abc123"
 const dataset = await prisma.gISDataset.create({
   data: {
     name: "Contra Costa County Parcels 2024",
     description: "Property parcels with assessment data",
-    datasetType: "PARCEL",
+    datasetTypeId: parcelType.id,
     sourceTable: "gis_abc123",
     geometryColumn: "geom",
     geometryType: "MULTIPOLYGON",
@@ -815,17 +900,21 @@ const features = await prisma.$queryRawUnsafe(`
 ## Next Steps
 
 1. ✅ Review this proposal
-2. [ ] Create Prisma migration with these changes
-3. [ ] Test migration on dev database
-4. [ ] Implement import processors
-5. [ ] Build catalog API endpoints
-6. [ ] Create catalog UI
+2. ✅ Implement ElectionType and DatasetType as option groups (completed)
+3. ✅ Create API endpoints for option groups (completed)
+4. ✅ Create admin UI for managing option groups (completed)
+5. ✅ Add seed scripts for default values (completed)
+6. [ ] Create Prisma migration for GIS catalog models (GISDataset, Contest, etc.)
+7. [ ] Test migration on dev database
+8. [ ] Implement import processors
+9. [ ] Build catalog API endpoints
+10. [ ] Create catalog UI
 
 ## Questions to Resolve
 
 1. ✅ **Catalog vs App Data**: RESOLVED - Maintain clear separation. Catalog is import archive, app models (Parcel/Precinct) are working data. Sync via background job.
 2. ✅ **Precinct/Parcel Linking**: RESOLVED - Add `sourceDatasetId` and `syncedAt` fields to track origin.
-3. **Election Enhancement**: Replace `electionType` string with enum, or keep both for backward compat?
+3. ✅ **Election/Dataset Types**: RESOLVED - Implemented as configurable option groups (models) rather than enums for flexibility.
 4. **Dataset Deletion**: When deleting a GISDataset, should we also DROP the PostGIS table, or keep for audit?
 5. **Sync Strategies**: Support "replace", "merge", "update" modes? Or just "replace" for v1?
 6. **Validation Rules**: What validation before allowing sync? (e.g., require minimum field mappings)
@@ -833,5 +922,5 @@ const features = await prisma.$queryRawUnsafe(`
 ---
 
 **Generated:** 2026-02-18  
-**Updated:** 2026-02-18 (Added two-tier architecture)  
-**Status:** Proposal - Ready for Implementation
+**Updated:** 2026-02-18 (Updated with implemented option groups)  
+**Status:** Partially Implemented - ElectionType and DatasetType option groups complete, GIS catalog models pending
