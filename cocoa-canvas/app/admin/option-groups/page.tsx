@@ -135,6 +135,8 @@ export default function OptionGroupsPage() {
   const optionGroups = [
     { id: 'parties', name: 'Political Parties', icon: '🎗️', fields: ['name', 'abbr', 'description', 'color'] },
     { id: 'locations', name: 'Location Types', icon: '📍', fields: ['name', 'category', 'description'] },
+    { id: 'election-types', name: 'Election Types', icon: '🗳️', fields: ['name', 'description'] },
+    { id: 'dataset-types', name: 'Dataset Types', icon: '📊', fields: ['name', 'description', 'category'] },
   ];
 
   if (!user) return null;

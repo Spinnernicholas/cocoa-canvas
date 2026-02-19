@@ -800,3 +800,41 @@ model Setting {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
+
+// ============================================================================
+// OPTION GROUPS (Configurable Reference Lists)
+// ============================================================================
+
+// Election Types (Primary, General, Special, etc.)
+model ElectionType {
+  id           String  @id @default(cuid())
+  name         String  @unique // "Primary", "General", "Special", "Runoff", "Recall", "Local"
+  description  String? @db.Text
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+  @@map("election_types")
+}
+
+// Dataset Types (Parcel, Precinct, Demographic, etc.)
+model DatasetType {
+  id           String  @id @default(cuid())
+  name         String  @unique // "Parcel", "Precinct", "Demographic", "Boundary", "Infrastructure", "Custom"
+  description  String? @db.Text
+  category     String? // Group similar types: "Political", "Property", "Demographics", "Infrastructure"
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+  @@index([category])
+  @@map("dataset_types")
+}
