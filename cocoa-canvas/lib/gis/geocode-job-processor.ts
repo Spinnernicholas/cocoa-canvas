@@ -11,6 +11,8 @@ import { prisma } from '@/lib/prisma';
 import { startJob, updateJobProgress, updateJobOutputStats, completeJob, failJob, addJobError } from '@/lib/queue/runner';
 import { OutputStats } from '@/lib/queue/types';
 import { geocodingService } from '../geocoding';
+import { geocoderRegistry } from '../geocoding/registry';
+import { createCatalogGeocoder } from '../geocoding/providers/catalog';
 
 /**
  * Geocoding job data structure
@@ -62,19 +64,68 @@ export async function processGeocodeJob(
     await startJob(jobId);
     console.log(`[Geocode Job] Started processing job ${jobId}`);
 
-    // Look up provider name if a specific provider ID was specified
-    let providerDisplayName = 'auto';
-    if (data.providerId) {
+    const enabledProviders = await prisma.geocoderProvider.findMany({
+      where: { isEnabled: true },
+      orderBy: [{ isPrimary: 'desc' }, { priority: 'asc' }],
+    });
+
+    if (enabledProviders.length === 0) {
+      await failJob(jobId, 'No enabled geocoding providers found');
+      return;
+    }
+
+    const selectedProvider = data.providerId
+      ? enabledProviders.find(
+          (provider) =>
+            provider.id === data.providerId || provider.providerId === data.providerId
+        )
+      : enabledProviders.find((provider) => provider.isPrimary) || enabledProviders[0];
+
+    if (!selectedProvider) {
+      await failJob(
+        jobId,
+        `Selected geocoding provider not found or disabled: ${data.providerId}`
+      );
+      return;
+    }
+
+    const selectedProviderKey = selectedProvider.providerId;
+    const providerDisplayName = selectedProvider.providerName;
+
+    let catalogProvider: ReturnType<typeof createCatalogGeocoder> | null = null;
+    if (selectedProviderKey === 'catalog') {
+      if (!selectedProvider.config) {
+        await failJob(
+          jobId,
+          `Catalog provider "${providerDisplayName}" is missing required configuration`
+        );
+        return;
+      }
+
       try {
-        const provider = await prisma.geocoderProvider.findUnique({
-          where: { id: data.providerId },
-          select: { providerName: true, providerId: true },
-        });
-        if (provider) {
-          providerDisplayName = provider.providerName;
-        }
-      } catch (err) {
-        console.warn(`[Geocode Job] Could not look up provider ${data.providerId}:`, err);
+        catalogProvider = createCatalogGeocoder(selectedProvider.config);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await failJob(jobId, `Catalog provider config is invalid: ${message}`);
+        return;
+      }
+
+      const isAvailable = await catalogProvider.isAvailable();
+      if (!isAvailable) {
+        await failJob(
+          jobId,
+          `Catalog provider "${providerDisplayName}" is unavailable. Verify dataset, dataset type, and field configuration.`
+        );
+        return;
+      }
+    } else {
+      const runtimeProvider = geocoderRegistry.getProvider(selectedProviderKey);
+      if (!runtimeProvider) {
+        await failJob(
+          jobId,
+          `Provider "${selectedProviderKey}" is not registered in geocoding runtime`
+        );
+        return;
       }
     }
 
@@ -136,9 +187,12 @@ export async function processGeocodeJob(
     const providersUsed = new Set<string>();
 
     for (let offset = 0; offset < householdCount; offset += batchSize) {
+      const remaining = householdCount - offset;
+      const takeCount = Math.min(batchSize, remaining);
+
       const batch = await prisma.household.findMany({
         where,
-        take: batchSize,
+        take: takeCount,
         skip: offset,
         select: {
           id: true,
@@ -166,28 +220,29 @@ export async function processGeocodeJob(
 
           if (!addressString.trim()) {
             skipCount++;
-            throw new Error('No address available to geocode');
+            continue;
           }
 
           // Geocode the address
-          const result = await geocodingService.geocode(
-            {
-              address: addressString,
-              city: household.city,
-              state: household.state,
-              zipCode: household.zipCode,
-            },
-            {
-              providerId: data.providerId,
-              useFallback: true,
-              timeout: 5000,
-            }
-          );
+          const request = {
+            address: addressString,
+            city: household.city,
+            state: household.state,
+            zipCode: household.zipCode,
+          };
+
+          const result = catalogProvider
+            ? await catalogProvider.geocode(request)
+            : await geocodingService.geocode(request, {
+                providerId: selectedProviderKey,
+                useFallback: true,
+                timeout: 5000,
+              });
 
           if (result) {
             // Update household with coordinates and provider info
-            const provider = result.source || data.providerId || 'unknown';
-            providersUsed.add(provider);
+            const providerName = providerDisplayName || selectedProviderKey || 'unknown';
+            providersUsed.add(providerName);
             
             await prisma.household.update({
               where: { id: household.id },
@@ -196,7 +251,7 @@ export async function processGeocodeJob(
                 longitude: result.longitude,
                 geocoded: true,
                 geocodedAt: new Date(),
-                geocodingProvider: provider,
+                geocodingProvider: providerName,
               },
             });
             successCount++;
@@ -205,16 +260,16 @@ export async function processGeocodeJob(
             errorLogs.push({
               householdId: household.id,
               address: addressString,
-              error: 'No results from geocoding service',
+              error: `No results from geocoding service (${providerDisplayName})`,
               timestamp: new Date().toISOString(),
             });
           }
         } catch (error) {
-          failureCount++;
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error(
             `[Geocode Job] Error geocoding household ${household.id}: ${errorMessage}`
           );
+          failureCount++;
           errorLogs.push({
             householdId: household.id,
             address: household.fullAddress || 'Unknown',
@@ -246,12 +301,10 @@ export async function processGeocodeJob(
           if (errorLogs.length > 0) {
             const recentErrors = errorLogs.slice(-10);
             for (const errorEntry of recentErrors) {
-              await import('@/lib/queue/runner').then(m => 
-                m.addJobError(jobId, {
-                  timestamp: errorEntry.timestamp,
-                  message: `${errorEntry.address}: ${errorEntry.error}`,
-                })
-              );
+              await addJobError(jobId, {
+                timestamp: errorEntry.timestamp,
+                message: `${errorEntry.address}: ${errorEntry.error}`,
+              });
             }
           }
         }

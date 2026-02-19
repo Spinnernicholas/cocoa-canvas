@@ -33,6 +33,10 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
 
   constructor(config: CatalogGeocoderConfig) {
     this.config = {
+      addressField: 'address',
+      cityField: 'city',
+      stateField: 'state',
+      zipCodeField: 'zipcode',
       matchTolerance: 'fuzzy',
       ...config,
     };
@@ -40,6 +44,10 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
+      if (!this.config.datasetId) {
+        return false;
+      }
+
       // Check if dataset exists and is active
       const dataset = await prisma.gISDataset.findUnique({
         where: { id: this.config.datasetId },
@@ -78,6 +86,10 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
 
   async geocode(request: GeocodeRequest): Promise<GeocodeResult | null> {
     try {
+      if (!this.config.datasetId) {
+        throw new Error('Catalog geocoder requires datasetId in provider config');
+      }
+
       // Get the dataset
       const dataset = await prisma.gISDataset.findUnique({
         where: { id: this.config.datasetId },
@@ -85,8 +97,7 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
       });
 
       if (!dataset) {
-        console.error(`[Catalog Geocoder] Dataset not found: ${this.config.datasetId}`);
-        return null;
+        throw new Error(`Dataset not found: ${this.config.datasetId}`);
       }
 
       // Query local PostGIS table or remote service
@@ -98,8 +109,9 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
 
       return null;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('[Catalog Geocoder] Error geocoding address:', error);
-      return null;
+      throw new Error(`[Catalog Geocoder] ${message}`);
     }
   }
 
@@ -195,8 +207,9 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
         source: 'catalog',
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('[Catalog Geocoder] Error querying local table:', error);
-      return null;
+      throw new Error(`Local table query failed: ${message}`);
     }
   }
 
@@ -264,11 +277,29 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
       const response = await fetch(`${featureUrl}?${queryParams}`);
 
       if (!response.ok) {
-        console.error('[Catalog Geocoder] Remote service error:', response.statusText);
-        return null;
+        let responseBody = '';
+        try {
+          responseBody = await response.text();
+        } catch {
+          responseBody = '';
+        }
+        throw new Error(
+          `Remote service error ${response.status}: ${response.statusText}${responseBody ? ` - ${responseBody.slice(0, 300)}` : ''}`
+        );
       }
 
       const data = await response.json();
+
+      if (data?.error) {
+        const arcgisMessage = data.error?.message || 'ArcGIS query failed';
+        const arcgisDetails = Array.isArray(data.error?.details)
+          ? data.error.details.join('; ')
+          : '';
+        throw new Error(
+          `ArcGIS error: ${arcgisMessage}${arcgisDetails ? ` - ${arcgisDetails}` : ''}`
+        );
+      }
+
       const features = data.features || [];
 
       if (features.length === 0) {
@@ -322,8 +353,9 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
         source: 'catalog',
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('[Catalog Geocoder] Error querying remote service:', error);
-      return null;
+      throw new Error(`Remote service query failed: ${message}`);
     }
   }
 
@@ -397,6 +429,11 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
  */
 export function createCatalogGeocoder(config: string): CatalogGeocoderProvider {
   const parsedConfig: CatalogGeocoderConfig = JSON.parse(config);
+
+  if (!parsedConfig.datasetId) {
+    throw new Error('Catalog geocoder requires datasetId in provider config');
+  }
+
   return new CatalogGeocoderProvider(parsedConfig);
 }
 

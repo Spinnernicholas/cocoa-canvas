@@ -503,20 +503,32 @@ export default function JobDetailPage() {
             {/* Error Log */}
             {job.errorLog && job.errorLog.length > 0 && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-4">Errors ({job.errorLog.length})</h3>
-                <ul className="space-y-3">
-                  {job.errorLog.slice(0, 10).map((error: any, idx: number) => (
-                    <li key={idx} className="text-sm text-red-800 dark:text-red-200 bg-red-100 dark:bg-red-800/50 p-3 rounded">
-                      <p className="font-monospace break-words">{error.message || error}</p>
-                      {error.row && <p className="text-xs mt-1 opacity-75">Row {error.row}</p>}
-                    </li>
-                  ))}
-                  {job.errorLog.length > 10 && (
-                    <p className="text-sm text-red-700 dark:text-red-300 italic">
-                      ... and {job.errorLog.length - 10} more errors
+                <details className="group" open>
+                  <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
+                      Errors ({job.errorLog.length})
+                    </h3>
+                    <span className="text-sm text-red-700 dark:text-red-300 group-open:rotate-180 transition-transform">⌄</span>
+                  </summary>
+
+                  <div className="mt-4">
+                    <p className="text-xs text-red-700 dark:text-red-300 mb-2">
+                      Console Output (read-only)
                     </p>
-                  )}
-                </ul>
+                    <textarea
+                      readOnly
+                      value={job.errorLog
+                        .map((error: any) => {
+                          const timestamp = error?.timestamp ? `[${error.timestamp}] ` : '';
+                          const rowInfo = error?.row ? ` (row ${error.row})` : '';
+                          const message = error?.message || String(error);
+                          return `${timestamp}${message}${rowInfo}`;
+                        })
+                        .join('\n')}
+                      className="w-full h-72 resize-y rounded-lg border border-red-300 dark:border-red-700 bg-red-100/70 dark:bg-red-950/40 text-red-900 dark:text-red-100 font-mono text-xs leading-5 p-3"
+                    />
+                  </div>
+                </details>
               </div>
             )}
 

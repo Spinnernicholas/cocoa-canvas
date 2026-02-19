@@ -69,9 +69,9 @@ export default function RunJobPage() {
             // Auto-select the primary provider by default
             const primaryProvider = enabledProviders.find((p: any) => p.isPrimary);
             if (primaryProvider) {
-              setSelectedProviderId(primaryProvider.id);
+              setSelectedProviderId(primaryProvider.providerId);
             } else if (enabledProviders.length > 0) {
-              setSelectedProviderId(enabledProviders[0].id);
+              setSelectedProviderId(enabledProviders[0].providerId);
             }
           }
         } catch (err) {
@@ -340,7 +340,7 @@ export default function RunJobPage() {
                       >
                         <option value="auto">Auto (use primary provider)</option>
                         {providers.map((provider) => (
-                          <option key={provider.id} value={provider.id}>
+                          <option key={provider.id} value={provider.providerId}>
                             {provider.providerName} {provider.isPrimary ? '(Primary)' : ''}
                           </option>
                         ))}
