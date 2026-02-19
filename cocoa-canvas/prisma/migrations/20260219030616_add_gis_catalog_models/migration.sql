@@ -890,9 +890,6 @@ CREATE INDEX "ContactLog_outcome_idx" ON "ContactLog"("outcome");
 CREATE INDEX "ContactLog_createdAt_idx" ON "ContactLog"("createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Setting_key_key" ON "Setting"("key");
-
--- CreateIndex
 CREATE UNIQUE INDEX "election_types_name_key" ON "election_types"("name");
 
 -- CreateIndex

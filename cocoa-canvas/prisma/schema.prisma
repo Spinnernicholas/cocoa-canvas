@@ -31,6 +31,7 @@ model User {
   jobsCreated   Job[]
   scheduledJobs ScheduledJob[]
   gisDatasets   GISDataset[]  // Datasets created by this user
+  remoteDatasets RemoteGISDataset[] // Remote datasets discovered by this user
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -942,6 +943,9 @@ model GISDataset {
   precinctDataset     PrecinctDataset?
   demographicDataset  DemographicDataset?
   
+  // Back-reference for remote datasets that were imported into this catalog dataset
+  sourceRemoteDataset RemoteGISDataset?
+  
   // Relations to app models (optional tracking)
   parcelsSourced      Parcel[] @relation("ParcelsSourcingDataset")      // Parcels that came from this dataset
   precinctsSourced    Precinct[] @relation("PrecinctsSourcingDataset")  // Precincts that came from this dataset
@@ -1058,6 +1062,58 @@ model DemographicDataset {
   updatedAt       DateTime    @updatedAt
   
   @@map("demographic_datasets")
+}
+
+/// Remote GIS datasets - references to external ArcGIS services
+/// These can be discovered through the map explorer and imported into the catalog
+model RemoteGISDataset {
+  id              String        @id @default(cuid())
+  
+  // Remote service reference
+  serviceUrl      String        // e.g., "https://gis.cccounty.us/arcgis/rest/services/CCMAP/Assessment_Parcels_ArcPro/MapServer"
+  layerId         Int           // Layer ID within the service (e.g., 0)
+  
+  // Layer metadata from service
+  layerName       String        // Name from service (e.g., "Assessment Parcels")
+  layerType       String?       // "Feature Layer", "Raster Layer", "Table", etc.
+  geometryType    String?       // "esriGeometryPoint", "esriGeometryPolyline", "esriGeometryPolygon"
+  
+  // Service metadata
+  serviceType     String?       // "MapServer", "FeatureServer", "TileServer", etc.
+  serviceTitle    String?       // Title of the parent service
+  
+  // Layer description and fields
+  layerDescription String?      @db.Text
+  fields          Json?         // Array of field definitions from service
+  
+  // Spatial reference
+  spatialReference Json?        // WKID or WKT from service
+  srid            Int?          // Derived SRID (e.g., 4326 for WGS84)
+  
+  // Extent information
+  extent          Json?         // {xmin, ymin, xmax, ymax} from service
+  
+  // Caching and metadata
+  fetchedAt       DateTime      @default(now())
+  lastValidatedAt DateTime?     // When we last verified the service was accessible
+  isAccessible    Boolean       @default(true)
+  
+  // Parent dataset link (if imported into catalog)
+  importedDatasetId String?     @unique
+  importedDataset     GISDataset? @relation(fields: [importedDatasetId], references: [id], onDelete: SetNull)
+  
+  // Tracking
+  discoveredBy    String?       // How it was discovered (e.g., "map_explorer", "manual")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+  createdBy       User?         @relation(fields: [createdById], references: [id])
+  
+  @@unique([serviceUrl, layerId])
+  @@index([importedDatasetId])
+  @@index([isAccessible])
+  @@index([createdAt])
+  @@map("remote_gis_datasets")
 }
 
 /// Contest within an election (office, ballot measure, etc.)

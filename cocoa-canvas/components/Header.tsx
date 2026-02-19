@@ -82,6 +82,12 @@ export default function Header({ userName }: HeaderProps) {
             >
               ⚙️ Admin
             </Link>
+            <Link
+              href="/gis/explorer"
+              className="px-3 py-2 text-sm font-medium text-cocoa-700 dark:text-cocoa-300 hover:text-cocoa-900 dark:hover:text-cinnamon-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded-lg transition-colors"
+            >
+              🔍 Explore
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">
