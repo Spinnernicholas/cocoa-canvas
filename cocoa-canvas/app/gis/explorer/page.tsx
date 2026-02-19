@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { ImportToCatalogDialog } from '@/components/ImportToCatalogDialog';
 
 interface LayerTreeNode {
   id: string;
@@ -131,12 +132,36 @@ export default function MapExplorer() {
   const [loading, setLoading] = useState(false);
   const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
   const [selectedNode, setSelectedNode] = useState<LayerTreeNode | null>(null);
+  const [selectedServiceUrl, setSelectedServiceUrl] = useState<string | null>(null);
   const [layerDetails, setLayerDetails] = useState<LayerDetailsResponse | null>(
     null
   );
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [datasetTypes, setDatasetTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Fetch dataset types on component mount
+  useEffect(() => {
+    const fetchDatasetTypes = async () => {
+      try {
+        const response = await fetch('/api/v1/gis/dataset-types');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            setDatasetTypes(data.data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch dataset types:', err);
+      }
+    };
+
+    fetchDatasetTypes();
+  }, []);
 
   const handleExploreMap = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,14 +261,15 @@ export default function MapExplorer() {
     try {
       // If it's a root layer with URL, fetch details
       if (node.id && mapConfig?.operationalLayers) {
-        const layer = mapConfig.operationalLayers.find(
-          (l) => l.title === node.name || l.id === node.id
+        const service = mapConfig.operationalLayers.find(
+          (l) => l._hierarchy?.some((h) => h.id === node.id || h.children?.some((c) => findNodeById(c, node.id)))
         );
 
-        if (layer) {
+        if (service) {
+          setSelectedServiceUrl(service._serviceUrl);
           const response = await fetch(
             `/api/v1/gis/layer-details?url=${encodeURIComponent(
-              layer.url
+              service._serviceUrl
             )}&layerId=${node.id}`
           );
           const data: LayerDetailsResponse = await response.json();
@@ -258,6 +284,113 @@ export default function MapExplorer() {
       });
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const findNodeById = (node: LayerTreeNode, id: string): boolean => {
+    if (node.id === id) return true;
+    if (node.children) {
+      return node.children.some((child) => findNodeById(child, id));
+    }
+    return false;
+  };
+
+  const handleOpenImportDialog = async () => {
+    if (!selectedNode || !selectedServiceUrl) return;
+
+    // First, save this layer as a remote dataset if not already done
+    try {
+      const response = await fetch('/api/v1/gis/remote-datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceUrl: selectedServiceUrl,
+          layerId: parseInt(selectedNode.id),
+          layerName: selectedNode.name,
+          layerType: selectedNode.type,
+          geometryType: selectedNode.geometryType,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setImportDialogOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save remote dataset:', err);
+      alert('Failed to prepare layer for import');
+    }
+  };
+
+  const handleImportToCatalog = async (
+    formData: any
+  ) => {
+    if (!selectedNode || !selectedServiceUrl) return;
+
+    setImportLoading(true);
+    try {
+      // First save the remote dataset
+      const remoteDatasetResponse = await fetch('/api/v1/gis/remote-datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceUrl: selectedServiceUrl,
+          layerId: parseInt(selectedNode.id),
+          layerName: selectedNode.name,
+          layerType: selectedNode.type,
+          geometryType: selectedNode.geometryType,
+        }),
+      });
+
+      if (!remoteDatasetResponse.ok) {
+        throw new Error('Failed to save remote dataset');
+      }
+
+      const remoteDatasetData = await remoteDatasetResponse.json();
+      if (!remoteDatasetData.success) {
+        throw new Error(remoteDatasetData.error || 'Failed to save remote dataset');
+      }
+
+      const remoteDatasetId = remoteDatasetData.data?.id;
+      if (!remoteDatasetId) {
+        throw new Error('No remote dataset ID received');
+      }
+
+      // Now import to catalog
+      const importResponse = await fetch('/api/v1/gis/remote-datasets/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          remoteDatasetId,
+          catalogName: formData.catalogName,
+          catalogDescription: formData.catalogDescription,
+          datasetTypeId: formData.datasetTypeId,
+          tags: formData.tags,
+          category: formData.category,
+          isPublic: formData.isPublic,
+        }),
+      });
+
+      if (!importResponse.ok) {
+        throw new Error('Failed to import to catalog');
+      }
+
+      const importData = await importResponse.json();
+      if (!importData.success) {
+        throw new Error(importData.error || 'Failed to import to catalog');
+      }
+
+      setImportSuccess(`Successfully imported "${formData.catalogName}" to catalog!`);
+      setImportDialogOpen(false);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setImportSuccess(null), 3000);
+    } catch (err) {
+      throw err;
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -434,11 +567,33 @@ export default function MapExplorer() {
                     onClick={() => {
                       setSelectedNode(null);
                       setLayerDetails(null);
+                      setSelectedServiceUrl(null);
                     }}
                     className="text-cocoa-500 dark:text-cocoa-400 hover:text-cocoa-700 dark:hover:text-cocoa-300"
                   >
                     ✕
                   </button>
+                </div>
+
+                {/* Success Message */}
+                {importSuccess && (
+                  <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded p-4 mb-4 text-green-800 dark:text-green-100">
+                    {importSuccess}
+                  </div>
+                )}
+
+                {/* Import Button */}
+                <div className="mb-6">
+                  <button
+                    onClick={handleOpenImportDialog}
+                    disabled={!selectedNode}
+                    className="px-4 py-2 rounded bg-cinnamon-600 dark:bg-cinnamon-700 text-white hover:bg-cinnamon-700 dark:hover:bg-cinnamon-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                  >
+                    ➕ Add to Catalog
+                  </button>
+                  <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-2">
+                    Import this layer as a remote GIS dataset to your catalog
+                  </p>
                 </div>
 
                 {detailsLoading ? (
@@ -609,6 +764,20 @@ export default function MapExplorer() {
           </p>
         </div>
       </div>
+
+      {/* Import to Catalog Dialog */}
+      {selectedNode && (
+        <ImportToCatalogDialog
+          isOpen={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          onImport={handleImportToCatalog}
+          layerName={selectedNode.name}
+          serviceUrl={selectedServiceUrl || ''}
+          layerId={parseInt(selectedNode.id)}
+          datasetTypes={datasetTypes}
+          isLoading={importLoading}
+        />
+      )}
     </div>
   );
 }
