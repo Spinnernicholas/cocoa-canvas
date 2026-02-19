@@ -94,6 +94,7 @@ export default function CampaignMapPage() {
         params.append('bounds', JSON.stringify(mapBounds));
         if (city) params.append('city', city);
         if (zipCode) params.append('zipCode', zipCode);
+        params.append('geocoded', 'true');
         if (votersOnly) params.append('votersOnly', 'true');
         if (volunteersOnly) params.append('volunteersOnly', 'true');
         params.append('limit', '1000');
