@@ -62,7 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Exact/partial filters
     if (city) where.city = { contains: city, mode: 'insensitive' };
     if (state) where.state = { contains: state, mode: 'insensitive' };
-    if (zipCode) where.zipCode = zipCode;
+    if (zipCode) where.zipCode = { contains: zipCode };
 
     // Geocoding status filter
     if (geocodedStr !== null) {

@@ -37,6 +37,7 @@ export default function HouseholdsPage() {
   const [user, setUser] = useState<any>(null);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -110,6 +111,7 @@ export default function HouseholdsPage() {
         setError(err instanceof Error ? err.message : 'Failed to fetch households');
       } finally {
         setLoading(false);
+        setInitialLoadComplete(true);
       }
     };
 
@@ -128,7 +130,7 @@ export default function HouseholdsPage() {
 
 
 
-  if (loading && households.length === 0) {
+  if (loading && !initialLoadComplete) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream-50 dark:bg-cocoa-900">
         <div className="text-center">
