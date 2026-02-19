@@ -62,6 +62,22 @@ export async function processGeocodeJob(
     await startJob(jobId);
     console.log(`[Geocode Job] Started processing job ${jobId}`);
 
+    // Look up provider name if a specific provider ID was specified
+    let providerDisplayName = 'auto';
+    if (data.providerId) {
+      try {
+        const provider = await prisma.geocoderProvider.findUnique({
+          where: { id: data.providerId },
+          select: { providerName: true, providerId: true },
+        });
+        if (provider) {
+          providerDisplayName = provider.providerName;
+        }
+      } catch (err) {
+        console.warn(`[Geocode Job] Could not look up provider ${data.providerId}:`, err);
+      }
+    }
+
     // Build query filters
     const where: Prisma.HouseholdWhereInput = {};
 
@@ -105,7 +121,7 @@ export async function processGeocodeJob(
       householdsFailed: 0,
       householdsSkipped: 0,
       percentComplete: 0,
-      geocodingProvider: data.providerId || 'auto',
+      geocodingProvider: providerDisplayName,
     });
 
     // Geocoding service is already loaded at top level
@@ -223,7 +239,7 @@ export async function processGeocodeJob(
             householdsFailed: failureCount,
             householdsSkipped: skipCount,
             percentComplete,
-            geocodingProvider: data.providerId || Array.from(providersUsed).join(', ') || 'auto',
+            geocodingProvider: providersUsed.size > 0 ? Array.from(providersUsed).join(', ') : providerDisplayName,
             geocodingErrors: errorLogs.length,
           });
           // Log errors separately
@@ -256,7 +272,7 @@ export async function processGeocodeJob(
       householdsSkipped: skipCount,
       geocodingErrors: errorLogs.length,
       percentComplete: 100,
-      geocodingProvider: data.providerId || Array.from(providersUsed).join(', ') || 'auto',
+      geocodingProvider: providersUsed.size > 0 ? Array.from(providersUsed).join(', ') : providerDisplayName,
     };
     
     // Update final output stats

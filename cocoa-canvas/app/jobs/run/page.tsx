@@ -27,6 +27,8 @@ export default function RunJobPage() {
   const [hasProviders, setHasProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [providers, setProviders] = useState<Array<{ id: string; providerId: string; providerName: string; isPrimary: boolean }>>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('auto');
 
   // Geocoding filters
   const [geocodeFilters, setGeocodeFilters] = useState<GeocodeFilters>({
@@ -62,6 +64,15 @@ export default function RunJobPage() {
             const data = await response.json();
             const enabledProviders = (data.providers || []).filter((p: any) => p.isEnabled);
             setHasProviders(enabledProviders.length > 0);
+            setProviders(enabledProviders);
+            
+            // Auto-select the primary provider by default
+            const primaryProvider = enabledProviders.find((p: any) => p.isPrimary);
+            if (primaryProvider) {
+              setSelectedProviderId(primaryProvider.id);
+            } else if (enabledProviders.length > 0) {
+              setSelectedProviderId(enabledProviders[0].id);
+            }
           }
         } catch (err) {
           console.error('Error fetching providers:', err);
@@ -102,6 +113,7 @@ export default function RunJobPage() {
           filters,
           skipGeocoded: geocodeFilters.skipGeocoded,
           limit: geocodeFilters.limit,
+          providerId: selectedProviderId === 'auto' ? undefined : selectedProviderId,
         }),
       });
 
@@ -312,6 +324,29 @@ export default function RunJobPage() {
                       />
                       <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
                         Default: 10,000
+                      </p>
+                    </div>
+
+                    {/* Geocoding Provider Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
+                        Geocoding Provider
+                      </label>
+                      <select
+                        value={selectedProviderId}
+                        onChange={(e) => setSelectedProviderId(e.target.value)}
+                        disabled={loading || providersLoading || providers.length === 0}
+                        className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 focus:outline-none focus:ring-2 focus:ring-cinnamon-500 disabled:opacity-50"
+                      >
+                        <option value="auto">Auto (use primary provider)</option>
+                        {providers.map((provider) => (
+                          <option key={provider.id} value={provider.id}>
+                            {provider.providerName} {provider.isPrimary ? '(Primary)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
+                        Select which geocoding provider to use for this job
                       </p>
                     </div>
 
