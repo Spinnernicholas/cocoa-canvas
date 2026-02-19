@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
+import PeopleImportModal from '@/components/PeopleImportModal';
 import Link from 'next/link';
 
-type JobType = 'geocoding';
+type JobType = 'geocoding' | 'people_import';
 
 interface GeocodeFilters {
   city?: string;
@@ -25,6 +26,7 @@ export default function RunJobPage() {
   const [success, setSuccess] = useState('');
   const [hasProviders, setHasProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(true);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Geocoding filters
   const [geocodeFilters, setGeocodeFilters] = useState<GeocodeFilters>({
@@ -175,6 +177,23 @@ export default function RunJobPage() {
                   <div className="font-medium">Geocoding</div>
                   <div className="text-xs mt-1 opacity-75">
                     Geocode household addresses
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedJob('people_import');
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                    selectedJob === 'people_import'
+                      ? 'bg-cinnamon-500 text-cream-50'
+                      : 'bg-cocoa-200 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 hover:bg-cocoa-300 dark:hover:bg-cocoa-600'
+                  }`}
+                >
+                  <div className="font-medium">Import People</div>
+                  <div className="text-xs mt-1 opacity-75">
+                    Upload voter files and create people
                   </div>
                 </button>
 
@@ -350,12 +369,40 @@ export default function RunJobPage() {
                   </div>
                 </div>
               )}
+              {selectedJob === 'people_import' && (
+                <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow p-6">
+                  <h3 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50 mb-4">
+                    People Import
+                  </h3>
+                  <p className="text-sm text-cocoa-600 dark:text-cocoa-300 mb-6">
+                    Upload voter files and import people into the system. The import wizard lets you choose the file format and import type.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowImportModal(true)}
+                      className="flex-1 px-6 py-3 bg-cinnamon-500 hover:bg-cinnamon-600 text-cream-50 font-medium rounded-lg transition-colors"
+                    >
+                      Open Import Wizard
+                    </button>
+                    <button
+                      onClick={() => setSelectedJob(null)}
+                      className="px-6 py-3 bg-cocoa-200 dark:bg-cocoa-700 hover:bg-cocoa-300 dark:hover:bg-cocoa-600 text-cocoa-900 dark:text-cream-50 font-medium rounded-lg transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </main>
 
       <Marshmallow />
+      <PeopleImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </div>
   );
 }
