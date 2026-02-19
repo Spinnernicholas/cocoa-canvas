@@ -8,7 +8,8 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { startJob, updateJobProgress, completeJob, failJob, addJobError } from '@/lib/queue/runner';
+import { startJob, updateJobProgress, updateJobOutputStats, completeJob, failJob, addJobError } from '@/lib/queue/runner';
+import { OutputStats } from '@/lib/queue/types';
 import { geocodingService } from '../geocoding';
 
 /**
@@ -96,8 +97,16 @@ export async function processGeocodeJob(
       `[Geocode Job] Found ${totalHouseholds} households, processing ${householdCount}`
     );
 
-    // Update job with total items
-    await updateJobProgress(jobId, 0, householdCount);
+    // Update job with total items and initial stats
+    await updateJobProgress(jobId, 0, householdCount, {
+      type: 'geocode',
+      householdsProcessed: 0,
+      householdsGeocoded: 0,
+      householdsFailed: 0,
+      householdsSkipped: 0,
+      percentComplete: 0,
+      geocodingProvider: data.providerId || 'auto',
+    });
 
     // Geocoding service is already loaded at top level
     // Process each household in the batch
@@ -105,7 +114,10 @@ export async function processGeocodeJob(
     let processedCount = 0;
     let successCount = 0;
     let failureCount = 0;
+    let skipCount = 0;
+    let alreadyGeocodedCount = 0;
     const errorLogs: GeocodeErrorLog[] = [];
+    const providersUsed = new Set<string>();
 
     for (let offset = 0; offset < householdCount; offset += batchSize) {
       const batch = await prisma.household.findMany({
@@ -137,6 +149,7 @@ export async function processGeocodeJob(
           const addressString = addressParts.join(' ') || household.fullAddress || '';
 
           if (!addressString.trim()) {
+            skipCount++;
             throw new Error('No address available to geocode');
           }
 
@@ -157,6 +170,9 @@ export async function processGeocodeJob(
 
           if (result) {
             // Update household with coordinates and provider info
+            const provider = result.source || data.providerId || 'unknown';
+            providersUsed.add(provider);
+            
             await prisma.household.update({
               where: { id: household.id },
               data: {
@@ -164,7 +180,7 @@ export async function processGeocodeJob(
                 longitude: result.longitude,
                 geocoded: true,
                 geocodedAt: new Date(),
-                geocodingProvider: result.source || data.providerId || 'unknown',
+                geocodingProvider: provider,
               },
             });
             successCount++;
@@ -195,7 +211,21 @@ export async function processGeocodeJob(
 
         // Update progress every 50 households
         if (processedCount % 50 === 0) {
-          await updateJobProgress(jobId, processedCount);
+          const percentComplete = Math.min(
+            Math.round((processedCount / householdCount) * 100),
+            99
+          );
+          
+          await updateJobProgress(jobId, processedCount, householdCount, {
+            type: 'geocode',
+            householdsProcessed: processedCount,
+            householdsGeocoded: successCount,
+            householdsFailed: failureCount,
+            householdsSkipped: skipCount,
+            percentComplete,
+            geocodingProvider: data.providerId || Array.from(providersUsed).join(', ') || 'auto',
+            geocodingErrors: errorLogs.length,
+          });
           // Log errors separately
           if (errorLogs.length > 0) {
             const recentErrors = errorLogs.slice(-10);
@@ -217,15 +247,32 @@ export async function processGeocodeJob(
       }
     }
 
-    // Complete the job with final stats
+    // Calculate final statistics
+    const finalOutputStats: Partial<OutputStats> = {
+      type: 'geocode',
+      householdsProcessed: processedCount,
+      householdsGeocoded: successCount,
+      householdsFailed: failureCount,
+      householdsSkipped: skipCount,
+      geocodingErrors: errorLogs.length,
+      percentComplete: 100,
+      geocodingProvider: data.providerId || Array.from(providersUsed).join(', ') || 'auto',
+    };
+    
+    // Update final output stats
+    await updateJobOutputStats(jobId, finalOutputStats);
+    
+    // Complete the job with final stats in data field
     await completeJob(jobId, {
       processedCount,
       successCount,
       failureCount,
+      skipCount,
+      providersUsed: Array.from(providersUsed),
     });
 
     console.log(
-      `[Geocode Job] Completed job ${jobId}: ${successCount} success, ${failureCount} failed`
+      `[Geocode Job] Completed job ${jobId}: ${successCount} geocoded, ${failureCount} failed, ${skipCount} skipped`
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

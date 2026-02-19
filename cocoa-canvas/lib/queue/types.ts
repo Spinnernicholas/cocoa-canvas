@@ -25,8 +25,12 @@ export interface OutputStats {
   
   // Geocode specific
   householdsProcessed?: number;
-  householdsGeocoded?: number;
-  householdsFailed?: number;
+  householdsGeocoded?: number; // Successfully geocoded
+  householdsFailed?: number; // Failed to geocode
+  householdsSkipped?: number; // Skipped (already geocoded or no address)
+  householdsAlreadyGeocoded?: number; // Were already geocoded before job
+  geocodingProvider?: string; // Primary provider used
+  geocodingErrors?: number; // Total errors encountered
   
   // File-based progress
   fileSize?: number; // Total file size in bytes
@@ -59,10 +63,16 @@ export function formatOutputStats(stats: OutputStats | null): string {
     }
   } else if (stats.type === 'geocode') {
     if (stats.householdsProcessed !== undefined) {
-      parts.push(`${stats.householdsProcessed} households processed`);
+      parts.push(`${stats.householdsProcessed} processed`);
     }
     if (stats.householdsGeocoded !== undefined) {
       parts.push(`${stats.householdsGeocoded} geocoded`);
+    }
+    if (stats.householdsFailed !== undefined && stats.householdsFailed > 0) {
+      parts.push(`${stats.householdsFailed} failed`);
+    }
+    if (stats.householdsSkipped !== undefined && stats.householdsSkipped > 0) {
+      parts.push(`${stats.householdsSkipped} skipped`);
     }
   }
   

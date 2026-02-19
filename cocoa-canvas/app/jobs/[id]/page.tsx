@@ -314,14 +314,32 @@ export default function JobDetailPage() {
                   )}
                   {job.outputStats.householdsProcessed !== undefined && (
                     <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg">
-                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Households</p>
+                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Households Processed</p>
                       <p className="mt-2 text-2xl font-bold text-indigo-800 dark:text-indigo-300">{job.outputStats.householdsProcessed.toLocaleString()}</p>
                     </div>
                   )}
                   {job.outputStats.householdsGeocoded !== undefined && (
+                    <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">Successfully Geocoded</p>
+                      <p className="mt-2 text-2xl font-bold text-green-800 dark:text-green-300">{job.outputStats.householdsGeocoded.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.householdsFailed !== undefined && job.outputStats.householdsFailed > 0 && (
+                    <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide">Failed</p>
+                      <p className="mt-2 text-2xl font-bold text-red-800 dark:text-red-300">{job.outputStats.householdsFailed.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.householdsSkipped !== undefined && job.outputStats.householdsSkipped > 0 && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide">Skipped</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-800 dark:text-yellow-300">{job.outputStats.householdsSkipped.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {job.outputStats.geocodingProvider && (
                     <div className="bg-teal-50 dark:bg-teal-900/30 p-4 rounded-lg">
-                      <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wide">Geocoded</p>
-                      <p className="mt-2 text-2xl font-bold text-teal-800 dark:text-teal-300">{job.outputStats.householdsGeocoded.toLocaleString()}</p>
+                      <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wide">Provider</p>
+                      <p className="mt-2 text-lg font-bold text-teal-800 dark:text-teal-300">{job.outputStats.geocodingProvider}</p>
                     </div>
                   )}
                   {job.outputStats.linesProcessed !== undefined && (
@@ -334,6 +352,85 @@ export default function JobDetailPage() {
                     <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg">
                       <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-400 uppercase tracking-wide">Header Row</p>
                       <p className="mt-2 text-2xl font-bold text-cyan-800 dark:text-cyan-300">{job.outputStats.headerDetected ? '✓ Detected' : '✗ Not Found'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Geocode Job Details */}
+            {job.type === 'geocode_households' && job.data && (
+              <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
+                <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Geocoding Details</h3>
+                <div className="space-y-6">
+                  {/* Filter Information */}
+                  {job.data.filters && Object.keys(job.data.filters).some(key => job.data.filters[key]) && (
+                    <div className="border-b border-cocoa-200 dark:border-cocoa-700 pb-4">
+                      <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">Filters Applied</h4>
+                      <dl className="space-y-3">
+                        {job.data.filters.city && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">City</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.filters.city}</dd>
+                          </div>
+                        )}
+                        {job.data.filters.state && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">State</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.filters.state}</dd>
+                          </div>
+                        )}
+                        {job.data.filters.zipCode && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">ZIP Code</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.filters.zipCode}</dd>
+                          </div>
+                        )}
+                        {job.data.filters.county && (
+                          <div>
+                            <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">County</dt>
+                            <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.filters.county}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                  )}
+                  
+                  {/* Settings */}
+                  <div className="border-b border-cocoa-200 dark:border-cocoa-700 pb-4">
+                    <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">Settings</h4>
+                    <dl className="space-y-3">
+                      {job.data.limit !== undefined && (
+                        <div>
+                          <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Limit</dt>
+                          <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.limit.toLocaleString()} households</dd>
+                        </div>
+                      )}
+                      {job.data.skipGeocoded !== undefined && (
+                        <div>
+                          <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Skip Already Geocoded</dt>
+                          <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.skipGeocoded ? 'Yes' : 'No'}</dd>
+                        </div>
+                      )}
+                      {job.data.providerId && (
+                        <div>
+                          <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Provider</dt>
+                          <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.data.providerId}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                  
+                  {/* User Information */}
+                  {job.createdBy && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-cocoa-700 dark:text-cocoa-300 mb-3">User Information</h4>
+                      <dl>
+                        <div>
+                          <dt className="text-sm font-medium text-cocoa-600 dark:text-cocoa-400">Started By</dt>
+                          <dd className="mt-1 text-sm text-cocoa-900 dark:text-cream-50">{job.createdBy.name} ({job.createdBy.email})</dd>
+                        </div>
+                      </dl>
                     </div>
                   )}
                 </div>
@@ -449,6 +546,29 @@ export default function JobDetailPage() {
                 )}
                 {job.type === 'voter_import' && !job.outputStats && (
                   <p>Your voter import has been completed. The voters have been added to the system.</p>
+                )}
+                {job.type === 'geocode_households' && job.outputStats && (
+                  <div className="space-y-2">
+                    <p>Your geocoding job has been completed successfully.</p>
+                    {job.outputStats.householdsGeocoded !== undefined && (
+                      <p className="font-medium">
+                        • {job.outputStats.householdsGeocoded.toLocaleString()} household(s) geocoded
+                      </p>
+                    )}
+                    {job.outputStats.householdsFailed !== undefined && job.outputStats.householdsFailed > 0 && (
+                      <p className="font-medium opacity-75">
+                        • {job.outputStats.householdsFailed.toLocaleString()} household(s) failed
+                      </p>
+                    )}
+                    {job.outputStats.householdsSkipped !== undefined && job.outputStats.householdsSkipped > 0 && (
+                      <p className="font-medium opacity-75">
+                        • {job.outputStats.householdsSkipped.toLocaleString()} household(s) skipped
+                      </p>
+                    )}
+                  </div>
+                )}
+                {job.type === 'geocode_households' && !job.outputStats && (
+                  <p>Your geocoding job has been completed. Households have been geocoded.</p>
                 )}
               </div>
             )}
