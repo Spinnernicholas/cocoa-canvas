@@ -126,42 +126,47 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
       // Build WHERE clause based on match tolerance
       const conditions: string[] = [];
       const isFuzzy = this.config.matchTolerance === 'fuzzy';
+      const safeTable = this.sanitizeIdentifier(tableName);
+      const safeAddrField = this.sanitizeIdentifier(this.config.addressField);
+      const safeCityField = this.config.cityField ? this.sanitizeIdentifier(this.config.cityField) : null;
+      const safeStateField = this.config.stateField ? this.sanitizeIdentifier(this.config.stateField) : null;
+      const safeZipField = this.config.zipCodeField ? this.sanitizeIdentifier(this.config.zipCodeField) : null;
 
       // Address matching
       if (isFuzzy) {
         conditions.push(
-          `LOWER("${this.config.addressField}") LIKE LOWER('%${this.sanitizeInput(request.address)}%')`
+          `LOWER("${safeAddrField}") LIKE LOWER('%${this.sanitizeInput(request.address)}%')`
         );
       } else {
         conditions.push(
-          `LOWER("${this.config.addressField}") = LOWER('${this.sanitizeInput(request.address)}')`
+          `LOWER("${safeAddrField}") = LOWER('${this.sanitizeInput(request.address)}')`
         );
       }
 
       // City matching
-      if (this.config.cityField && request.city) {
+      if (safeCityField && request.city) {
         if (isFuzzy) {
           conditions.push(
-            `LOWER("${this.config.cityField}") LIKE LOWER('%${this.sanitizeInput(request.city)}%')`
+            `LOWER("${safeCityField}") LIKE LOWER('%${this.sanitizeInput(request.city)}%')`
           );
         } else {
           conditions.push(
-            `LOWER("${this.config.cityField}") = LOWER('${this.sanitizeInput(request.city)}')`
+            `LOWER("${safeCityField}") = LOWER('${this.sanitizeInput(request.city)}')`
           );
         }
       }
 
       // State matching
-      if (this.config.stateField && request.state) {
+      if (safeStateField && request.state) {
         conditions.push(
-          `LOWER("${this.config.stateField}") = LOWER('${this.sanitizeInput(request.state)}')`
+          `LOWER("${safeStateField}") = LOWER('${this.sanitizeInput(request.state)}')`
         );
       }
 
       // Zip code matching
-      if (this.config.zipCodeField && request.zipCode) {
+      if (safeZipField && request.zipCode) {
         conditions.push(
-          `"${this.config.zipCodeField}" = '${this.sanitizeInput(request.zipCode)}'`
+          `"${safeZipField}" = '${this.sanitizeInput(request.zipCode)}'`
         );
       }
 
@@ -170,13 +175,13 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
       // Query the table (limit 1 for best match)
       const query = `
         SELECT 
-          "${this.config.addressField}" as address,
-          ${this.config.cityField ? `"${this.config.cityField}" as city,` : ''}
-          ${this.config.stateField ? `"${this.config.stateField}" as state,` : ''}
-          ${this.config.zipCodeField ? `"${this.config.zipCodeField}" as zip,` : ''}
+          "${safeAddrField}" as address,
+          ${safeCityField ? `"${safeCityField}" as city,` : ''}
+          ${safeStateField ? `"${safeStateField}" as state,` : ''}
+          ${safeZipField ? `"${safeZipField}" as zip,` : ''}
           ST_Y(geom) as latitude,
           ST_X(geom) as longitude
-        FROM ${tableName}
+        FROM "${safeTable}"
         WHERE ${whereClause}
         LIMIT 1
       `;
@@ -364,6 +369,14 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
    */
   private sanitizeInput(input: string): string {
     return input.replace(/'/g, "''").trim();
+  }
+
+  /**
+   * Sanitize a SQL identifier (table/column name) by removing double-quote characters
+   * to prevent injection via identifier context.
+   */
+  private sanitizeIdentifier(name: string): string {
+    return name.replace(/"/g, '');
   }
 
   getCustomProperties(): CustomProperty[] {
