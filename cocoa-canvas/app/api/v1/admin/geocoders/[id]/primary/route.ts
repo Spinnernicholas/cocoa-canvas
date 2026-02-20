@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await validateProtectedRoute(request);
   if (!authResult.isValid) {
@@ -14,7 +14,7 @@ export async function POST(
   }
 
   try {
-    const providerId = (await params).id ?? params.id;
+    const { id: providerId } = await params;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({

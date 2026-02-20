@@ -69,7 +69,6 @@ export async function GET(
         city: household.city,
         state: household.state,
         zipCode: household.zipCode,
-        county: household.county || undefined,
         fullAddress: household.fullAddress,
         latitude: household.latitude,
         longitude: household.longitude,

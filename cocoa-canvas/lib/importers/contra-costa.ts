@@ -218,8 +218,8 @@ export async function importContraCostaFile(
     const stream = createReadStream(filePath);
     
     // Track bytes read from stream
-    stream.on('data', (chunk: Buffer) => {
-      bytesProcessed += chunk.length;
+    stream.on('data', (chunk: string | Buffer) => {
+      bytesProcessed += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
     });
     
     // Detect header on first data event
@@ -436,18 +436,20 @@ async function processVoterRecord(
   if (resAddress) {
     // Create household and link person to it
     try {
-      await ensureHouseholdForPerson(person.id, {
-        houseNumber: resAddress.houseNumber,
-        preDirection: resAddress.preDirection,
-        streetName: resAddress.streetName,
-        streetSuffix: resAddress.streetSuffix,
-        postDirection: resAddress.postDirection,
-        unitAbbr: resAddress.unitAbbr,
-        unitNumber: resAddress.unitNumber,
-        city: resAddress.city,
-        state: resAddress.state,
-        zipCode: resAddress.zipCode,
-      });
+      if (resAddress.city && resAddress.zipCode) {
+        await ensureHouseholdForPerson(person.id, {
+          houseNumber: resAddress.houseNumber,
+          preDirection: resAddress.preDirection ?? undefined,
+          streetName: resAddress.streetName,
+          streetSuffix: resAddress.streetSuffix ?? undefined,
+          postDirection: resAddress.postDirection ?? undefined,
+          unitAbbr: resAddress.unitAbbr ?? undefined,
+          unitNumber: resAddress.unitNumber ?? undefined,
+          city: resAddress.city,
+          state: resAddress.state ?? undefined,
+          zipCode: resAddress.zipCode,
+        });
+      }
     } catch (householdError) {
       console.warn(`Could not create household for ${resAddress.fullAddress}: ${householdError}`);
       // Continue - household creation is not critical for the import
@@ -513,7 +515,8 @@ async function processVoterRecord(
   
   // Step 10: Import vote history (5 most recent elections)
   for (let i = 1; i <= 5; i++) {
-    const electionDate = parseDate(record[`ElectionDate_${i}` as keyof ContraCostaVoterRecord]);
+    const electionDateRaw = record[`ElectionDate_${i}` as keyof ContraCostaVoterRecord] || '';
+    const electionDate = parseDate(electionDateRaw);
     if (electionDate) {
       const electionAbbr = normalize(record[`ElectionAbbr_${i}` as keyof ContraCostaVoterRecord]) || 'UNKNOWN';
       

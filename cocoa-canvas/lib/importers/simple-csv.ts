@@ -86,8 +86,8 @@ export class SimpleCsvImporter implements VoterImporter {
       const stream = createReadStream(filePath);
       
       // Track bytes read from stream
-      stream.on('data', (chunk: Buffer) => {
-        bytesProcessed += chunk.length;
+      stream.on('data', (chunk: string | Buffer) => {
+        bytesProcessed += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
       });
       
       stream.pipe(parser);

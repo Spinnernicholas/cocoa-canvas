@@ -295,7 +295,7 @@ export async function startWorkers() {
             throw new Error(`No database job record found for ${job.id}`);
           }
 
-          await processGeocodeJob(dbJob.id, job.data, dbJob.createdById);
+          await processGeocodeJob(dbJob.id, job.data, dbJob.createdById ?? undefined);
 
           return { success: true, jobId: job.id };
         } catch (error) {

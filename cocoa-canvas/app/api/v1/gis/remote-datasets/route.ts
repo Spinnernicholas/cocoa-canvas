@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
         data: {
           lastValidatedAt: new Date(),
           isAccessible: true,
-          fields: body.fields || remoteDataset.fields,
-          extent: body.extent || remoteDataset.extent,
+          fields: body.fields !== undefined ? body.fields : undefined,
+          extent: body.extent !== undefined ? body.extent : undefined,
         },
       });
     }

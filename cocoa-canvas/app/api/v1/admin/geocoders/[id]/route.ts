@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await validateProtectedRoute(request);
   if (!authResult.isValid) {
@@ -15,7 +15,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const providerId = (await params).id ?? params.id;
+    const { id: providerId } = await params;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({
@@ -56,7 +56,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await validateProtectedRoute(request);
   if (!authResult.isValid) {
@@ -64,7 +64,7 @@ export async function DELETE(
   }
 
   try {
-    const providerId = (await params).id ?? params.id;
+    const { id: providerId } = await params;
 
     // Check if provider exists
     const provider = await prisma.geocoderProvider.findUnique({

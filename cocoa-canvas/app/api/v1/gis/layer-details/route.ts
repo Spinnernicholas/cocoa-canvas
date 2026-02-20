@@ -39,6 +39,11 @@ interface ServiceInfo {
       wkid: number;
     };
   };
+  error?: {
+    message?: string;
+    code?: number;
+    details?: string[];
+  };
 }
 
 /**

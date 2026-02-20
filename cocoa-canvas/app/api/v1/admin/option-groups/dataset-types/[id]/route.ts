@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 // PUT /api/v1/admin/option-groups/dataset-types/[id] - Update dataset type
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authResult = await validateProtectedRoute(request);
     if (!authResult.isValid || !authResult.user) {
@@ -20,8 +20,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
+    const { id } = await params;
+
     const datasetType = await prisma.datasetType.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description: description || null,
@@ -40,18 +42,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/v1/admin/option-groups/dataset-types/[id] - Delete dataset type
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authResult = await validateProtectedRoute(request);
     if (!authResult.isValid || !authResult.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     await prisma.datasetType.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
-    await auditLog(authResult.user.userId, 'DATASET_TYPE_DELETE', request, 'dataset_type', params.id);
+    await auditLog(authResult.user.userId, 'DATASET_TYPE_DELETE', request, 'dataset_type', id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

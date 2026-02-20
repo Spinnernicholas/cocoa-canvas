@@ -33,12 +33,12 @@ export class CatalogGeocoderProvider implements GeocoderProvider {
 
   constructor(config: CatalogGeocoderConfig) {
     this.config = {
-      addressField: 'address',
-      cityField: 'city',
-      stateField: 'state',
-      zipCodeField: 'zipcode',
-      matchTolerance: 'fuzzy',
-      ...config,
+      datasetId: config.datasetId,
+      addressField: config.addressField,
+      cityField: config.cityField ?? 'city',
+      stateField: config.stateField ?? 'state',
+      zipCodeField: config.zipCodeField ?? 'zipcode',
+      matchTolerance: config.matchTolerance ?? 'fuzzy',
     };
   }
 

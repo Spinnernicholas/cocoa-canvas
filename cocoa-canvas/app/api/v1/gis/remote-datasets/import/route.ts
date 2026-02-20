@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
               minY: bbox.ymin,
               maxX: bbox.xmax,
               maxY: bbox.ymax,
-            } : null,
+            } : undefined,
             recordCount: features.length,
             tags: body.tags || [],
             category: body.category,
