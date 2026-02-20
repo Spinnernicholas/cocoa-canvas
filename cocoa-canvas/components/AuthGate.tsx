@@ -50,7 +50,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
 
-    if (!isPublicRoute(window.location.pathname)) {
+    if (window.location.pathname !== '/login') {
       router.replace('/login');
     }
   }, [router]);
@@ -92,6 +92,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
       if (response.status === 401 && isProtectedApiRequest(input)) {
         forceLogout();
+        return new Promise<Response>(() => {});
       }
 
       return response;

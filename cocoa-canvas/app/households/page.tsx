@@ -99,14 +99,22 @@ export default function HouseholdsPage() {
           },
         });
 
+        if (response.status === 401) {
+          return;
+        }
+
         if (!response.ok) {
-          throw new Error('Failed to fetch households');
+          throw new Error(`Failed to fetch households (${response.status})`);
         }
 
         const data = await response.json();
         setHouseholds(data.households || []);
         setTotal(data.total || 0);
       } catch (err) {
+        if (err instanceof Error && err.message.includes('401')) {
+          return;
+        }
+
         console.error('Error fetching households:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch households');
       } finally {
