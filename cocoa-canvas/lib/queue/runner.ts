@@ -10,8 +10,10 @@ import { OutputStats } from './types';
  * Job statuses:
  * - pending: Job created, waiting to be processed
  * - processing: Job currently running
+ * - paused: Job paused and can be resumed
  * - completed: Job finished successfully
  * - failed: Job finished with errors
+ * - cancelled: Job was cancelled by user
  */
 
 export interface JobError {
@@ -23,6 +25,12 @@ export interface JobError {
 
 export interface JobData {
   [key: string]: string | number | boolean | object | null | undefined;
+}
+
+export interface CreateJobOptions {
+  isDynamic?: boolean;
+  totalItems?: number;
+  processedItems?: number;
 }
 
 /**
@@ -105,7 +113,8 @@ export async function getJobs(
 export async function createJob(
   type: string,
   createdById: string,
-  data?: JobData
+  data?: JobData,
+  options?: CreateJobOptions
 ) {
   try {
     return await prisma.job.create({
@@ -113,10 +122,11 @@ export async function createJob(
         type,
         createdById,
         status: 'pending',
-        totalItems: 0,
-        processedItems: 0,
+        totalItems: options?.totalItems ?? 0,
+        processedItems: options?.processedItems ?? 0,
+        isDynamic: options?.isDynamic ?? false,
         data: data ? JSON.stringify(data) : null,
-      },
+      } as any,
       include: {
         createdBy: {
           select: {
@@ -141,15 +151,58 @@ export async function createJob(
  */
 export async function startJob(jobId: string) {
   try {
-    return await prisma.job.update({
-      where: { id: jobId },
+    const startResult = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: 'pending',
+      },
       data: {
         status: 'processing',
         startedAt: new Date(),
       },
     });
+
+    if (startResult.count === 0) {
+      return null;
+    }
+
+    return await prisma.job.findUnique({
+      where: { id: jobId },
+    });
   } catch (error) {
     console.error('[Start Job Error]', error);
+    return null;
+  }
+}
+
+/**
+ * Merge partial data into a job's existing JSON data payload
+ */
+export async function mergeJobData(jobId: string, dataPatch: JobData) {
+  try {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      select: { data: true },
+    });
+
+    if (!job) {
+      return null;
+    }
+
+    const existingData = parseJobData(job.data);
+    const mergedData = {
+      ...existingData,
+      ...dataPatch,
+    };
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        data: JSON.stringify(mergedData),
+      },
+    });
+  } catch (error) {
+    console.error('[Merge Job Data Error]', error);
     return null;
   }
 }
@@ -373,12 +426,21 @@ export async function pauseJob(jobId: string, reason?: string) {
       });
     }
 
-    return await prisma.job.update({
-      where: { id: jobId },
+    const result = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: { in: ['pending', 'processing'] },
+      },
       data: {
         status: 'paused',
       },
     });
+
+    if (result.count === 0) {
+      return await prisma.job.findUnique({ where: { id: jobId } });
+    }
+
+    return await prisma.job.findUnique({ where: { id: jobId } });
   } catch (error) {
     console.error('[Pause Job Error]', error);
     return null;
@@ -398,13 +460,22 @@ export async function markJobCancelled(jobId: string, reason?: string) {
       });
     }
 
-    return await prisma.job.update({
-      where: { id: jobId },
+    const result = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: { in: ['pending', 'processing', 'paused'] },
+      },
       data: {
         status: 'cancelled',
         completedAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      return await prisma.job.findUnique({ where: { id: jobId } });
+    }
+
+    return await prisma.job.findUnique({ where: { id: jobId } });
   } catch (error) {
     console.error('[Cancel Job Error]', error);
     return null;
@@ -508,20 +579,7 @@ export async function cancelJob(jobId: string) {
       return job;
     }
 
-    return await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        status: 'failed',
-        completedAt: new Date(),
-        errorLog: JSON.stringify([
-          {
-            timestamp: new Date().toISOString(),
-            message: 'Job cancelled by user',
-            code: 'JOB_CANCELLED',
-          },
-        ]),
-      },
-    });
+    return await markJobCancelled(jobId, 'Job cancelled by user');
   } catch (error) {
     console.error('[Cancel Job Error]', error);
     return null;

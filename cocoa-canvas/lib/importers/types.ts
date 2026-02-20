@@ -30,6 +30,7 @@ export interface VoterImportOptions {
   fileSize?: number; // Total file size in bytes for progress tracking
   jobId?: string;
   userId?: string;
+  resumeFromProcessed?: number;
   onProgress?: (processed: number, total: number, errors: number, bytesProcessed?: number) => void;
 }
 

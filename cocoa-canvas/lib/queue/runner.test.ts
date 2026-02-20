@@ -22,6 +22,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       count: vi.fn(),
       deleteMany: vi.fn(),
     },
@@ -35,6 +36,7 @@ describe('Job Queue System', () => {
     id: mockJobId,
     type: 'import_voters',
     status: 'pending',
+    isDynamic: false,
     totalItems: 0,
     processedItems: 0,
     errorLog: null,
@@ -64,6 +66,27 @@ describe('Job Queue System', () => {
       expect(job?.type).toBe('import_voters');
       expect(job?.status).toBe('pending');
       expect(prisma.job.create).toHaveBeenCalled();
+      expect(prisma.job.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isDynamic: false,
+          }),
+        })
+      );
+    });
+
+    it('should create a dynamic job when requested', async () => {
+      (prisma.job.create as Mock).mockResolvedValue({ ...mockJob, isDynamic: true });
+
+      await createJob('import_voters', mockUserId, { filePath: 'test.csv' }, { isDynamic: true });
+
+      expect(prisma.job.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isDynamic: true,
+          }),
+        })
+      );
     });
 
     it('should handle creation errors', async () => {
@@ -163,13 +186,15 @@ describe('Job Queue System', () => {
   describe('startJob', () => {
     it('should update job status to processing', async () => {
       const processingJob = { ...mockJob, status: 'processing', startedAt: new Date() };
+      (prisma.job.updateMany as Mock).mockResolvedValue({ count: 1 });
+      (prisma.job.findUnique as Mock).mockResolvedValue(processingJob);
       (prisma.job.update as Mock).mockResolvedValue(processingJob);
 
       const job = await startJob(mockJobId);
 
       expect(job?.status).toBe('processing');
       expect(job?.startedAt).toBeDefined();
-      expect(prisma.job.update).toHaveBeenCalled();
+      expect(prisma.job.updateMany).toHaveBeenCalled();
     });
   });
 
@@ -226,14 +251,19 @@ describe('Job Queue System', () => {
 
   describe('cancelJob', () => {
     it('should cancel a pending job', async () => {
-      const cancelledJob = { ...mockJob, status: 'failed', completedAt: new Date() };
+      const cancelledJob = { ...mockJob, status: 'cancelled', completedAt: new Date() };
       (prisma.job.findUnique as Mock).mockResolvedValue(mockJob);
+      (prisma.job.updateMany as Mock).mockResolvedValue({ count: 1 });
       (prisma.job.update as Mock).mockResolvedValue(cancelledJob);
+      (prisma.job.findUnique as Mock)
+        .mockResolvedValueOnce(mockJob)
+        .mockResolvedValueOnce(mockJob)
+        .mockResolvedValueOnce(cancelledJob);
 
       const job = await cancelJob(mockJobId);
 
-      expect(job?.status).toBe('failed');
-      expect(prisma.job.update).toHaveBeenCalled();
+      expect(job?.status).toBe('cancelled');
+      expect(prisma.job.updateMany).toHaveBeenCalled();
     });
 
     it('should not cancel processing job', async () => {

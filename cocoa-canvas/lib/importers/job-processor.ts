@@ -6,10 +6,14 @@
  */
 
 import { importerRegistry } from '@/lib/importers';
+import { unlink } from 'fs/promises';
 import {
+  getJob,
+  parseJobData,
   startJob,
   updateJobProgress,
   updateJobOutputStats,
+  mergeJobData,
   completeJob,
   failJob,
   addJobError,
@@ -51,8 +55,25 @@ export async function processImportJob(
       return;
     }
 
-    // Mark job as processing
-    await startJob(jobId);
+    const existingJob = await getJob(jobId);
+    if (!existingJob) {
+      return;
+    }
+
+    if (existingJob.status === 'paused' || existingJob.status === 'cancelled' || existingJob.status === 'completed') {
+      return;
+    }
+
+    const startResult = await startJob(jobId);
+    if (!startResult) {
+      return;
+    }
+
+    const parsedData = parseJobData(existingJob.data);
+    const resumeFromProcessed = Math.max(
+      0,
+      Number(parsedData.resumeFromProcessed ?? existingJob.processedItems ?? 0)
+    );
 
     // Execute the import with progress tracking
     const result = await importer.importFile({
@@ -61,6 +82,7 @@ export async function processImportJob(
       format,
       fileSize,
       userId,
+      resumeFromProcessed,
       onProgress: async (processed, total, errors, bytesProcessed) => {
         const currentJob = await prisma.job.findUnique({
           where: { id: jobId },
@@ -68,10 +90,18 @@ export async function processImportJob(
         });
 
         if (currentJob?.status === 'paused') {
+          await mergeJobData(jobId, {
+            resumeFromProcessed: processed,
+            resumedAt: new Date().toISOString(),
+          });
           throw new Error('__JOB_PAUSED__');
         }
 
         if (currentJob?.status === 'cancelled') {
+          await mergeJobData(jobId, {
+            resumeFromProcessed: processed,
+            resumedAt: new Date().toISOString(),
+          });
           throw new Error('__JOB_CANCELLED__');
         }
 
@@ -94,12 +124,21 @@ export async function processImportJob(
         
         // Update job progress with output stats
         await updateJobProgress(jobId, processed, total || undefined, outputStats);
+        await mergeJobData(jobId, {
+          resumeFromProcessed: processed,
+        });
         
         if (errors > 0) {
           console.log(`[Import Job] ${jobId} - Processed: ${processed}, Bytes: ${bytesProcessed}, Errors: ${errors}`);
         }
       },
     });
+
+    const existingStats = existingJob.outputStats ? JSON.parse(existingJob.outputStats) : {};
+    const totalCreated = (existingStats.recordsCreated || 0) + result.created;
+    const totalUpdated = (existingStats.recordsUpdated || 0) + result.updated;
+    const totalSkipped = (existingStats.recordsSkipped || 0) + result.skipped;
+    const totalErrors = (existingStats.totalErrors || 0) + result.errors;
 
     // Log any import errors
     if (result.errorDetails && result.errorDetails.length > 0) {
@@ -116,10 +155,10 @@ export async function processImportJob(
     const finalOutputStats: Partial<OutputStats> = {
       type: 'voter_import',
       recordsProcessed: result.processed,
-      recordsCreated: result.created,
-      recordsUpdated: result.updated,
-      recordsSkipped: result.skipped,
-      totalErrors: result.errors,
+      recordsCreated: totalCreated,
+      recordsUpdated: totalUpdated,
+      recordsSkipped: totalSkipped,
+      totalErrors,
       percentComplete: 100,
     };
     
@@ -140,12 +179,15 @@ export async function processImportJob(
     
     await completeJob(jobId, {
       processed: result.processed,
-      created: result.created,
-      updated: result.updated,
-      skipped: result.skipped,
-      errors: result.errors,
+      created: totalCreated,
+      updated: totalUpdated,
+      skipped: totalSkipped,
+      errors: totalErrors,
       success: result.success,
+      resumeFromProcessed: result.processed,
     });
+
+    await cleanupImportFile(filePath);
 
     console.log(`[Import Job] Completed: ${jobId} - ${result.processed} processed, ${result.errors} errors`);
   } catch (error) {
@@ -153,6 +195,11 @@ export async function processImportJob(
 
     if (errorMessage === '__JOB_PAUSED__' || errorMessage === '__JOB_CANCELLED__') {
       console.log(`[Import Job] Interrupted: ${jobId} - ${errorMessage}`);
+
+      if (errorMessage === '__JOB_CANCELLED__') {
+        await cleanupImportFile(jobData.filePath);
+      }
+
       return;
     }
 
@@ -161,6 +208,15 @@ export async function processImportJob(
       jobId,
       error instanceof Error ? error.message : 'Unknown error during import'
     );
+    await cleanupImportFile(jobData.filePath);
+  }
+}
+
+async function cleanupImportFile(filePath: string) {
+  try {
+    await unlink(filePath);
+  } catch {
+    // Ignore cleanup failures
   }
 }
 

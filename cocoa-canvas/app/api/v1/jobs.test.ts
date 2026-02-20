@@ -167,6 +167,56 @@ describe('POST /api/v1/jobs', () => {
     expect(data.job?.type).toBe('import_voters');
   });
 
+  it('should pass isDynamic to job creation', async () => {
+    vi.mocked(validateProtectedRoute).mockResolvedValue({
+      isValid: true,
+      user: { userId: 'user123' },
+      response: null,
+    });
+
+    const mockJob = {
+      id: 'job789',
+      type: 'import_voters',
+      status: 'pending',
+      totalItems: 0,
+      processedItems: 0,
+      errorLog: '[]',
+      data: JSON.stringify({ filePath: 'test.csv' }),
+      createdById: 'user123',
+      createdAt: new Date(),
+      startedAt: null,
+      completedAt: null,
+      isDynamic: true,
+      createdBy: { id: 'user123', email: 'user@example.com', name: 'User' },
+    };
+
+    vi.mocked(createJob).mockResolvedValue(mockJob as any);
+    vi.mocked(getJobProgress).mockReturnValue(0);
+
+    const req = new NextRequest('http://localhost:3000/api/v1/jobs', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'import_voters',
+        data: { filePath: 'test.csv' },
+        isDynamic: true,
+      }),
+      headers: {
+        authorization: 'Bearer fake-token',
+        'content-type': 'application/json',
+      },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(201);
+    expect(createJob).toHaveBeenCalledWith(
+      'import_voters',
+      'user123',
+      { filePath: 'test.csv' },
+      { isDynamic: true }
+    );
+  });
+
   it('should reject unauthenticated requests', async () => {
     vi.mocked(validateProtectedRoute).mockResolvedValue({
       isValid: false,

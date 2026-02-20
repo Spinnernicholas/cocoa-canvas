@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { getJob, parseJobData, pauseJob, markJobCancelled } from '@/lib/queue/runner';
 import { auditLog } from '@/lib/audit/logger';
-import { getGeocodeQueue } from '@/lib/queue/bullmq';
-import { processImportJob, type ImportJobData } from '@/lib/importers/job-processor';
+import { getGeocodeQueue, getVoterImportQueue } from '@/lib/queue/bullmq';
 import { prisma } from '@/lib/prisma';
+import { enqueueJobFromDb } from '@/lib/queue/recovery';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +20,14 @@ function isImportType(type: string) {
 
 async function removeGeocodeQueueJob(jobId: string) {
   const queue = getGeocodeQueue();
+  const queuedJob = await queue.getJob(jobId);
+  if (queuedJob) {
+    await queuedJob.remove();
+  }
+}
+
+async function removeImportQueueJob(jobId: string) {
+  const queue = getVoterImportQueue();
   const queuedJob = await queue.getJob(jobId);
   if (queuedJob) {
     await queuedJob.remove();
@@ -57,6 +65,8 @@ export async function POST(
       if (job.status === 'pending') {
         if (isGeocodingType(job.type)) {
           await removeGeocodeQueueJob(jobId);
+        } else if (isImportType(job.type)) {
+          await removeImportQueueJob(jobId);
         }
         await pauseJob(jobId, 'Job paused by user');
       } else if (job.status === 'processing') {
@@ -80,6 +90,8 @@ export async function POST(
       if (job.status === 'pending' || job.status === 'paused') {
         if (isGeocodingType(job.type)) {
           await removeGeocodeQueueJob(jobId);
+        } else if (isImportType(job.type)) {
+          await removeImportQueueJob(jobId);
         }
         await markJobCancelled(jobId, 'Job cancelled by user');
       } else if (job.status === 'processing') {
@@ -107,8 +119,6 @@ export async function POST(
         );
       }
 
-      const parsedData = parseJobData(job.data);
-
       await prisma.job.update({
         where: { id: jobId },
         data: {
@@ -117,28 +127,22 @@ export async function POST(
         },
       });
 
-      if (isGeocodingType(job.type)) {
-        const queue = getGeocodeQueue();
-        await queue.add(
-          'geocode',
-          {
-            filters: (parsedData.filters as Record<string, any>) || {},
-            limit: (parsedData.limit as number) || 10000,
-            skipGeocoded: (parsedData.skipGeocoded as boolean) !== false,
-            providerId: parsedData.providerId as string | undefined,
-          },
-          {
-            jobId,
-          }
-        );
-      } else if (isImportType(job.type)) {
-        const importData = parsedData as unknown as ImportJobData;
-        processImportJob(jobId, importData).catch((error) => {
-          console.error(`[Job Resume] Failed to resume import job ${jobId}:`, error);
-        });
-      } else {
+      if (!isGeocodingType(job.type) && !isImportType(job.type)) {
         return NextResponse.json(
           { success: false, error: `Resume not supported for job type: ${job.type}` },
+          { status: 400 }
+        );
+      }
+
+      const refreshedJob = await getJob(jobId);
+      if (!refreshedJob) {
+        return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
+      }
+
+      const enqueueResult = await enqueueJobFromDb(refreshedJob as any);
+      if (enqueueResult === 'failed') {
+        return NextResponse.json(
+          { success: false, error: 'Job data is incomplete and cannot be resumed' },
           { status: 400 }
         );
       }

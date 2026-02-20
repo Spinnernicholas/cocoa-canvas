@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    const { type, data } = body;
+    const { type, data, isDynamic } = body;
     if (!type || !type.trim()) {
       return NextResponse.json(
         {
@@ -166,7 +166,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the job
-    const job = await createJob(type.trim(), validation.user!.userId, data);
+    const job = await createJob(type.trim(), validation.user!.userId, data, {
+      isDynamic: Boolean(isDynamic),
+    });
 
     if (!job) {
       return NextResponse.json(

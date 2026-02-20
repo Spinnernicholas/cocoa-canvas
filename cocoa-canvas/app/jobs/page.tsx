@@ -11,6 +11,7 @@ interface Job {
   id: string;
   type: string;
   status: string;
+  isDynamic?: boolean;
   progress: number;
   totalItems?: number;
   processedItems?: number;
@@ -32,6 +33,7 @@ export default function JobsPage() {
   const [user, setUser] = useState<any>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState('');
   
   // Filters
@@ -40,9 +42,11 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError('');
       const token = localStorage.getItem('authToken');
 
@@ -76,13 +80,19 @@ export default function JobsPage() {
 
       const data = await response.json();
       setJobs(data.jobs || []);
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+        setLoading(false);
+      }
     } catch (err) {
       console.error('Error fetching jobs:', err);
       setError('Error loading jobs');
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
-  }, [limit, router, statusFilter, typeFilter]);
+  }, [hasLoadedOnce, limit, router, statusFilter, typeFilter]);
 
   // Load user
   useEffect(() => {
@@ -107,10 +117,10 @@ export default function JobsPage() {
   useEffect(() => {
     if (!user) return;
 
-    fetchJobs();
-    const interval = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
+    fetchJobs(!hasLoadedOnce);
+    const interval = setInterval(() => fetchJobs(false), 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, [user, fetchJobs]);
+  }, [user, fetchJobs, hasLoadedOnce]);
 
   const handleJobControl = async (
     event: React.MouseEvent,
@@ -421,9 +431,12 @@ export default function JobsPage() {
                       onClick={() => router.push(`/jobs/${job.id}`)}
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-lg">{getTypeEmoji(job.type)}</span>
                           <span className="font-medium text-cocoa-900 dark:text-cream-50">{job.type}</span>
+                          <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold ${job.isDynamic ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300' : 'bg-cocoa-100 dark:bg-cocoa-900/40 text-cocoa-700 dark:text-cocoa-300'}`}>
+                            {job.isDynamic ? 'Dynamic' : 'Static'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">

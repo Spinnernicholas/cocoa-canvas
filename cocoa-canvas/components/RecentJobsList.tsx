@@ -8,6 +8,7 @@ interface Job {
   id: string;
   type: string;
   status: string;
+  isDynamic?: boolean;
   progress: number;
   createdAt: string;
   processedItems?: number;
@@ -161,7 +162,9 @@ export default function RecentJobsList() {
                     <p className="text-sm font-medium text-cocoa-900 dark:text-cream-50 capitalize">
                       {job.type} Job
                     </p>
-                    <p className="text-xs text-cocoa-500 dark:text-cocoa-400">{formatDate(job.createdAt)}</p>
+                    <p className="text-xs text-cocoa-500 dark:text-cocoa-400">
+                      {formatDate(job.createdAt)} • {job.isDynamic ? 'Dynamic' : 'Static'}
+                    </p>
                   </div>
                 </div>
                 <span className={`text-sm font-medium ${getStatusColor(job.status)}`}>

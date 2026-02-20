@@ -10,6 +10,7 @@ import { VoterImportJobData, ScheduledJobData, GeocodeJobData, JobData } from '.
 import { processImportJob } from '@/lib/importers/job-processor';
 import { processGeocodeJob } from '@/lib/gis/geocode-job-processor';
 import { prisma } from '@/lib/prisma';
+import { DEFAULT_JOBS_CONFIG, getJobsConfig } from './config';
 
 const redisConnection = {
   url: process.env.REDIS_URL!,
@@ -17,53 +18,146 @@ const redisConnection = {
 
 let workers: Worker[] = [];
 
+type WorkerType = 'import' | 'geocode' | 'scheduled';
+
+class CentralWorkerPool {
+  private readonly maxWorkers: number;
+  private readonly maxByType: Record<WorkerType, number>;
+  private activeWorkers = 0;
+  private readonly activeByType: Record<WorkerType, number> = {
+    import: 0,
+    geocode: 0,
+    scheduled: 0,
+  };
+  private readonly waitQueue: Array<{ type: WorkerType; resolve: () => void }> = [];
+
+  constructor(maxWorkers: number, maxByType: Record<WorkerType, number>) {
+    this.maxWorkers = Math.max(1, maxWorkers);
+    this.maxByType = maxByType;
+  }
+
+  private canRun(type: WorkerType) {
+    return this.activeWorkers < this.maxWorkers && this.activeByType[type] < this.maxByType[type];
+  }
+
+  async acquire(type: WorkerType) {
+    if (this.canRun(type)) {
+      this.activeWorkers++;
+      this.activeByType[type]++;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.waitQueue.push({ type, resolve });
+    });
+
+    this.activeWorkers++;
+    this.activeByType[type]++;
+  }
+
+  release(type: WorkerType) {
+    this.activeWorkers = Math.max(0, this.activeWorkers - 1);
+    this.activeByType[type] = Math.max(0, this.activeByType[type] - 1);
+
+    for (let index = 0; index < this.waitQueue.length; ) {
+      const candidate = this.waitQueue[index];
+      if (this.canRun(candidate.type)) {
+        this.waitQueue.splice(index, 1);
+        candidate.resolve();
+      } else {
+        index++;
+      }
+
+      if (this.activeWorkers >= this.maxWorkers) {
+        break;
+      }
+    }
+  }
+
+  snapshot() {
+    return {
+      maxWorkers: this.maxWorkers,
+      activeWorkers: this.activeWorkers,
+      waitingJobs: this.waitQueue.length,
+      maxByType: { ...this.maxByType },
+      activeByType: { ...this.activeByType },
+    };
+  }
+}
+
+let centralWorkerPool: CentralWorkerPool | null = null;
+
+async function withWorkerSlot<T>(type: WorkerType, fn: () => Promise<T>): Promise<T> {
+  if (!centralWorkerPool) {
+    return fn();
+  }
+
+  await centralWorkerPool.acquire(type);
+  try {
+    return await fn();
+  } finally {
+    centralWorkerPool.release(type);
+  }
+}
+
 /**
  * Start all job workers
  */
 export async function startWorkers() {
+  if (workers.length > 0) {
+    console.log('[Worker] Workers already started');
+    return workers;
+  }
+
   console.log('[Worker] Starting job workers');
+
+  let jobsConfig = DEFAULT_JOBS_CONFIG;
+  try {
+    jobsConfig = await getJobsConfig();
+  } catch (error) {
+    console.error('[Worker] Failed to load jobs config, using defaults', error);
+  }
+
+  console.log('[Worker] Using jobs config', jobsConfig);
+
+  centralWorkerPool = new CentralWorkerPool(jobsConfig.maxWorkers, {
+    import: jobsConfig.importWorkers,
+    geocode: jobsConfig.geocodeWorkers,
+    scheduled: jobsConfig.scheduledWorkers,
+  });
+
+  const importConcurrency = Math.max(1, Math.min(jobsConfig.importWorkers, jobsConfig.maxWorkers));
+  const geocodeConcurrency = Math.max(1, Math.min(jobsConfig.geocodeWorkers, jobsConfig.maxWorkers));
+  const scheduledConcurrency = Math.max(1, Math.min(jobsConfig.scheduledWorkers, jobsConfig.maxWorkers));
 
   // Voter Import Worker
   const voterImportWorker = new Worker<VoterImportJobData>(
     'voter-import',
     async (job: Job<VoterImportJobData>) => {
-      console.log(`[Worker] Processing voter import job: ${job.id}`);
-      try {
-        // Find the corresponding database job record by parsing JSON data
-        const jobs = await prisma.job.findMany({
-          where: {
-            type: 'import_voters',
-            status: { in: ['pending', 'processing'] },
-          },
-          take: 100, // Limit to prevent loading too many records
-        });
+      return withWorkerSlot('import', async () => {
+        console.log(`[Worker] Processing voter import job: ${job.id}`);
+        try {
+          const jobId = String(job.id);
+          const dbJob = await prisma.job.findUnique({
+            where: { id: jobId },
+          });
 
-        const dbJob = jobs.find((j) => {
-          try {
-            const jobData = j.data ? JSON.parse(j.data) : {};
-            return jobData.filePath === job.data.filePath;
-          } catch {
-            return false;
+          if (dbJob) {
+            await processImportJob(dbJob.id, job.data);
+          } else {
+            throw new Error('No corresponding job record found');
           }
-        });
 
-        if (dbJob) {
-          // Process using existing import job processor
-          await processImportJob(dbJob.id, job.data);
-        } else {
-          // Direct processing if no DB job found
-          throw new Error('No corresponding job record found');
+          return { success: true, jobId: job.id };
+        } catch (error) {
+          console.error(`[Worker] Error processing voter import job ${job.id}:`, error);
+          throw error;
         }
-
-        return { success: true, jobId: job.id };
-      } catch (error) {
-        console.error(`[Worker] Error processing voter import job ${job.id}:`, error);
-        throw error;
-      }
+      });
     },
     {
       connection: redisConnection,
-      concurrency: 1,  // Process one import at a time
+      concurrency: importConcurrency,
     }
   );
 
@@ -71,9 +165,10 @@ export async function startWorkers() {
   const scheduledJobsWorker = new Worker<ScheduledJobData>(
     'scheduled-jobs',
     async (job: Job<ScheduledJobData>) => {
-      console.log(`[Worker] Processing scheduled job: ${job.id}`);
-      try {
-        const { jobType, scheduledJobId } = job.data;
+      return withWorkerSlot('scheduled', async () => {
+        console.log(`[Worker] Processing scheduled job: ${job.id}`);
+        try {
+          const { jobType, scheduledJobId } = job.data;
 
         // Update scheduled job status
         await prisma.scheduledJob.update({
@@ -140,9 +235,9 @@ export async function startWorkers() {
           },
         });
 
-        return { success: true, scheduledJobId };
-      } catch (error) {
-        console.error(`[Worker] Error processing scheduled job ${job.id}:`, error);
+          return { success: true, scheduledJobId };
+        } catch (error) {
+          console.error(`[Worker] Error processing scheduled job ${job.id}:`, error);
 
         // Update scheduled job with error
         try {
@@ -158,12 +253,13 @@ export async function startWorkers() {
           // Silently fail if we can't update the db
         }
 
-        throw error;
-      }
+          throw error;
+        }
+      });
     },
     {
       connection: redisConnection,
-      concurrency: 3,  // Allow some parallelism for scheduled jobs
+      concurrency: scheduledConcurrency,
     }
   );
 
@@ -188,29 +284,29 @@ export async function startWorkers() {
   const geocodeWorker = new Worker<GeocodeJobData>(
     'geocode-households',
     async (job: Job<GeocodeJobData>) => {
-      console.log(`[Worker] Processing geocode job: ${job.id}`);
-      try {
-        // Find the corresponding database job record
-        const dbJob = await prisma.job.findUnique({
-          where: { id: job.id },
-        });
+      return withWorkerSlot('geocode', async () => {
+        console.log(`[Worker] Processing geocode job: ${job.id}`);
+        try {
+          const dbJob = await prisma.job.findUnique({
+            where: { id: job.id },
+          });
 
-        if (!dbJob) {
-          throw new Error(`No database job record found for ${job.id}`);
+          if (!dbJob) {
+            throw new Error(`No database job record found for ${job.id}`);
+          }
+
+          await processGeocodeJob(dbJob.id, job.data, dbJob.createdById);
+
+          return { success: true, jobId: job.id };
+        } catch (error) {
+          console.error(`[Worker] Error processing geocode job ${job.id}:`, error);
+          throw error;
         }
-
-        // Process the geocoding job
-        await processGeocodeJob(dbJob.id, job.data, dbJob.createdById);
-
-        return { success: true, jobId: job.id };
-      } catch (error) {
-        console.error(`[Worker] Error processing geocode job ${job.id}:`, error);
-        throw error;
-      }
+      });
     },
     {
       connection: redisConnection,
-      concurrency: 1, // Process one geocoding job at a time
+      concurrency: geocodeConcurrency,
     }
   );
 
@@ -232,11 +328,16 @@ export async function startWorkers() {
  * Stop all workers
  */
 export async function stopWorkers() {
+  if (workers.length === 0) {
+    return;
+  }
+
   console.log('[Worker] Stopping all workers');
   for (const worker of workers) {
     await worker.close();
   }
   workers = [];
+  centralWorkerPool = null;
   console.log('[Worker] All workers stopped');
 }
 
@@ -247,5 +348,6 @@ export async function getWorkerStatus() {
   return {
     activeWorkers: workers.length,
     workerNames: workers.map(w => w.name),
+    pool: centralWorkerPool?.snapshot() || null,
   };
 }

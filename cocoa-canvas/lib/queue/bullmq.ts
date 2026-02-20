@@ -61,6 +61,9 @@ export interface GeocodeJobData {
   limit?: number;
   providerId?: string;
   skipGeocoded?: boolean;
+  householdIds?: string[];
+  checkpointIndex?: number;
+  dynamic?: boolean;
 }
 
 export type JobData = VoterImportJobData | ScheduledJobData | GeocodeJobData | Record<string, any>;

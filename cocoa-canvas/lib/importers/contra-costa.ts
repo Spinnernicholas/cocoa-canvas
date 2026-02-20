@@ -24,6 +24,7 @@ export interface ContraCostaImportOptions {
   importType: 'full' | 'incremental';
   fileSize?: number; // Total file size in bytes for progress tracking
   jobId?: string;
+  resumeFromProcessed?: number;
   onProgress?: (processed: number, total: number, errors: number, bytesProcessed?: number) => void;
 }
 
@@ -179,14 +180,16 @@ export async function importContraCostaFile(
   options: ContraCostaImportOptions
 ): Promise<{ success: boolean; processed: number; errors: number; message?: string; bytesProcessed?: number; linesProcessed?: number; headerDetected?: boolean }> {
   
-  const { filePath, importType, jobId, fileSize, onProgress } = options;
+  const { filePath, importType, jobId, fileSize, onProgress, resumeFromProcessed } = options;
+  const resumeCount = Math.max(0, resumeFromProcessed || 0);
   
-  let processed = 0;
+  let processed = resumeCount;
   let errors = 0;
   let skipped = 0;
   let bytesProcessed = 0;
-  let linesProcessed = 0;
+  let linesProcessed = resumeCount;
   let headerDetected = false;
+  let resumeRowsRemaining = resumeCount;
   
   console.log(`[Contra Costa Import] Starting ${importType} import from: ${filePath}`);
   
@@ -242,6 +245,12 @@ export async function importContraCostaFile(
       try {
         // Pause stream while processing
         parser.pause();
+
+        if (resumeRowsRemaining > 0) {
+          resumeRowsRemaining--;
+          parser.resume();
+          return;
+        }
         
         // Track lines (including header which was already parsed)
         linesProcessed++;

@@ -49,7 +49,7 @@ interface HouseholdStats {
   totalDonors: number;
 }
 
-export default function CampaignMapPage() {
+export default function HouseholdsMapPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [households, setHouseholds] = useState<Household[]>([]);
@@ -188,9 +188,9 @@ export default function CampaignMapPage() {
         <div className="w-80 bg-white dark:bg-cocoa-800 shadow-lg overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">Campaign Map</h2>
+              <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">Households Map</h2>
               <Link
-                href="/campaign"
+                href="/households"
                 className="text-sm text-cocoa-600 dark:text-cocoa-300 hover:underline"
               >
                 ← Back

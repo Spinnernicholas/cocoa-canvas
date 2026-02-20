@@ -8,7 +8,17 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { startJob, updateJobProgress, updateJobOutputStats, completeJob, failJob, addJobError } from '@/lib/queue/runner';
+import {
+  getJob,
+  parseJobData,
+  mergeJobData,
+  startJob,
+  updateJobProgress,
+  updateJobOutputStats,
+  completeJob,
+  failJob,
+  addJobError,
+} from '@/lib/queue/runner';
 import { OutputStats } from '@/lib/queue/types';
 import { geocodingService } from '../geocoding';
 import { geocoderRegistry } from '../geocoding/registry';
@@ -28,6 +38,9 @@ export interface GeocodeJobData {
   limit?: number;
   providerId?: string; // Specific provider to use, optional
   skipGeocoded?: boolean; // Skip households already geocoded
+  householdIds?: string[]; // Snapshot of households to process (recommended)
+  checkpointIndex?: number; // Resume checkpoint for paused jobs
+  dynamic?: boolean; // True when work is discovered on-demand while running
 }
 
 /**
@@ -57,11 +70,27 @@ interface GeocodeErrorLog {
 export async function processGeocodeJob(
   jobId: string,
   data: GeocodeJobData,
-  userId: string
+  userId?: string
 ): Promise<void> {
   try {
-    // Start the job
-    await startJob(jobId);
+    const existingJob = await getJob(jobId);
+    if (!existingJob) {
+      return;
+    }
+
+    if (existingJob.status === 'paused' || existingJob.status === 'cancelled' || existingJob.status === 'completed') {
+      return;
+    }
+
+    const startResult = await startJob(jobId);
+    if (!startResult) {
+      return;
+    }
+
+    const existingData = parseJobData(existingJob.data);
+    const configuredCheckpoint = Number(data.checkpointIndex ?? existingData.checkpointIndex ?? existingJob.processedItems ?? 0);
+    const resumeFromIndex = Math.max(0, configuredCheckpoint);
+
     console.log(`[Geocode Job] Started processing job ${jobId}`);
 
     const enabledProviders = await prisma.geocoderProvider.findMany({
@@ -155,13 +184,31 @@ export async function processGeocodeJob(
       where.geocoded = false;
     }
 
-    // Count total households to geocode
-    const totalHouseholds = await prisma.household.count({ where });
     const limit = data.limit || 10000;
-    const householdCount = Math.min(totalHouseholds, limit);
+
+    const snapshotHouseholdIds = Array.isArray(data.householdIds)
+      ? data.householdIds
+      : Array.isArray(existingData.householdIds)
+      ? (existingData.householdIds as string[])
+      : [];
+
+    const isDynamicJob = Boolean(data.dynamic ?? existingJob.isDynamic) || snapshotHouseholdIds.length === 0;
+
+    let householdIds = snapshotHouseholdIds;
+    if (!isDynamicJob && householdIds.length > limit) {
+      householdIds = householdIds.slice(0, limit);
+    }
+
+    let householdCount = 0;
+    if (isDynamicJob) {
+      const totalHouseholds = await prisma.household.count({ where });
+      householdCount = Math.min(totalHouseholds, limit);
+    } else {
+      householdCount = householdIds.length;
+    }
 
     console.log(
-      `[Geocode Job] Found ${totalHouseholds} households, processing ${householdCount}`
+      `[Geocode Job] Processing ${householdCount} households (${isDynamicJob ? 'dynamic' : 'snapshotted'})`
     );
 
     // Update job with total items and initial stats
@@ -175,13 +222,23 @@ export async function processGeocodeJob(
       geocodingProvider: providerDisplayName,
     });
 
+    await mergeJobData(jobId, {
+      ...existingData,
+      ...data,
+      checkpointIndex: resumeFromIndex,
+      householdIds,
+      dynamic: isDynamicJob,
+    });
+
     // Geocoding service is already loaded at top level
     // Process each household in the batch
+    const existingOutputStats = existingJob.outputStats ? JSON.parse(existingJob.outputStats) : {};
+
     const batchSize = 100;
-    let processedCount = 0;
-    let successCount = 0;
-    let failureCount = 0;
-    let skipCount = 0;
+    let processedCount = Math.max(resumeFromIndex, Number(existingOutputStats.householdsProcessed || 0));
+    let successCount = Number(existingOutputStats.householdsGeocoded || 0);
+    let failureCount = Number(existingOutputStats.householdsFailed || 0);
+    let skipCount = Number(existingOutputStats.householdsSkipped || 0);
     let alreadyGeocodedCount = 0;
     const errorLogs: GeocodeErrorLog[] = [];
     const providersUsed = new Set<string>();
@@ -196,13 +253,40 @@ export async function processGeocodeJob(
       return current.status;
     };
 
-    for (let offset = 0; offset < householdCount; offset += batchSize) {
+    const persistProgress = async (isFinal = false) => {
+      const percentComplete = householdCount > 0
+        ? Math.min(Math.round((processedCount / householdCount) * 100), isFinal ? 100 : 99)
+        : 100;
+
+      await updateJobProgress(jobId, processedCount, householdCount, {
+        type: 'geocode',
+        householdsProcessed: processedCount,
+        householdsGeocoded: successCount,
+        householdsFailed: failureCount,
+        householdsSkipped: skipCount,
+        percentComplete,
+        geocodingProvider: providersUsed.size > 0 ? Array.from(providersUsed).join(', ') : providerDisplayName,
+        geocodingErrors: errorLogs.length,
+      });
+
+      await mergeJobData(jobId, {
+        ...existingData,
+        ...data,
+        householdIds,
+        dynamic: isDynamicJob,
+        checkpointIndex: processedCount,
+      });
+    };
+
+    for (let offset = resumeFromIndex; offset < householdCount; offset += batchSize) {
       const controlStatus = await getControlStatus();
       if (controlStatus === 'paused') {
+        await persistProgress();
         await addJobError(jobId, 'Job paused by user during processing');
         return;
       }
       if (controlStatus === 'cancelled') {
+        await persistProgress();
         await addJobError(jobId, 'Job cancelled by user during processing');
         return;
       }
@@ -210,21 +294,39 @@ export async function processGeocodeJob(
       const remaining = householdCount - offset;
       const takeCount = Math.min(batchSize, remaining);
 
-      const batch = await prisma.household.findMany({
-        where,
-        take: takeCount,
-        skip: offset,
-        select: {
-          id: true,
-          fullAddress: true,
-          houseNumber: true,
-          streetName: true,
-          streetSuffix: true,
-          city: true,
-          state: true,
-          zipCode: true,
-        },
-      });
+      const batch = isDynamicJob
+        ? await prisma.household.findMany({
+            where,
+            take: takeCount,
+            skip: offset,
+            select: {
+              id: true,
+              fullAddress: true,
+              houseNumber: true,
+              streetName: true,
+              streetSuffix: true,
+              city: true,
+              state: true,
+              zipCode: true,
+            },
+          })
+        : await prisma.household.findMany({
+            where: {
+              id: {
+                in: householdIds.slice(offset, offset + takeCount),
+              },
+            },
+            select: {
+              id: true,
+              fullAddress: true,
+              houseNumber: true,
+              streetName: true,
+              streetSuffix: true,
+              city: true,
+              state: true,
+              zipCode: true,
+            },
+          });
 
       // Process each household in the batch
       for (const household of batch) {
@@ -300,23 +402,9 @@ export async function processGeocodeJob(
 
         processedCount++;
 
-        // Update progress every 50 households
-        if (processedCount % 50 === 0) {
-          const percentComplete = Math.min(
-            Math.round((processedCount / householdCount) * 100),
-            99
-          );
-          
-          await updateJobProgress(jobId, processedCount, householdCount, {
-            type: 'geocode',
-            householdsProcessed: processedCount,
-            householdsGeocoded: successCount,
-            householdsFailed: failureCount,
-            householdsSkipped: skipCount,
-            percentComplete,
-            geocodingProvider: providersUsed.size > 0 ? Array.from(providersUsed).join(', ') : providerDisplayName,
-            geocodingErrors: errorLogs.length,
-          });
+        // Update progress every 25 households
+        if (processedCount % 25 === 0) {
+          await persistProgress();
           // Log errors separately
           if (errorLogs.length > 0) {
             const recentErrors = errorLogs.slice(-10);
@@ -338,6 +426,7 @@ export async function processGeocodeJob(
 
     const finalControlStatus = await getControlStatus();
     if (finalControlStatus === 'paused' || finalControlStatus === 'cancelled') {
+      await persistProgress();
       return;
     }
 
@@ -355,6 +444,7 @@ export async function processGeocodeJob(
     
     // Update final output stats
     await updateJobOutputStats(jobId, finalOutputStats);
+    await persistProgress(true);
     
     // Complete the job with final stats in data field
     await completeJob(jobId, {
@@ -363,6 +453,8 @@ export async function processGeocodeJob(
       failureCount,
       skipCount,
       providersUsed: Array.from(providersUsed),
+      checkpointIndex: processedCount,
+      dynamic: isDynamicJob,
     });
 
     console.log(

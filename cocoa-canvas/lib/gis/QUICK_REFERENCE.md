@@ -260,7 +260,7 @@ Alert:        bg-red-50 dark:bg-red-900 border border-red-200 rounded
 
 ### Related Features
 
-- Map visualization: `app/campaign/map/page.tsx`
+- Map visualization: `app/households/map/page.tsx`
 - GIS Catalog: `app/maps/page.tsx`
 - Dataset search: `PeopleSearch.tsx` (similar pattern)
 - Job system: For long-running imports if added

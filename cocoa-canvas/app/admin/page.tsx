@@ -65,6 +65,13 @@ export default function AdminPage() {
           color: 'from-orange-500 to-orange-600',
           disabled: true,
         },
+        {
+          title: 'Jobs Configuration',
+          description: 'Set background processing limits like max workers per job type',
+          icon: '🧵',
+          route: '/admin/jobs',
+          color: 'from-amber-500 to-amber-600',
+        },
       ],
     },
     {

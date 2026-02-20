@@ -98,6 +98,7 @@ model Job {
   // Job metadata
   type   String // "import_voters", "geocode", "export", etc.
   status String @default("pending") // pending, processing, completed, failed
+  isDynamic Boolean @default(false) // true when work is discovered on-demand during processing
 
   // Progress
   totalItems     Int @default(0)

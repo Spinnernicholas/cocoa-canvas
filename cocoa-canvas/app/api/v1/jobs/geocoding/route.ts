@@ -3,6 +3,7 @@ import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { createJob } from '@/lib/queue/runner';
 import { getGeocodeQueue } from '@/lib/queue/bullmq';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: GeocodeJobRequest = await request.json();
+    const limit = Math.min(body.limit || 10000, 50000);
 
     // Check if at least one geocoding provider is configured and enabled
     const providers = await prisma.geocoderProvider.findMany({
@@ -49,12 +51,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const where: Prisma.HouseholdWhereInput = {};
+    const filters = body.filters || {};
+
+    if (filters.city) {
+      where.city = { mode: 'insensitive', contains: filters.city };
+    }
+    if (filters.state) {
+      where.state = filters.state;
+    }
+    if (filters.zipCode) {
+      where.zipCode = filters.zipCode;
+    }
+    if (body.skipGeocoded !== false) {
+      where.geocoded = false;
+    }
+
+    const householdIdRows = await prisma.household.findMany({
+      where,
+      take: limit,
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+
+    const householdIds = householdIdRows.map((row) => row.id);
+
     // Create job in database
     const job = await createJob('geocoding', user.userId, {
-      filters: body.filters || {},
-      limit: Math.min(body.limit || 10000, 50000), // Cap at 50k
+      filters,
+      limit,
       skipGeocoded: body.skipGeocoded !== false, // Default to true
       providerId: body.providerId || undefined,
+      householdIds,
+      checkpointIndex: 0,
+      dynamic: false,
+    }, {
+      isDynamic: false,
+      totalItems: householdIds.length,
     });
 
     if (!job) {
@@ -68,10 +101,13 @@ export async function POST(request: NextRequest) {
     try {
       const queue = getGeocodeQueue();
       await queue.add('geocode', {
-        filters: body.filters || {},
-        limit: Math.min(body.limit || 10000, 50000),
+        filters,
+        limit,
         skipGeocoded: body.skipGeocoded !== false,
         providerId: body.providerId || undefined,
+        householdIds,
+        checkpointIndex: 0,
+        dynamic: false,
       }, {
         jobId: job.id,  // Use database job ID as BullMQ job ID
       });

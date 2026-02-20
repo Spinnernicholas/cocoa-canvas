@@ -11,6 +11,7 @@ interface Job {
   id: string;
   type: string;
   status: string;
+  isDynamic?: boolean;
   progress: number;
   totalItems?: number;
   processedItems?: number;
@@ -235,6 +236,9 @@ export default function JobDetailPage() {
                   </h1>
                   <p className="text-cocoa-600 dark:text-cocoa-400 text-sm mt-1 font-mono">
                     Job ID: {job.id}
+                  </p>
+                  <p className="text-cocoa-600 dark:text-cocoa-400 text-sm mt-1">
+                    Mode: {job.isDynamic ? 'Dynamic (on-demand work discovery)' : 'Static (snapshotted work plan)'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

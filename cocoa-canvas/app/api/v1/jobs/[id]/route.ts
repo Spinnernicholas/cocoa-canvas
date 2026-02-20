@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getJob,
-  parseJobData,
-  parseJobErrors,
   getJobProgress,
-  cancelJob,
+  markJobCancelled,
 } from '@/lib/queue/runner';
 import { auditLog } from '@/lib/audit/logger';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
@@ -74,7 +72,7 @@ export async function GET(
 /**
  * DELETE /api/v1/jobs/[id]
  * 
- * Cancel a pending job (only works on jobs that haven't started)
+ * Cancel a job (pending, processing, or paused)
  * Requires authentication
  * 
  * Response (200):
@@ -110,8 +108,7 @@ export async function DELETE(
       );
     }
 
-    // Only allow cancelling pending jobs
-    if (job.status !== 'pending') {
+    if (!['pending', 'processing', 'paused'].includes(job.status)) {
       return NextResponse.json(
         {
           success: false,
@@ -122,7 +119,7 @@ export async function DELETE(
     }
 
     // Cancel the job
-    const cancelled = await cancelJob(jobId);
+    await markJobCancelled(jobId, 'Job cancelled by user');
 
     // Log the cancellation
     await auditLog(validation.user!.userId, 'cancel_job', request, 'job', jobId, {
