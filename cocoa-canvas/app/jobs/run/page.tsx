@@ -15,6 +15,7 @@ interface GeocodeFilters {
   zipCode?: string;
   skipGeocoded?: boolean;
   limit?: number;
+  mode?: 'dynamic' | 'static';
 }
 
 export default function RunJobPage() {
@@ -37,6 +38,7 @@ export default function RunJobPage() {
     zipCode: '',
     skipGeocoded: true,
     limit: 10000,
+    mode: 'static',
   });
 
   // Load user and check for providers
@@ -113,6 +115,7 @@ export default function RunJobPage() {
           filters,
           skipGeocoded: geocodeFilters.skipGeocoded,
           limit: geocodeFilters.limit,
+          mode: geocodeFilters.mode || 'static',
           providerId: selectedProviderId === 'auto' ? undefined : selectedProviderId,
         }),
       });
@@ -251,6 +254,26 @@ export default function RunJobPage() {
                   )}
 
                   <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">
+                        Geocoding mode
+                      </label>
+                      <select
+                        value={geocodeFilters.mode || 'static'}
+                        onChange={(e) =>
+                          setGeocodeFilters({
+                            ...geocodeFilters,
+                            mode: e.target.value === 'dynamic' ? 'dynamic' : 'static',
+                          })
+                        }
+                        disabled={loading}
+                        className="w-full px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 focus:outline-none focus:ring-2 focus:ring-cinnamon-500"
+                      >
+                        <option value="static">Static (snapshot households at start)</option>
+                        <option value="dynamic">Dynamic (discover households while running)</option>
+                      </select>
+                    </div>
+
                     {/* City Filter */}
                     <div>
                       <label className="block text-sm font-medium text-cocoa-900 dark:text-cream-50 mb-2">

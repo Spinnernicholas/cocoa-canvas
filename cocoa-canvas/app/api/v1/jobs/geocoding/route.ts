@@ -18,6 +18,7 @@ interface GeocodeJobRequest {
   limit?: number;
   skipGeocoded?: boolean;
   providerId?: string;
+  mode?: 'dynamic' | 'static';
 }
 
 export async function POST(request: NextRequest) {
@@ -38,6 +39,8 @@ export async function POST(request: NextRequest) {
   try {
     const body: GeocodeJobRequest = await request.json();
     const limit = Math.min(body.limit || 10000, 50000);
+    const mode: 'dynamic' | 'static' = body.mode === 'dynamic' ? 'dynamic' : 'static';
+    const isDynamic = mode === 'dynamic';
 
     // Check if at least one geocoding provider is configured and enabled
     const providers = await prisma.geocoderProvider.findMany({
@@ -67,14 +70,16 @@ export async function POST(request: NextRequest) {
       where.geocoded = false;
     }
 
-    const householdIdRows = await prisma.household.findMany({
-      where,
-      take: limit,
-      orderBy: { id: 'asc' },
-      select: { id: true },
-    });
-
-    const householdIds = householdIdRows.map((row) => row.id);
+    const householdIds = isDynamic
+      ? []
+      : (
+          await prisma.household.findMany({
+            where,
+            take: limit,
+            orderBy: { id: 'asc' },
+            select: { id: true },
+          })
+        ).map((row) => row.id);
 
     // Create job in database
     const job = await createJob('geocoding', user.userId, {
@@ -84,10 +89,11 @@ export async function POST(request: NextRequest) {
       providerId: body.providerId || undefined,
       householdIds,
       checkpointIndex: 0,
-      dynamic: false,
+      failedHouseholdIds: [],
+      dynamic: isDynamic,
     }, {
-      isDynamic: false,
-      totalItems: householdIds.length,
+      isDynamic,
+      totalItems: isDynamic ? 0 : householdIds.length,
     });
 
     if (!job) {
@@ -107,7 +113,8 @@ export async function POST(request: NextRequest) {
         providerId: body.providerId || undefined,
         householdIds,
         checkpointIndex: 0,
-        dynamic: false,
+        failedHouseholdIds: [],
+        dynamic: isDynamic,
       }, {
         jobId: job.id,  // Use database job ID as BullMQ job ID
       });
@@ -121,6 +128,7 @@ export async function POST(request: NextRequest) {
       success: true,
       jobId: job.id,
       type: 'geocoding',
+      mode,
       status: 'pending',
       createdAt: job.createdAt,
     });

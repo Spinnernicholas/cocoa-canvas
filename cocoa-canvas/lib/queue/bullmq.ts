@@ -63,6 +63,7 @@ export interface GeocodeJobData {
   skipGeocoded?: boolean;
   householdIds?: string[];
   checkpointIndex?: number;
+  failedHouseholdIds?: string[];
   dynamic?: boolean;
 }
 

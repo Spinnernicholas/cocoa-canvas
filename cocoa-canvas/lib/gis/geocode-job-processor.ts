@@ -40,6 +40,7 @@ export interface GeocodeJobData {
   skipGeocoded?: boolean; // Skip households already geocoded
   householdIds?: string[]; // Snapshot of households to process (recommended)
   checkpointIndex?: number; // Resume checkpoint for paused jobs
+  failedHouseholdIds?: string[]; // Households that failed once and must never be retried
   dynamic?: boolean; // True when work is discovered on-demand while running
 }
 
@@ -90,6 +91,10 @@ export async function processGeocodeJob(
     const existingData = parseJobData(existingJob.data);
     const configuredCheckpoint = Number(data.checkpointIndex ?? existingData.checkpointIndex ?? existingJob.processedItems ?? 0);
     const resumeFromIndex = Math.max(0, configuredCheckpoint);
+    const failedHouseholdIdsSet = new Set<string>([
+      ...(Array.isArray(existingData.failedHouseholdIds) ? (existingData.failedHouseholdIds as string[]) : []),
+      ...(Array.isArray(data.failedHouseholdIds) ? data.failedHouseholdIds : []),
+    ]);
 
     console.log(`[Geocode Job] Started processing job ${jobId}`);
 
@@ -227,6 +232,7 @@ export async function processGeocodeJob(
       ...data,
       checkpointIndex: resumeFromIndex,
       householdIds,
+      failedHouseholdIds: Array.from(failedHouseholdIdsSet),
       dynamic: isDynamicJob,
     });
 
@@ -273,12 +279,115 @@ export async function processGeocodeJob(
         ...existingData,
         ...data,
         householdIds,
+        failedHouseholdIds: Array.from(failedHouseholdIdsSet),
         dynamic: isDynamicJob,
         checkpointIndex: processedCount,
       });
     };
 
-    for (let offset = resumeFromIndex; offset < householdCount; offset += batchSize) {
+    const processHousehold = async (household: {
+      id: string;
+      fullAddress: string;
+      houseNumber: string | null;
+      streetName: string;
+      streetSuffix: string | null;
+      city: string;
+      state: string;
+      zipCode: string;
+    }) => {
+      if (failedHouseholdIdsSet.has(household.id)) {
+        skipCount++;
+        processedCount++;
+        return;
+      }
+
+      try {
+        const addressParts = [
+          household.houseNumber,
+          household.streetName,
+          household.streetSuffix,
+        ].filter(Boolean);
+
+        const addressString = addressParts.join(' ') || household.fullAddress || '';
+
+        if (!addressString.trim()) {
+          skipCount++;
+          processedCount++;
+          return;
+        }
+
+        const request = {
+          address: addressString,
+          city: household.city,
+          state: household.state,
+          zipCode: household.zipCode,
+        };
+
+        const result = catalogProvider
+          ? await catalogProvider.geocode(request)
+          : await geocodingService.geocode(request, {
+              providerId: selectedProviderKey,
+              useFallback: true,
+              timeout: 5000,
+            });
+
+        if (result) {
+          const providerName = providerDisplayName || selectedProviderKey || 'unknown';
+          providersUsed.add(providerName);
+
+          await prisma.household.update({
+            where: { id: household.id },
+            data: {
+              latitude: result.latitude,
+              longitude: result.longitude,
+              geocoded: true,
+              geocodedAt: new Date(),
+              geocodingProvider: providerName,
+            },
+          });
+          successCount++;
+        } else {
+          failureCount++;
+          failedHouseholdIdsSet.add(household.id);
+          errorLogs.push({
+            householdId: household.id,
+            address: addressString,
+            error: `No results from geocoding service (${providerDisplayName})`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[Geocode Job] Error geocoding household ${household.id}: ${errorMessage}`
+        );
+        failureCount++;
+        failedHouseholdIdsSet.add(household.id);
+        errorLogs.push({
+          householdId: household.id,
+          address: household.fullAddress || 'Unknown',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      processedCount++;
+
+      if (processedCount % 25 === 0) {
+        await persistProgress();
+        if (errorLogs.length > 0) {
+          const recentErrors = errorLogs.slice(-10);
+          for (const errorEntry of recentErrors) {
+            await addJobError(jobId, {
+              timestamp: errorEntry.timestamp,
+              message: `${errorEntry.address}: ${errorEntry.error}`,
+            });
+          }
+        }
+      }
+    };
+
+    for (let offset = resumeFromIndex; !isDynamicJob && offset < householdCount; offset += batchSize) {
       const controlStatus = await getControlStatus();
       if (controlStatus === 'paused') {
         await persistProgress();
@@ -328,99 +437,63 @@ export async function processGeocodeJob(
             },
           });
 
-      // Process each household in the batch
       for (const household of batch) {
-        try {
-          // Build complete address string
-          const addressParts = [
-            household.houseNumber,
-            household.streetName,
-            household.streetSuffix,
-          ].filter(Boolean);
-
-          const addressString = addressParts.join(' ') || household.fullAddress || '';
-
-          if (!addressString.trim()) {
-            skipCount++;
-            continue;
-          }
-
-          // Geocode the address
-          const request = {
-            address: addressString,
-            city: household.city,
-            state: household.state,
-            zipCode: household.zipCode,
-          };
-
-          const result = catalogProvider
-            ? await catalogProvider.geocode(request)
-            : await geocodingService.geocode(request, {
-                providerId: selectedProviderKey,
-                useFallback: true,
-                timeout: 5000,
-              });
-
-          if (result) {
-            // Update household with coordinates and provider info
-            const providerName = providerDisplayName || selectedProviderKey || 'unknown';
-            providersUsed.add(providerName);
-            
-            await prisma.household.update({
-              where: { id: household.id },
-              data: {
-                latitude: result.latitude,
-                longitude: result.longitude,
-                geocoded: true,
-                geocodedAt: new Date(),
-                geocodingProvider: providerName,
-              },
-            });
-            successCount++;
-          } else {
-            failureCount++;
-            errorLogs.push({
-              householdId: household.id,
-              address: addressString,
-              error: `No results from geocoding service (${providerDisplayName})`,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error(
-            `[Geocode Job] Error geocoding household ${household.id}: ${errorMessage}`
-          );
-          failureCount++;
-          errorLogs.push({
-            householdId: household.id,
-            address: household.fullAddress || 'Unknown',
-            error: errorMessage,
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        processedCount++;
-
-        // Update progress every 25 households
-        if (processedCount % 25 === 0) {
-          await persistProgress();
-          // Log errors separately
-          if (errorLogs.length > 0) {
-            const recentErrors = errorLogs.slice(-10);
-            for (const errorEntry of recentErrors) {
-              await addJobError(jobId, {
-                timestamp: errorEntry.timestamp,
-                message: `${errorEntry.address}: ${errorEntry.error}`,
-              });
-            }
-          }
-        }
+        await processHousehold(household);
       }
 
       // Rate limiting between batches (if needed)
       if (offset + batchSize < householdCount) {
         await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay
+      }
+    }
+
+    while (isDynamicJob && processedCount < limit) {
+      const controlStatus = await getControlStatus();
+      if (controlStatus === 'paused') {
+        await persistProgress();
+        await addJobError(jobId, 'Job paused by user during processing');
+        return;
+      }
+      if (controlStatus === 'cancelled') {
+        await persistProgress();
+        await addJobError(jobId, 'Job cancelled by user during processing');
+        return;
+      }
+
+      const takeCount = Math.min(batchSize, limit - processedCount);
+      const dynamicWhere: Prisma.HouseholdWhereInput = {
+        ...where,
+        ...(failedHouseholdIdsSet.size > 0
+          ? { id: { notIn: Array.from(failedHouseholdIdsSet) } }
+          : {}),
+      };
+
+      const batch = await prisma.household.findMany({
+        where: dynamicWhere,
+        take: takeCount,
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          fullAddress: true,
+          houseNumber: true,
+          streetName: true,
+          streetSuffix: true,
+          city: true,
+          state: true,
+          zipCode: true,
+        },
+      });
+
+      if (batch.length === 0) {
+        break;
+      }
+
+      for (const household of batch) {
+        await processHousehold(household);
+      }
+
+      if (processedCount < limit) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
 

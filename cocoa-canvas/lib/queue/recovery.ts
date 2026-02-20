@@ -67,6 +67,9 @@ function toGeocodePayload(job: DbJob) {
       ? (parsedData.householdIds as string[])
       : undefined,
     checkpointIndex: Number(parsedData.checkpointIndex || job.processedItems || 0),
+    failedHouseholdIds: Array.isArray(parsedData.failedHouseholdIds)
+      ? (parsedData.failedHouseholdIds as string[])
+      : [],
     dynamic: Boolean(parsedData.dynamic ?? job.isDynamic),
   };
 }
