@@ -65,4 +65,4 @@ jobs:
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ```
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
