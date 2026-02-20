@@ -50,7 +50,24 @@ export interface ScheduledJobData {
   [key: string]: string | number | boolean | object | null | undefined;
 }
 
-export type JobData = VoterImportJobData | ScheduledJobData | Record<string, any>;
+export interface GeocodeJobData {
+  filters: {
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    county?: string;
+    precinctNumber?: string;
+  };
+  limit?: number;
+  providerId?: string;
+  skipGeocoded?: boolean;
+  householdIds?: string[];
+  checkpointIndex?: number;
+  failedHouseholdIds?: string[];
+  dynamic?: boolean;
+}
+
+export type JobData = VoterImportJobData | ScheduledJobData | GeocodeJobData | Record<string, any>;
 
 /**
  * Create or get job queues
@@ -58,6 +75,7 @@ export type JobData = VoterImportJobData | ScheduledJobData | Record<string, any
 const queuesMap = {
   voterImportQueue: null as Queue<VoterImportJobData> | null,
   scheduledJobsQueue: null as Queue<ScheduledJobData> | null,
+  geocodeQueue: null as Queue<GeocodeJobData> | null,
   genericQueue: null as Queue<JobData> | null,
 };
 
@@ -101,6 +119,26 @@ export function getScheduledJobsQueue(): Queue<ScheduledJobData> {
   return queuesMap.scheduledJobsQueue;
 }
 
+export function getGeocodeQueue(): Queue<GeocodeJobData> {
+  if (!queuesMap.geocodeQueue) {
+    queuesMap.geocodeQueue = new Queue<GeocodeJobData>('geocode-households', {
+      connection: {
+        url: process.env.REDIS_URL!,
+      },
+      defaultJobOptions: {
+        attempts: 1,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
+    });
+  }
+  return queuesMap.geocodeQueue;
+}
+
 export function getGenericQueue(): Queue<JobData> {
   if (!queuesMap.genericQueue) {
     queuesMap.genericQueue = new Queue<JobData>('generic', {
@@ -125,9 +163,11 @@ export function getGenericQueue(): Queue<JobData> {
 const setupQueueEvents = () => {
   const voterImportQueue = getVoterImportQueue();
   const scheduledJobsQueue = getScheduledJobsQueue();
+  const geocodeQueue = getGeocodeQueue();
 
   const voterImportQueueEvents = new QueueEvents('voter-import', { connection: { url: process.env.REDIS_URL! } });
   const scheduledJobsQueueEvents = new QueueEvents('scheduled-jobs', { connection: { url: process.env.REDIS_URL! } });
+  const geocodeQueueEvents = new QueueEvents('geocode-households', { connection: { url: process.env.REDIS_URL! } });
 
   voterImportQueueEvents.on('completed', ({ jobId }) => {
     console.log(`[Queue] Job ${jobId} completed`);
@@ -145,9 +185,18 @@ const setupQueueEvents = () => {
     console.error(`[Queue] Scheduled job ${jobId} failed:`, failedReason);
   });
 
+  geocodeQueueEvents.on('completed', ({ jobId }) => {
+    console.log(`[Queue] Geocode job ${jobId} completed`);
+  });
+
+  geocodeQueueEvents.on('failed', ({ jobId, failedReason }) => {
+    console.error(`[Queue] Geocode job ${jobId} failed:`, failedReason);
+  });
+
   return {
     voterImport: voterImportQueueEvents,
     scheduledJobs: scheduledJobsQueueEvents,
+    geocode: geocodeQueueEvents,
   };
 };
 
@@ -166,10 +215,12 @@ export function getQueueEvents() {
 export async function closeQueues() {
   if (queuesMap.voterImportQueue) await queuesMap.voterImportQueue.close();
   if (queuesMap.scheduledJobsQueue) await queuesMap.scheduledJobsQueue.close();
+  if (queuesMap.geocodeQueue) await queuesMap.geocodeQueue.close();
   if (queuesMap.genericQueue) await queuesMap.genericQueue.close();
   if (queueEventsInstance) {
     await queueEventsInstance.voterImport.close();
     await queueEventsInstance.scheduledJobs.close();
+    await queueEventsInstance.geocode.close();
   }
   await redis.quit();
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
@@ -48,13 +48,7 @@ export default function OptionGroupsPage() {
     }
   }, [router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchItems();
-    }
-  }, [user, activeGroup]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -71,7 +65,13 @@ export default function OptionGroupsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeGroup]);
+
+  useEffect(() => {
+    if (user) {
+      fetchItems();
+    }
+  }, [user, activeGroup, fetchItems]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,10 +132,28 @@ export default function OptionGroupsPage() {
     setShowAddModal(true);
   };
 
-  const optionGroups = [
-    { id: 'parties', name: 'Political Parties', icon: '🎗️', fields: ['name', 'abbr', 'description', 'color'] },
-    { id: 'locations', name: 'Location Types', icon: '📍', fields: ['name', 'category', 'description'] },
+  const optionGroupsCategories = [
+    {
+      category: 'Political & Campaign',
+      description: 'Manage political parties and election types',
+      groups: [
+        { id: 'parties', name: 'Political Parties', icon: '🎗️', description: 'Manage political party names, abbreviations, and colors', fields: ['name', 'abbr', 'description', 'color'] },
+        { id: 'election-types', name: 'Election Types', icon: '🗳️', description: 'Configure types of elections (Primary, General, Special, etc.)', fields: ['name', 'description'] },
+      ]
+    },
+    {
+      category: 'Geographic & Spatial',
+      description: 'Manage location and spatial dataset classifications',
+      groups: [
+        { id: 'locations', name: 'Location Types', icon: '📍', description: 'Define categories for contact locations and addresses', fields: ['name', 'category', 'description'] },
+        { id: 'dataset-types', name: 'Dataset Types', icon: '📊', description: 'Classify spatial datasets (Parcel, Precinct, Demographic, etc.)', fields: ['name', 'description', 'category'] },
+      ]
+    },
   ];
+
+  // Flatten for easy lookup
+  const allGroups = optionGroupsCategories.flatMap(cat => cat.groups);
+  const activeGroupData = allGroups.find(g => g.id === activeGroup);
 
   if (!user) return null;
 
@@ -185,28 +203,58 @@ export default function OptionGroupsPage() {
           </div>
         </div>
 
-        {/* Group Selector */}
-        <div className="mb-6 flex gap-2">
-          {optionGroups.map((group) => (
-            <button
-              key={group.id}
-              onClick={() => setActiveGroup(group.id)}
-              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                activeGroup === group.id
-                  ? 'bg-cocoa-600 dark:bg-cinnamon-600 text-white'
-                  : 'bg-white dark:bg-cocoa-800 border border-cocoa-200 dark:border-cocoa-700 text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700'
-              }`}
-            >
-              {group.icon} {group.name}
-            </button>
-          ))}
-        </div>
+        {/* Categorized Group Selector */}
+        {optionGroupsCategories.map((section) => (
+          <div key={section.category} className="mb-8">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-1">
+                {section.category}
+              </h2>
+              <p className="text-cocoa-600 dark:text-cocoa-300">
+                {section.description}
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {section.groups.map((group) => (
+                <button
+                  key={group.id}
+                  onClick={() => setActiveGroup(group.id)}
+                  className={`p-6 rounded-lg shadow-sm border-2 text-left transition-all ${
+                    activeGroup === group.id
+                      ? 'border-cocoa-600 dark:border-cinnamon-500 bg-cocoa-50 dark:bg-cocoa-700/50'
+                      : 'border-cocoa-200 dark:border-cocoa-700 bg-white dark:bg-cocoa-800 hover:border-cocoa-300 dark:hover:border-cocoa-600 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">{group.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-1">
+                        {group.name}
+                      </h3>
+                      <p className="text-sm text-cocoa-600 dark:text-cocoa-300">
+                        {group.description}
+                      </p>
+                    </div>
+                    {activeGroup === group.id && (
+                      <div className="text-cocoa-600 dark:text-cinnamon-500">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
 
         {/* Items List */}
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">
-              {optionGroups.find(g => g.id === activeGroup)?.name}
+              {activeGroupData?.icon} {activeGroupData?.name}
             </h2>
             <button
               onClick={() => {
@@ -226,7 +274,7 @@ export default function OptionGroupsPage() {
             </div>
           ) : items.length === 0 ? (
             <p className="text-center py-8 text-cocoa-600 dark:text-cocoa-300">
-              No items found. Click "Add New" to create one.
+              No items found. Click &quot;Add New&quot; to create one.
             </p>
           ) : (
             <div className="space-y-2">
@@ -289,7 +337,7 @@ export default function OptionGroupsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-xl p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold text-cocoa-900 dark:text-cream-50 mb-4">
-              {editingItem ? 'Edit' : 'Add New'} {optionGroups.find(g => g.id === activeGroup)?.name.slice(0, -1)}
+              {editingItem ? 'Edit' : 'Add New'} {activeGroupData?.name.slice(0, -1) || 'Item'}
             </h2>
             
             <form onSubmit={handleSave} className="space-y-4">
@@ -344,6 +392,25 @@ export default function OptionGroupsPage() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
                   />
+                </div>
+              )}
+
+              {activeGroup === 'dataset-types' && (
+                <div>
+                  <label className="block text-sm font-medium text-cocoa-700 dark:text-cocoa-300 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50"
+                  >
+                    <option value="">Select a category</option>
+                    <option value="vector">Vector</option>
+                    <option value="raster">Raster</option>
+                    <option value="tabular">Tabular</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
               )}
 

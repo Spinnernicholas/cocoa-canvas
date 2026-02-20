@@ -68,7 +68,7 @@ export default function PeopleImportModal({ isOpen, onClose, onSuccess }: People
       };
       fetchFormats();
     }
-  }, [isOpen, step, importKind, importFormats.length]);
+  }, [isOpen, step, importKind, importFormats.length, router]);
 
   // Reset state when modal closes
   useEffect(() => {

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Job"
+ADD COLUMN "isDynamic" BOOLEAN NOT NULL DEFAULT false;

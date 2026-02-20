@@ -8,6 +8,8 @@
  */
 
 import { seedLocations } from './seed-locations.ts';
+import { seedElectionTypes } from './seed-election-types.ts';
+import { seedDatasetTypes } from './seed-dataset-types.ts';
 
 async function main() {
   console.log('[Seed] Starting database initialization...');
@@ -18,6 +20,18 @@ async function main() {
     console.log('[Seed] Step 1: Location Types & Party Types');
     console.log('─'.repeat(40));
     await seedLocations(true);
+    console.log('');
+
+    // Seed election types
+    console.log('[Seed] Step 2: Election Types');
+    console.log('─'.repeat(40));
+    await seedElectionTypes();
+    console.log('');
+
+    // Seed dataset types
+    console.log('[Seed] Step 3: Dataset Types');
+    console.log('─'.repeat(40));
+    await seedDatasetTypes();
     console.log('');
 
     console.log('[Seed] ✅ Database initialization complete!');

@@ -19,15 +19,19 @@ export interface VoterImportResult {
     message: string;
   }>;
   message?: string;
+  linesProcessed?: number; // Total lines including header
+  headerDetected?: boolean; // Whether a header row was detected
 }
 
 export interface VoterImportOptions {
   filePath: string;
   importType: ImportType;
   format: string;
+  fileSize?: number; // Total file size in bytes for progress tracking
   jobId?: string;
   userId?: string;
-  onProgress?: (processed: number, total: number, errors: number) => void;
+  resumeFromProcessed?: number;
+  onProgress?: (processed: number, total: number, errors: number, bytesProcessed?: number) => void;
 }
 
 export interface ParsedVoterRecord {

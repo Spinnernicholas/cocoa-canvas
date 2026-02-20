@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
+import { formatOutputStats, getProgressFromStats } from '@/lib/queue/types';
 
 interface Job {
   id: string;
   type: string;
   status: string;
+  isDynamic?: boolean;
   progress: number;
   totalItems?: number;
   processedItems?: number;
+  outputStats?: any;
   data?: any;
   errorLog?: any[];
   createdAt: string;
@@ -30,6 +33,7 @@ export default function JobsPage() {
   const [user, setUser] = useState<any>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState('');
   
   // Filters
@@ -37,6 +41,58 @@ export default function JobsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
+
+  const fetchJobs = useCallback(async (showLoading = false) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      setError('');
+      const token = localStorage.getItem('authToken');
+
+      const params = new URLSearchParams({
+        limit: (limit * 10).toString(),
+        offset: '0',
+      });
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      if (typeFilter !== 'all') {
+        params.append('type', typeFilter);
+      }
+
+      const response = await fetch(`/api/v1/jobs?${params}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('authToken');
+          router.push('/login');
+          return;
+        }
+        setError('Failed to load jobs');
+        return;
+      }
+
+      const data = await response.json();
+      setJobs(data.jobs || []);
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      setError('Error loading jobs');
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  }, [hasLoadedOnce, limit, router, statusFilter, typeFilter]);
 
   // Load user
   useEffect(() => {
@@ -61,54 +117,39 @@ export default function JobsPage() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchJobs = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const token = localStorage.getItem('authToken');
-        
-        const params = new URLSearchParams({
-          limit: (limit * 10).toString(), // Get more for client-side filtering
-          offset: '0',
-        });
-
-        if (statusFilter !== 'all') {
-          params.append('status', statusFilter);
-        }
-
-        if (typeFilter !== 'all') {
-          params.append('type', typeFilter);
-        }
-
-        const response = await fetch(`/api/v1/jobs?${params}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem('user');
-            localStorage.removeItem('authToken');
-            router.push('/login');
-            return;
-          }
-          setError('Failed to load jobs');
-          return;
-        }
-
-        const data = await response.json();
-        setJobs(data.jobs || []);
-      } catch (err) {
-        console.error('Error fetching jobs:', err);
-        setError('Error loading jobs');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchJobs();
-    const interval = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
+    fetchJobs(!hasLoadedOnce);
+    const interval = setInterval(() => fetchJobs(false), 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, [user, statusFilter, typeFilter, limit, router]);
+  }, [user, fetchJobs, hasLoadedOnce]);
+
+  const handleJobControl = async (
+    event: React.MouseEvent,
+    jobId: string,
+    action: 'pause' | 'resume' | 'cancel'
+  ) => {
+    event.stopPropagation();
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/v1/jobs/${jobId}/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `Failed to ${action} job`);
+      }
+
+      await fetchJobs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} job`);
+    }
+  };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -120,6 +161,8 @@ export default function JobsPage() {
         return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
       case 'failed':
         return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+      case 'paused':
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
       case 'cancelled':
         return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
       default:
@@ -133,6 +176,7 @@ export default function JobsPage() {
       case 'processing': return '⚙️';
       case 'pending': return '⏳';
       case 'failed': return '❌';
+      case 'paused': return '⏸️';
       case 'cancelled': return '🚫';
       default: return '📊';
     }
@@ -213,17 +257,25 @@ export default function JobsPage() {
                 Monitor and manage background jobs
               </p>
             </div>
-            <Link
-              href="/dashboard"
-              className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium transition-colors"
-            >
-              ← Back to Dashboard
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/jobs/run"
+                className="px-4 py-2 bg-cinnamon-500 hover:bg-cinnamon-600 text-cream-50 rounded-lg font-medium transition-colors"
+              >
+                + Run Job
+              </Link>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 border border-cocoa-300 dark:border-cocoa-600 rounded-lg text-cocoa-700 dark:text-cocoa-300 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 font-medium transition-colors"
+              >
+                ← Back to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
             <div className="flex items-center justify-between">
               <div>
@@ -269,6 +321,30 @@ export default function JobsPage() {
               <span className="text-3xl">❌</span>
             </div>
           </div>
+
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Paused</p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {jobs.filter(j => j.status === 'paused').length}
+                </p>
+              </div>
+              <span className="text-3xl">⏸️</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Cancelled</p>
+                <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">
+                  {jobs.filter(j => j.status === 'cancelled').length}
+                </p>
+              </div>
+              <span className="text-3xl">🚫</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -284,6 +360,7 @@ export default function JobsPage() {
               <option value="processing">Processing</option>
               <option value="completed">Completed</option>
               <option value="failed">Failed</option>
+              <option value="paused">Paused</option>
               <option value="cancelled">Cancelled</option>
             </select>
 
@@ -339,9 +416,11 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Type</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Status</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Progress</th>
+                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Output</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Duration</th>
                     <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Created By</th>
+                    <th className="px-6 py-3 text-left font-semibold text-cocoa-900 dark:text-cream-50">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cocoa-200 dark:divide-cocoa-700">
@@ -352,9 +431,12 @@ export default function JobsPage() {
                       onClick={() => router.push(`/jobs/${job.id}`)}
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-lg">{getTypeEmoji(job.type)}</span>
                           <span className="font-medium text-cocoa-900 dark:text-cream-50">{job.type}</span>
+                          <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold ${job.isDynamic ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300' : 'bg-cocoa-100 dark:bg-cocoa-900/40 text-cocoa-700 dark:text-cocoa-300'}`}>
+                            {job.isDynamic ? 'Dynamic' : 'Static'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -379,6 +461,20 @@ export default function JobsPage() {
                           <span className="text-cocoa-700 dark:text-cocoa-300">—</span>
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-cocoa-600 dark:text-cocoa-400 max-w-sm">
+                          {job.outputStats ? (
+                            (() => {
+                              const stats = typeof job.outputStats === 'string' 
+                                ? JSON.parse(job.outputStats) 
+                                : job.outputStats;
+                              return formatOutputStats(stats);
+                            })()
+                          ) : (
+                            <span className="text-cocoa-500 dark:text-cocoa-500">No statistics</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
                         {formatDate(job.createdAt)}
                       </td>
@@ -387,6 +483,34 @@ export default function JobsPage() {
                       </td>
                       <td className="px-6 py-4 text-cocoa-700 dark:text-cocoa-300">
                         {job.createdBy?.name || '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {(job.status === 'pending' || job.status === 'processing') && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'pause')}
+                              className="px-2 py-1 text-xs rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                            >
+                              Pause
+                            </button>
+                          )}
+                          {job.status === 'paused' && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'resume')}
+                              className="px-2 py-1 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
+                            >
+                              Resume
+                            </button>
+                          )}
+                          {(job.status === 'pending' || job.status === 'processing' || job.status === 'paused') && (
+                            <button
+                              onClick={(e) => handleJobControl(e, job.id, 'cancel')}
+                              className="px-2 py-1 text-xs rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

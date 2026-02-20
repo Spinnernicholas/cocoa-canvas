@@ -396,7 +396,7 @@ export default function CampaignPage() {
             {/* Navigation Links */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
               <Link
-                href="/campaign/map"
+                href="/households/map"
                 className="block bg-cocoa-600 dark:bg-cocoa-700 hover:bg-cocoa-700 dark:hover:bg-cocoa-600 text-white font-medium py-3 px-4 rounded-lg text-center transition-colors"
               >
                 🗺️ View Campaign Map

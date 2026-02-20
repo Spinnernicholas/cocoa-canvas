@@ -5,11 +5,12 @@ CREATE TABLE "User" (
     "name" TEXT,
     "passwordHash" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "lastLogin" DATETIME,
+    "lastLogin" TIMESTAMP,
     "loginAttempts" INTEGER NOT NULL DEFAULT 0,
-    "lockedUntil" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "lockedUntil" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
+    CONSTRAINT "User_email_key" UNIQUE ("email")
 );
 
 -- CreateTable
@@ -17,11 +18,12 @@ CREATE TABLE "Session" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "token" TEXT NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
+    "expiresAt" TIMESTAMP NOT NULL,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Session_token_key" UNIQUE ("token")
 );
 
 -- CreateTable
@@ -29,12 +31,15 @@ CREATE TABLE "Campaign" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "startDate" DATETIME NOT NULL,
-    "endDate" DATETIME NOT NULL,
+    "startDate" TIMESTAMP NOT NULL,
+    "endDate" TIMESTAMP NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'planning',
     "targetArea" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "color" TEXT NOT NULL DEFAULT '#6B4423',
+    "logoUrl" TEXT,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
+    CONSTRAINT "Campaign_id_key" UNIQUE ("id")
 );
 
 -- CreateTable
@@ -47,9 +52,9 @@ CREATE TABLE "Job" (
     "errorLog" TEXT,
     "data" TEXT,
     "createdById" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "startedAt" DATETIME,
-    "completedAt" DATETIME,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "startedAt" TIMESTAMP,
+    "completedAt" TIMESTAMP,
     CONSTRAINT "Job_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -63,7 +68,7 @@ CREATE TABLE "AuditLog" (
     "details" TEXT,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -76,13 +81,13 @@ CREATE TABLE "Voter" (
     "address" TEXT,
     "notes" TEXT,
     "contactStatus" TEXT NOT NULL DEFAULT 'pending',
-    "lastContactDate" DATETIME,
+    "lastContactDate" TIMESTAMP,
     "lastContactMethod" TEXT,
     "importedFrom" TEXT,
-    "registrationDate" DATETIME,
+    "registrationDate" TIMESTAMP,
     "votingPreference" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -91,9 +96,9 @@ CREATE TABLE "CampaignVoter" (
     "campaignId" TEXT NOT NULL,
     "voterId" TEXT NOT NULL,
     "assigned" BOOLEAN NOT NULL DEFAULT true,
-    "assignedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "assignedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
     CONSTRAINT "CampaignVoter_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "CampaignVoter_voterId_fkey" FOREIGN KEY ("voterId") REFERENCES "Voter" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -106,9 +111,9 @@ CREATE TABLE "ContactLog" (
     "outcome" TEXT,
     "notes" TEXT,
     "followUpNeeded" BOOLEAN NOT NULL DEFAULT false,
-    "followUpDate" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "followUpDate" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
     CONSTRAINT "ContactLog_voterId_fkey" FOREIGN KEY ("voterId") REFERENCES "Voter" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -117,18 +122,13 @@ CREATE TABLE "Setting" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
-    "updatedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP NOT NULL,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Setting_key_key" UNIQUE ("key")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-
--- CreateIndex
 CREATE INDEX "User_email_idx" ON "User"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Session_token_key" ON "Session"("token");
 
 -- CreateIndex
 CREATE INDEX "Session_userId_idx" ON "Session"("userId");
@@ -189,6 +189,3 @@ CREATE INDEX "ContactLog_contactType_idx" ON "ContactLog"("contactType");
 
 -- CreateIndex
 CREATE INDEX "ContactLog_createdAt_idx" ON "ContactLog"("createdAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Setting_key_key" ON "Setting"("key");

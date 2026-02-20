@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { OutputStats } from './types';
 
 /**
  * Job Queue Runner
@@ -9,8 +10,10 @@ import { prisma } from '@/lib/prisma';
  * Job statuses:
  * - pending: Job created, waiting to be processed
  * - processing: Job currently running
+ * - paused: Job paused and can be resumed
  * - completed: Job finished successfully
  * - failed: Job finished with errors
+ * - cancelled: Job was cancelled by user
  */
 
 export interface JobError {
@@ -22,6 +25,12 @@ export interface JobError {
 
 export interface JobData {
   [key: string]: string | number | boolean | object | null | undefined;
+}
+
+export interface CreateJobOptions {
+  isDynamic?: boolean;
+  totalItems?: number;
+  processedItems?: number;
 }
 
 /**
@@ -104,7 +113,8 @@ export async function getJobs(
 export async function createJob(
   type: string,
   createdById: string,
-  data?: JobData
+  data?: JobData,
+  options?: CreateJobOptions
 ) {
   try {
     return await prisma.job.create({
@@ -112,10 +122,11 @@ export async function createJob(
         type,
         createdById,
         status: 'pending',
-        totalItems: 0,
-        processedItems: 0,
+        totalItems: options?.totalItems ?? 0,
+        processedItems: options?.processedItems ?? 0,
+        isDynamic: options?.isDynamic ?? false,
         data: data ? JSON.stringify(data) : null,
-      },
+      } as any,
       include: {
         createdBy: {
           select: {
@@ -140,12 +151,23 @@ export async function createJob(
  */
 export async function startJob(jobId: string) {
   try {
-    return await prisma.job.update({
-      where: { id: jobId },
+    const startResult = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: 'pending',
+      },
       data: {
         status: 'processing',
         startedAt: new Date(),
       },
+    });
+
+    if (startResult.count === 0) {
+      return null;
+    }
+
+    return await prisma.job.findUnique({
+      where: { id: jobId },
     });
   } catch (error) {
     console.error('[Start Job Error]', error);
@@ -154,19 +176,68 @@ export async function startJob(jobId: string) {
 }
 
 /**
+ * Merge partial data into a job's existing JSON data payload
+ */
+export async function mergeJobData(jobId: string, dataPatch: JobData) {
+  try {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      select: { data: true },
+    });
+
+    if (!job) {
+      return null;
+    }
+
+    const existingData = parseJobData(job.data);
+    const mergedData = {
+      ...existingData,
+      ...dataPatch,
+    };
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        data: JSON.stringify(mergedData),
+      },
+    });
+  } catch (error) {
+    console.error('[Merge Job Data Error]', error);
+    return null;
+  }
+}
+
+/**
  * Update job progress
  * 
  * Call this during processing to track how many items have been processed.
+ * Optionally pass output stats to track job-specific metrics.
  */
 export async function updateJobProgress(
   jobId: string,
   processedItems: number,
-  totalItems?: number
+  totalItems?: number,
+  outputStats?: Partial<OutputStats>
 ) {
   try {
     const updateData: any = { processedItems };
     if (totalItems !== undefined && totalItems > 0) {
       updateData.totalItems = totalItems;
+    }
+    
+    // Merge output stats with existing ones if provided
+    if (outputStats) {
+      const job = await prisma.job.findUnique({
+        where: { id: jobId },
+      });
+      
+      if (job && job.outputStats) {
+        const existing = JSON.parse(job.outputStats);
+        const merged = { ...existing, ...outputStats };
+        updateData.outputStats = JSON.stringify(merged);
+      } else {
+        updateData.outputStats = JSON.stringify(outputStats);
+      }
     }
 
     return await prisma.job.update({
@@ -175,6 +246,44 @@ export async function updateJobProgress(
     });
   } catch (error) {
     console.error('[Update Job Progress Error]', error);
+    return null;
+  }
+}
+
+/**
+ * Update output statistics for a job
+ * 
+ * Stores job-specific metrics like bytes processed, records created, etc.
+ * Useful for tracking progress with file-based metrics.
+ */
+export async function updateJobOutputStats(
+  jobId: string,
+  stats: Partial<OutputStats>
+) {
+  try {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+    });
+
+    if (!job) {
+      console.warn('[Update Output Stats] Job not found:', jobId);
+      return null;
+    }
+
+    let merged = { ...stats };
+    if (job.outputStats) {
+      const existing = JSON.parse(job.outputStats);
+      merged = { ...existing, ...stats };
+    }
+
+    return await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        outputStats: JSON.stringify(merged),
+      },
+    });
+  } catch (error) {
+    console.error('[Update Output Stats Error]', error);
     return null;
   }
 }
@@ -305,6 +414,75 @@ export async function failJob(jobId: string, errorMessage: string) {
 }
 
 /**
+ * Mark a job as paused
+ */
+export async function pauseJob(jobId: string, reason?: string) {
+  try {
+    if (reason) {
+      await addJobError(jobId, {
+        timestamp: new Date().toISOString(),
+        message: reason,
+        code: 'JOB_PAUSED',
+      });
+    }
+
+    const result = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: { in: ['pending', 'processing'] },
+      },
+      data: {
+        status: 'paused',
+      },
+    });
+
+    if (result.count === 0) {
+      return await prisma.job.findUnique({ where: { id: jobId } });
+    }
+
+    return await prisma.job.findUnique({ where: { id: jobId } });
+  } catch (error) {
+    console.error('[Pause Job Error]', error);
+    return null;
+  }
+}
+
+/**
+ * Mark a job as cancelled
+ */
+export async function markJobCancelled(jobId: string, reason?: string) {
+  try {
+    if (reason) {
+      await addJobError(jobId, {
+        timestamp: new Date().toISOString(),
+        message: reason,
+        code: 'JOB_CANCELLED',
+      });
+    }
+
+    const result = await prisma.job.updateMany({
+      where: {
+        id: jobId,
+        status: { in: ['pending', 'processing', 'paused'] },
+      },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+
+    if (result.count === 0) {
+      return await prisma.job.findUnique({ where: { id: jobId } });
+    }
+
+    return await prisma.job.findUnique({ where: { id: jobId } });
+  } catch (error) {
+    console.error('[Cancel Job Error]', error);
+    return null;
+  }
+}
+
+/**
  * Parse job data from stored JSON string
  * 
  * Safely parses JSON with fallback to empty object
@@ -337,16 +515,42 @@ export function parseJobErrors(errorLogJson: string | null): JobError[] {
 /**
  * Get progress percentage for a job
  * 
+ * Prioritizes file-based progress from outputStats if available,
+ * falls back to record-based progress.
  * Returns 0 if no items processed yet, 100 if completed/failed
  */
 export function getJobProgress(job: {
   status: string;
   totalItems: number;
   processedItems: number;
+  outputStats?: string | null;
 }): number {
-  if (job.status === 'completed' || job.status === 'failed') {
+  if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
     return 100;
   }
+  
+  // Try to get progress from outputStats (file-based)
+  if (job.outputStats) {
+    try {
+      const stats = JSON.parse(job.outputStats);
+      
+      // File-based progress (for imports)
+      if (stats.bytesProcessed !== undefined && stats.fileSize !== undefined && stats.fileSize > 0) {
+        const progress = Math.round((stats.bytesProcessed / stats.fileSize) * 100);
+        return Math.min(progress, 99);
+      }
+      
+      // Or use explicit percentComplete if set
+      if (stats.percentComplete !== undefined) {
+        return Math.min(stats.percentComplete, 99);
+      }
+    } catch (error) {
+      console.warn('[getJobProgress] Failed to parse outputStats:', error);
+      // Fall through to record-based progress
+    }
+  }
+  
+  // Fall back to record-based progress
   if (job.totalItems === 0) {
     return 0;
   }
@@ -375,20 +579,7 @@ export async function cancelJob(jobId: string) {
       return job;
     }
 
-    return await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        status: 'failed',
-        completedAt: new Date(),
-        errorLog: JSON.stringify([
-          {
-            timestamp: new Date().toISOString(),
-            message: 'Job cancelled by user',
-            code: 'JOB_CANCELLED',
-          },
-        ]),
-      },
-    });
+    return await markJobCancelled(jobId, 'Job cancelled by user');
   } catch (error) {
     console.error('[Cancel Job Error]', error);
     return null;

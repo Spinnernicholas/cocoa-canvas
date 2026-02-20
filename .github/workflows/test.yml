@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - 'cocoa-canvas/**'
       - '.github/workflows/test.yml'

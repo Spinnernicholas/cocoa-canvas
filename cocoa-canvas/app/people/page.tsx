@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Marshmallow from '@/components/Marshmallow';
@@ -124,7 +124,7 @@ export default function PeoplePage() {
   }, [router]);
 
   // Fetch people
-  const fetchPeople = async () => {
+  const fetchPeople = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -177,11 +177,11 @@ export default function PeoplePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, limit, page, router, user, viewFilter]);
 
   useEffect(() => {
     fetchPeople();
-  }, [user, page, filters, viewFilter]);
+  }, [fetchPeople]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

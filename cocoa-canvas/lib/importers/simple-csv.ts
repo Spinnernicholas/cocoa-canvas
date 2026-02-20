@@ -17,6 +17,7 @@ import {
   VoterImportResult,
 } from './types';
 import { prisma } from '@/lib/prisma';
+import { ensureHouseholdForPerson } from './household-helper';
 
 /**
  * Normalize string field
@@ -35,7 +36,7 @@ export class SimpleCsvImporter implements VoterImporter {
   readonly supportsIncremental = false; // No unique ID to match on
   
   async importFile(options: VoterImportOptions): Promise<VoterImportResult> {
-    const { filePath, importType, onProgress } = options;
+    const { filePath, importType, fileSize, onProgress, resumeFromProcessed } = options;
     
     if (importType === 'incremental') {
       return {
@@ -66,9 +67,11 @@ export class SimpleCsvImporter implements VoterImporter {
       };
     }
     
-    let processed = 0;
+    let processed = Math.max(0, resumeFromProcessed || 0);
     let created = 0;
     let skipped = 0;
+    let bytesProcessed = 0;
+    let resumeRowsRemaining = Math.max(0, resumeFromProcessed || 0);
     const errors: Array<{ row: number; field?: string; message: string }> = [];
     
     return new Promise((resolve) => {
@@ -81,11 +84,23 @@ export class SimpleCsvImporter implements VoterImporter {
       });
       
       const stream = createReadStream(filePath);
+      
+      // Track bytes read from stream
+      stream.on('data', (chunk: string | Buffer) => {
+        bytesProcessed += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+      });
+      
       stream.pipe(parser);
       
       parser.on('data', async (record: any) => {
         try {
           parser.pause();
+
+          if (resumeRowsRemaining > 0) {
+            resumeRowsRemaining--;
+            parser.resume();
+            return;
+          }
           
           const firstName = normalize(record.firstname || record.first_name || record.FirstName);
           const lastName = normalize(record.lastname || record.last_name || record.LastName);
@@ -128,7 +143,22 @@ export class SimpleCsvImporter implements VoterImporter {
             },
           });
           
-          // Step 3: Create address (linked to Person)
+          // Step 3: Create household and link person (if address provided)
+          if (address && city && zipCode) {
+            try {
+              await ensureHouseholdForPerson(person.id, {
+                streetName: address,
+                city,
+                state,
+                zipCode,
+              });
+            } catch (householdError) {
+              console.warn(`Could not create household for ${address}: ${householdError}`);
+              // Continue - household creation is not critical for the import
+            }
+          }
+          
+          // Step 4: Create address record (linked to Person)
           if (address && city && zipCode) {
             await prisma.address.create({
               data: {
@@ -146,7 +176,7 @@ export class SimpleCsvImporter implements VoterImporter {
             });
           }
           
-          // Step 4: Create phone (linked to Person)
+          // Step 5: Create phone (linked to Person)
           if (phone) {
             await prisma.phone.create({
               data: {
@@ -160,7 +190,7 @@ export class SimpleCsvImporter implements VoterImporter {
             });
           }
           
-          // Step 5: Create email (linked to Person)
+          // Step 6: Create email (linked to Person)
           if (email) {
             await prisma.email.create({
               data: {
@@ -178,7 +208,7 @@ export class SimpleCsvImporter implements VoterImporter {
           processed++;
           
           if (onProgress && processed % 100 === 0) {
-            onProgress(processed, 0, errors.length);
+            onProgress(processed, 0, errors.length, bytesProcessed);
           }
           
           parser.resume();

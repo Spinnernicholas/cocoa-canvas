@@ -1,7 +1,7 @@
 /**
  * GET /api/v1/gis/households
- * Query households with geographic bounds filtering
- * Supports administrative and category filters
+ * Query households with filtering and search
+ * Supports city, state, zipCode, geocoded status filters
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,45 +9,25 @@ import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { auditLog } from '@/lib/audit/logger';
 
-interface Bounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
-interface HouseholdQuery {
-  bounds?: Bounds | string; // JSON string or object
-  city?: string;
-  zipCode?: string;
-  precinctNumber?: string;
-  county?: string;
-  votersOnly?: boolean;
-  volunteersOnly?: boolean;
-  donorsOnly?: boolean;
-  limit?: number;
-  offset?: number;
-}
+export const dynamic = 'force-dynamic';
 
 interface HouseholdResponse {
   id: string;
-  address: {
-    street: string;
-    city?: string;
-    zipCode?: string;
-    county?: string;
-  };
-  location: {
-    lat: number;
-    lng: number;
-  };
-  memberCount: number;
-  members: Array<{
-    id: string;
-    name: string;
-    roles: string[];
-  }>;
-  parcelId?: string;
+  houseNumber?: string;
+  streetName: string;
+  streetSuffix?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  fullAddress: string;
+  personCount: number;
+  latitude?: number;
+  longitude?: number;
+  geocoded: boolean;
+  geocodedAt?: string;
+  geocodingProvider?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -60,138 +40,104 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
-    const boundsParam = searchParams.get('bounds');
+    const search = searchParams.get('search');
     const city = searchParams.get('city');
+    const state = searchParams.get('state');
     const zipCode = searchParams.get('zipCode');
-    const county = searchParams.get('county');
-    const votersOnly = searchParams.get('votersOnly') === 'true';
-    const volunteersOnly = searchParams.get('volunteersOnly') === 'true';
-    const donorsOnly = searchParams.get('donorsOnly') === 'true';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 10000);
+    const geocodedStr = searchParams.get('geocoded');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 500);
     const offset = parseInt(searchParams.get('offset') || '0');
-
-    // Parse bounds
-    let bounds: Bounds | null = null;
-    if (boundsParam) {
-      try {
-        const parsedBounds = JSON.parse(boundsParam);
-        if (parsedBounds && parsedBounds.north && parsedBounds.south && parsedBounds.east && parsedBounds.west) {
-          bounds = parsedBounds;
-        } else {
-          return NextResponse.json(
-            { error: 'Bounds must include north, south, east, west' },
-            { status: 400 }
-          );
-        }
-      } catch {
-        return NextResponse.json({ error: 'Invalid bounds JSON' }, { status: 400 });
-      }
-    }
 
     // Build where clause
     const where: any = {};
 
-    if (bounds) {
-      where.parcel = {
-        centroidLatitude: { gte: bounds.south, lte: bounds.north },
-        centroidLongitude: { gte: bounds.west, lte: bounds.east },
-      };
+    // Text search on full address fields
+    if (search) {
+      where.OR = [
+        { houseNumber: { contains: search, mode: 'insensitive' } },
+        { streetName: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
+    // Exact/partial filters
     if (city) where.city = { contains: city, mode: 'insensitive' };
-    if (zipCode) where.zipCode = zipCode;
-    if (county) where.county = { contains: county, mode: 'insensitive' };
+    if (state) where.state = { contains: state, mode: 'insensitive' };
+    if (zipCode) where.zipCode = { contains: zipCode };
 
-    // Apply category filters
-    if (votersOnly || volunteersOnly || donorsOnly) {
-      const OR: any[] = [];
-      if (votersOnly) OR.push({ members: { some: { voter: { isNot: null } } } });
-      if (volunteersOnly) OR.push({ members: { some: { volunteer: { isNot: null } } } });
-      if (donorsOnly) OR.push({ members: { some: { donor: { isNot: null } } } });
-      where.OR = OR;
+    // Geocoding status filter
+    if (geocodedStr !== null) {
+      where.geocoded = geocodedStr === 'true';
     }
 
     // Fetch households with pagination
     const households = await prisma.household.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        houseNumber: true,
+        streetName: true,
+        streetSuffix: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        fullAddress: true,  
+        latitude: true,
+        longitude: true,
+        geocoded: true,
+        geocodedAt: true,
+        geocodingProvider: true,
+        createdAt: true,
+        updatedAt: true,
         people: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            voter: { select: { id: true } },
-            volunteer: { select: { id: true } },
-            donor: { select: { id: true } },
-          },
-        },
-        parcel: {
-          select: {
-            centroidLatitude: true,
-            centroidLongitude: true,
-          },
+          select: { id: true },
         },
       },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
 
     // Transform response
-    const response: HouseholdResponse[] = households.map((h: any) => {
-      const members = h.people.map((p: any) => {
-        const roles: string[] = [];
-        if (p.voter) roles.push('voter');
-        if (p.volunteer) roles.push('volunteer');
-        if (p.donor) roles.push('donor');
-
-        return {
-          id: p.id,
-          name: `${p.firstName} ${p.lastName}`,
-          roles,
-        };
-      });
-
-      return {
-        id: h.id,
-        address: {
-          street: h.fullAddress || '',
-          city: h.city || undefined,
-          zipCode: h.zipCode || undefined,
-          county: h.county || undefined,
-        },
-        location: {
-          lat: h.parcel?.centroidLatitude || 0,
-          lng: h.parcel?.centroidLongitude || 0,
-        },
-        memberCount: members.length,
-        members,
-        parcelId: h.parcelId || undefined,
-      };
-    });
+    const response: HouseholdResponse[] = households.map((h: any) => ({
+      id: h.id,
+      houseNumber: h.houseNumber || undefined,
+      streetName: h.streetName,
+      streetSuffix: h.streetSuffix || undefined,
+      city: h.city,
+      state: h.state,
+      zipCode: h.zipCode,
+      fullAddress: h.fullAddress,
+      personCount: h.people.length,
+      latitude: h.latitude || undefined,
+      longitude: h.longitude || undefined,
+      geocoded: h.geocoded,
+      geocodedAt: h.geocodedAt?.toISOString(),
+      geocodingProvider: h.geocodingProvider || undefined,
+      createdAt: h.createdAt.toISOString(),
+      updatedAt: h.updatedAt.toISOString(),
+    }));
 
     // Get total count for pagination
     const total = await prisma.household.count({ where });
 
     // Log audit event
     await auditLog(authResult.user?.userId || 'Unknown', 'HOUSEHOLDS_QUERY', request, undefined, undefined, {
-      bounds: !!bounds,
+      search: !!search,
       city: city || undefined,
+      state: state || undefined,
       zipCode: zipCode || undefined,
-      county: county || undefined,
-      votersOnly,
-      volunteersOnly,
-      donorsOnly,
+      geocoded: geocodedStr || undefined,
       resultCount: response.length,
       totalAvailable: total,
     });
 
     return NextResponse.json({
       households: response,
+      total,
       pagination: {
         limit,
         offset,
-        total,
-        returned: response.length,
+        remaining: Math.max(0, total - (offset + limit)),
       },
     });
   } catch (err) {

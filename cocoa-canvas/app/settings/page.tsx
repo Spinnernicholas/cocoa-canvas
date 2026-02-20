@@ -13,25 +13,26 @@ interface User {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    const token = localStorage.getItem('authToken');
-
-    if (!userStr || !token) {
-      router.push('/login');
-      return;
+  const [user] = useState<User | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
     }
 
     try {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
-    } catch (error) {
-      console.error('Error parsing user data:', error);
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+
+    if (!user || !token) {
       router.push('/login');
     }
-  }, [router]);
+  }, [router, user]);
 
   if (!user) {
     return null;

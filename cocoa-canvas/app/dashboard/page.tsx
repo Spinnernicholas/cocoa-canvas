@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Marshmallow from '@/components/Marshmallow';
 import Header from '@/components/Header';
-import CampaignCard from '@/components/CampaignCard';
 import JobQueueStatus from '@/components/JobQueueStatus';
-import RecentJobsList from '@/components/RecentJobsList';
 
 interface User {
   id: string;
@@ -15,10 +13,17 @@ interface User {
   name: string;
 }
 
+interface QuickNavCounts {
+  households: number;
+  people: number;
+  datasets: number;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState<QuickNavCounts | null>(null);
 
   useEffect(() => {
     // Get user from localStorage
@@ -41,6 +46,55 @@ export default function DashboardPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const fetchCounts = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          return;
+        }
+
+        const headers = {
+          Authorization: `Bearer ${token}`,
+        };
+
+        const [peopleRes, householdsRes, datasetsRes] = await Promise.all([
+          fetch('/api/v1/people?limit=1&offset=0', { headers }),
+          fetch('/api/v1/gis/households?limit=1&offset=0', { headers }),
+          fetch('/api/v1/gis/datasets', { headers }),
+        ]);
+
+        if (
+          !peopleRes.ok ||
+          !householdsRes.ok ||
+          !datasetsRes.ok
+        ) {
+          return;
+        }
+
+        const [peopleData, householdsData, datasetsData] = await Promise.all([
+          peopleRes.json(),
+          householdsRes.json(),
+          datasetsRes.json(),
+        ]);
+
+        setCounts({
+          people: Number(peopleData?.total || 0),
+          households: Number(householdsData?.total || 0),
+          datasets: Array.isArray(datasetsData?.data) ? datasetsData.data.length : 0,
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard counts:', error);
+      }
+    };
+
+    fetchCounts();
+  }, [user]);
+
 
 
   if (loading) {
@@ -57,6 +111,18 @@ export default function DashboardPage() {
   if (!user) {
     return null;
   }
+
+  const renderCount = (value?: number, label: string = 'total') => {
+    if (!value || value <= 0) {
+      return null;
+    }
+
+    return (
+      <p className="mt-3 inline-flex items-center px-3 py-1 rounded-full bg-cocoa-100 dark:bg-cocoa-700 text-cocoa-900 dark:text-cream-50 text-sm font-bold">
+        {value.toLocaleString()} {label}
+      </p>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-cocoa-900 relative overflow-hidden">
@@ -96,22 +162,6 @@ export default function DashboardPage() {
           <p className="text-cocoa-600 dark:text-cocoa-300">Your voter database and canvassing platform</p>
         </div>
 
-        {/* Campaign Section */}
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50 mb-4">📊 Campaign Overview</h3>
-          <CampaignCard />
-        </div>
-
-        {/* Job Queue and Recent Jobs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <JobQueueStatus />
-          </div>
-          <div>
-            <RecentJobsList />
-          </div>
-        </div>
-
         {/* Navigation Cards */}
         <div className="mb-8">
           <h3 className="text-xl font-semibold text-cocoa-900 dark:text-cream-50 mb-4">Quick Navigation</h3>
@@ -123,26 +173,34 @@ export default function DashboardPage() {
             >
               <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">👥 People</h4>
               <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage people & voters</p>
+              {renderCount(counts?.people)}
             </Link>
 
-            {/* Maps */}
+            {/* Households */}
             <Link
-              href="/maps"
+              href="/households"
               className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700 hover:shadow-md hover:border-cocoa-300 dark:hover:border-cocoa-600 transition-all"
             >
-              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">🗺️ Maps</h4>
-              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">View area maps</p>
+              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">🏠 Households</h4>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">View & geocode addresses</p>
+              {renderCount(counts?.households)}
             </Link>
 
-            {/* Settings */}
+            {/* Dataset Catalog */}
             <Link
-              href="/settings"
+              href="/catalog"
               className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm p-4 border border-cocoa-200 dark:border-cocoa-700 hover:shadow-md hover:border-cocoa-300 dark:hover:border-cocoa-600 transition-all"
             >
-              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">⚙️ Settings</h4>
-              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage settings</p>
+              <h4 className="text-lg font-semibold text-cocoa-900 dark:text-cream-50 mb-2">🗄️ Dataset Catalog</h4>
+              <p className="text-sm text-cocoa-600 dark:text-cocoa-300">Manage spatial datasets</p>
+              {renderCount(counts?.datasets, 'datasets')}
             </Link>
           </div>
+        </div>
+
+        {/* Job Queue */}
+        <div className="mb-8">
+          <JobQueueStatus />
         </div>
 
         {/* Resources */}
