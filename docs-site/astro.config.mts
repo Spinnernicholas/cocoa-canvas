@@ -26,6 +26,10 @@ export default defineConfig({
           autogenerate: { directory: 'developer' },
         },
         {
+          label: 'Contributing',
+          autogenerate: { directory: 'contributing' },
+        },
+        {
           label: 'Planning & Architecture',
           collapsed: true,
           autogenerate: { directory: 'planning' },
