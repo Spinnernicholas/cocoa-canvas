@@ -1,7 +1,6 @@
 'use client';
 
 import { useTheme } from './ThemeProvider';
-import { useState } from 'react';
 
 interface MarshmallowProps {
   className?: string;
@@ -12,7 +11,9 @@ interface MarshmallowProps {
 
 export default function Marshmallow({ className = '', size = 40, animationDuration = '3s', animationDelay = '0s' }: MarshmallowProps) {
   const { theme } = useTheme();
-  const [rotation] = useState(() => Math.random() * 90 - 45);
+  const delay = Number.parseFloat(animationDelay) || 0;
+  const duration = Number.parseFloat(animationDuration) || 0;
+  const rotation = (((size * 17) + (delay * 37) + (duration * 29)) % 90) - 45;
   
   // Dark marshmallows for light theme, light marshmallows for dark theme
   const bodyFill = theme === 'light' ? '#6B5744' : '#E8D5C4';
