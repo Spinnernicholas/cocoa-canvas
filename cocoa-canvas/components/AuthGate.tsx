@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 const publicRoutes = ['/login', '/setup'];
@@ -13,12 +13,47 @@ function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some((route) => pathname.startsWith(route));
 }
 
+function isProtectedApiRequest(input: RequestInfo | URL): boolean {
+  const requestUrl = typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.toString()
+      : input.url;
+
+  const parsed = new URL(requestUrl, window.location.origin);
+
+  if (!parsed.pathname.startsWith('/api/v1')) {
+    return false;
+  }
+
+  if (parsed.pathname.startsWith('/api/v1/auth/login')) {
+    return false;
+  }
+
+  return true;
+}
+
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
+  const isHandlingUnauthorized = useRef(false);
 
   const publicRoute = useMemo(() => isPublicRoute(pathname), [pathname]);
+
+  const forceLogout = useCallback(() => {
+    if (isHandlingUnauthorized.current) {
+      return;
+    }
+
+    isHandlingUnauthorized.current = true;
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+
+    if (!isPublicRoute(window.location.pathname)) {
+      router.replace('/login');
+    }
+  }, [router]);
 
   useEffect(() => {
     if (publicRoute) {
@@ -32,9 +67,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const userStr = localStorage.getItem('user');
 
     if (!token || !userStr) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      router.replace('/login');
+      forceLogout();
       return;
     }
 
@@ -44,14 +77,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid user payload');
       }
     } catch {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      router.replace('/login');
+      forceLogout();
       return;
     }
 
     setChecking(false);
-  }, [publicRoute, router]);
+  }, [forceLogout, publicRoute]);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await originalFetch(input, init);
+
+      if (response.status === 401 && isProtectedApiRequest(input)) {
+        forceLogout();
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [forceLogout]);
 
   if (publicRoute) {
     return <>{children}</>;
