@@ -18,16 +18,16 @@ interface Bounds {
 
 interface Household {
   id: string;
-  address: {
-    street: string;
-    city?: string;
-    zipCode?: string;
-  };
-  location: {
-    lat: number;
-    lng: number;
-  };
-  memberCount: number;
+  streetName?: string;
+  houseNumber?: string;
+  streetSuffix?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  fullAddress: string;
+  latitude?: number;
+  longitude?: number;
+  personCount: number;
 }
 
 interface MapComponentProps {
@@ -102,21 +102,26 @@ export default function Map({ households, onBoundsChange }: MapComponentProps) {
 
     // Add new markers
     for (const household of households) {
-      if (household.location.lat === 0 && household.location.lng === 0) {
-        continue; // Skip invalid locations
+      // Skip households without valid coordinates
+      if (!household.latitude || !household.longitude) {
+        continue;
       }
 
-      const marker = L.marker([household.location.lat, household.location.lng], {
+      if (household.latitude === 0 && household.longitude === 0) {
+        continue; // Skip null island
+      }
+
+      const marker = L.marker([household.latitude, household.longitude], {
         icon: DefaultIcon,
       });
 
       // Create popup content
       const popupContent = `
         <div class="font-sans p-2">
-          <p class="font-semibold text-sm">${household.address.street}</p>
-          <p class="text-xs text-gray-600">${household.address.city}, ${household.address.zipCode}</p>
-          <p class="text-xs text-gray-500 mt-1">${household.memberCount} member${household.memberCount !== 1 ? 's' : ''}</p>
-          <a href="/api/v1/gis/households/${household.id}" class="text-xs text-blue-600 hover:underline mt-2 inline-block">View details →</a>
+          <p class="font-semibold text-sm">${household.fullAddress}</p>
+          <p class="text-xs text-gray-600">${household.city}, ${household.state} ${household.zipCode}</p>
+          <p class="text-xs text-gray-500 mt-1">${household.personCount} person${household.personCount !== 1 ? 's' : ''}</p>
+          <a href="/households/${household.id}" class="text-xs text-blue-600 hover:underline mt-2 inline-block">View details →</a>
         </div>
       `;
 

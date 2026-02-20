@@ -1,0 +1,339 @@
+/**
+ * EXAMPLE INTEGRATION TEST FOR LOGIN
+ * 
+ * This is an example of a proper integration test that:
+ * - Uses real database (no mocking Prisma)
+ * - Uses real password hashing (no mocking bcrypt)
+ * - Uses real JWT generation (no mocking jsonwebtoken)
+ * - Verifies actual database state changes
+ * - Tests full request/response cycle
+ * 
+ * Compare this to login.test.ts which mocks everything.
+ * 
+ * To run: npm test app/api/v1/auth/login.integration.test.ts
+ */
+
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { NextRequest } from 'next/server';
+import { POST } from './route';
+import { 
+  setupTestDatabase, 
+  cleanupTestDatabase, 
+  disconnectTestDatabase,
+  createTestUser 
+} from '@/lib/testing/db-setup';
+import { prisma } from '@/lib/prisma';
+
+describe('POST /api/v1/auth/login (Integration)', () => {
+  // Run once before all tests - push schema to test DB
+  beforeAll(async () => {
+    await setupTestDatabase();
+  });
+
+  // Run before each test - clean all data
+  beforeEach(async () => {
+    await cleanupTestDatabase();
+  });
+
+  // Run once after all tests - disconnect
+  afterAll(async () => {
+    await disconnectTestDatabase();
+  });
+
+  it('should successfully login with correct credentials', async () => {
+    // ARRANGE: Create real user in test database
+    const { user, password } = await createTestUser({
+      email: 'test@example.com',
+      password: 'TestPassword123!',
+      name: 'Test User',
+    });
+
+    // ACT: Make real API request
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'TestPassword123!',
+      }),
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '192.168.1.1',
+        'user-agent': 'Mozilla/5.0 Test Browser',
+      },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // ASSERT: Response is correct
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.user).toBeDefined();
+    expect(data.user.email).toBe('test@example.com');
+    expect(data.user.name).toBe('Test User');
+    expect(data.token).toBeDefined();
+    expect(typeof data.token).toBe('string');
+    expect(data.token.split('.').length).toBe(3); // JWT format
+
+    // VERIFY: Session created in database
+    const session = await prisma.session.findUnique({
+      where: { token: data.token },
+    });
+    expect(session).toBeDefined();
+    expect(session?.userId).toBe(user.id);
+    expect(session?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+
+    // VERIFY: Audit log created
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { 
+        userId: user.id, 
+        action: 'login' 
+      },
+    });
+    expect(auditLogs.length).toBeGreaterThan(0);
+    expect(auditLogs[0].resource).toBe('user');
+
+    // VERIFY: User lastLogin updated
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    expect(updatedUser?.lastLogin).toBeTruthy();
+    expect(updatedUser?.loginAttempts).toBe(0);
+  });
+
+  it('should reject login with incorrect password', async () => {
+    // ARRANGE: Create user with specific password
+    const { user } = await createTestUser({
+      email: 'test@example.com',
+      password: 'CorrectPassword123!',
+    });
+
+    // ACT: Try to login with wrong password
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'WrongPassword456!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // ASSERT: Request rejected
+    expect(response.status).toBe(401);
+    expect(data.success).toBe(false);
+    expect(data.error).toBeDefined();
+    expect(data.error).toContain('Invalid');
+
+    // VERIFY: No session created
+    const sessionCount = await prisma.session.count();
+    expect(sessionCount).toBe(0);
+
+    // VERIFY: No successful login audit log
+    const successfulLoginLogs = await prisma.auditLog.findMany({
+      where: { 
+        userId: user.id, 
+        action: 'login',
+        details: { contains: 'success' }
+      },
+    });
+    expect(successfulLoginLogs.length).toBe(0);
+  });
+
+  it('should increment login attempts on failed password', async () => {
+    // ARRANGE: Create user
+    const { user } = await createTestUser({
+      email: 'test@example.com',
+      password: 'CorrectPassword123!',
+    });
+
+    // ACT: First failed login attempt
+    const request1 = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'WrongPassword1!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+    await POST(request1);
+
+    // VERIFY: Login attempts incremented to 1
+    let updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    expect(updatedUser?.loginAttempts).toBe(1);
+
+    // ACT: Second failed login attempt
+    const request2 = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'WrongPassword2!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+    await POST(request2);
+
+    // VERIFY: Login attempts incremented to 2
+    updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    expect(updatedUser?.loginAttempts).toBe(2);
+
+    // ACT: Successful login
+    const request3 = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'CorrectPassword123!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response3 = await POST(request3);
+
+    // VERIFY: Login attempts reset to 0 on success
+    expect(response3.status).toBe(200);
+    updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    expect(updatedUser?.loginAttempts).toBe(0);
+  });
+
+  it('should reject login for disabled account', async () => {
+    // ARRANGE: Create disabled user
+    await createTestUser({
+      email: 'disabled@example.com',
+      password: 'TestPassword123!',
+      isActive: false,
+    });
+
+    // ACT: Try to login
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'disabled@example.com',
+        password: 'TestPassword123!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // ASSERT: Login rejected
+    expect(response.status).toBe(401);
+    expect(data.success).toBe(false);
+    expect(data.error).toContain('disabled');
+
+    // VERIFY: No session created
+    const sessionCount = await prisma.session.count();
+    expect(sessionCount).toBe(0);
+  });
+
+  it('should reject login for non-existent user', async () => {
+    // ACT: Try to login with email that doesn't exist
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'nonexistent@example.com',
+        password: 'TestPassword123!',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // ASSERT: Login rejected
+    expect(response.status).toBe(401);
+    expect(data.success).toBe(false);
+    expect(data.error).toContain('Invalid');
+  });
+
+  it('should reject request with missing email', async () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        password: 'TestPassword123!',
+        // email missing
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('required');
+  });
+
+  it('should reject request with missing password', async () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        // password missing
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('required');
+  });
+
+  it('should reject request with invalid JSON', async () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: 'not valid json {[}]',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('Invalid JSON');
+  });
+
+  it('should track IP address and user agent in session', async () => {
+    // ARRANGE
+    const { user } = await createTestUser({
+      email: 'test@example.com',
+      password: 'TestPassword123!',
+    });
+
+    const testIp = '203.0.113.42';
+    const testUserAgent = 'Mozilla/5.0 (Test Device)';
+
+    // ACT
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        password: 'TestPassword123!',
+      }),
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': testIp,
+        'user-agent': testUserAgent,
+      },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // VERIFY: Session has IP and user agent
+    const session = await prisma.session.findUnique({
+      where: { token: data.token },
+    });
+
+    expect(session?.ipAddress).toBe(testIp);
+    expect(session?.userAgent).toBe(testUserAgent);
+  });
+});

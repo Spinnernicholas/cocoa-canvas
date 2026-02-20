@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import AuthGate from '@/components/AuthGate';
 
 export const metadata: Metadata = {
   title: 'Cocoa Canvas',
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-cream-50 dark:bg-cocoa-900 text-cocoa-900 dark:text-cream-100 transition-colors">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthGate>{children}</AuthGate>
+        </ThemeProvider>
       </body>
     </html>
   );

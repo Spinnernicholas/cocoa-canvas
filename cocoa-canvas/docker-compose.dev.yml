@@ -12,6 +12,7 @@ version: '3.8'
 services:
   # Redis for job queues and caching
   redis:
+    profiles: ["dev"]
     image: redis:7-alpine
     container_name: cocoa-canvas-redis-dev
     ports:
@@ -27,9 +28,10 @@ services:
     networks:
       - cocoa-dev-network
 
-  # PostgreSQL (optional, for testing)
+  # PostgreSQL + PostGIS (optional, for testing)
   postgres:
-    image: postgres:15-alpine
+    profiles: ["dev"]
+    image: postgis/postgis:15-3.4-alpine
     container_name: cocoa-canvas-postgres-dev
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cocoa_canvas_dev}
@@ -39,6 +41,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -47,8 +50,49 @@ services:
     networks:
       - cocoa-dev-network
 
+  # PostgreSQL + PostGIS Test Database (for integration tests)
+  postgres-test:
+    profiles: ["test"]
+    image: postgis/postgis:15-3.4-alpine
+    container_name: cocoa-canvas-postgres-test
+    environment:
+      POSTGRES_DB: cocoa_canvas_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cocoa-dev-network
+
+  # Redis Test Instance (for integration tests)
+  redis-test:
+    profiles: ["test"]
+    image: redis:7-alpine
+    container_name: cocoa-canvas-redis-test
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cocoa-dev-network
+
   # Next.js Application (runs npm run dev with hot reload)
   app:
+    profiles: ["dev"]
     image: node:22-alpine
     container_name: cocoa-canvas-app-dev
     working_dir: /app
@@ -75,7 +119,9 @@ services:
 
 volumes:
   redis_dev_data:
+  redis_test_data:
   postgres_dev_data:
+  postgres_test_data:
 
 networks:
   cocoa-dev-network:

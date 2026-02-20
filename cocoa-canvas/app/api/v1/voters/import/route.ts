@@ -14,8 +14,9 @@ import path from 'path';
 import { importerRegistry } from '@/lib/importers';
 import { validateProtectedRoute } from '@/lib/middleware/auth';
 import { auditLog } from '@/lib/audit/logger';
-import { createJob } from '@/lib/queue/runner';
-import { processImportJob, ImportJobData } from '@/lib/importers/job-processor';
+import { createJob, markJobCancelled } from '@/lib/queue/runner';
+import { getVoterImportQueue } from '@/lib/queue/bullmq';
+import { ImportJobData } from '@/lib/importers/job-processor';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,7 +143,10 @@ export async function POST(request: NextRequest) {
         importType,
         fileName: file.name,
         fileSize: buffer.length,
-      } as ImportJobData
+      } as ImportJobData,
+      {
+        isDynamic: false,
+      }
     );
 
     if (!job) {
@@ -168,18 +172,31 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Start processing the job in the background
-    // Don't await this - let it run asynchronously
-    processImportJob(job.id, {
-      filePath: tempFilePath,
-      format,
-      importType,
-      fileName: file.name,
-      fileSize: buffer.length,
-      userId: authResult.user?.userId,
-    }).catch((error) => {
-      console.error(`[Import Job Error] Failed to process job ${job.id}:`, error);
-    });
+    try {
+      const queue = getVoterImportQueue();
+      await queue.add(
+        'import-voters',
+        {
+          filePath: tempFilePath,
+          format,
+          importType,
+          fileName: file.name,
+          fileSize: buffer.length,
+          userId: authResult.user?.userId,
+        },
+        {
+          jobId: job.id,
+        }
+      );
+    } catch (queueError) {
+      console.error('[Import API] Failed to queue import job:', queueError);
+      await unlink(tempFilePath).catch(() => {});
+      await markJobCancelled(job.id, 'Failed to enqueue import job');
+      return NextResponse.json(
+        { error: 'Failed to queue import job' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
