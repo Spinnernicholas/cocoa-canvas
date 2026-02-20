@@ -156,9 +156,17 @@ export default function HouseholdsPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8 relative z-10">
         {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50 mb-2">Households</h2>
-          <p className="text-cocoa-600 dark:text-cocoa-300">View and manage household addresses</p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-cocoa-900 dark:text-cream-50 mb-2">Households</h2>
+            <p className="text-cocoa-600 dark:text-cocoa-300">View and manage household addresses</p>
+          </div>
+          <Link
+            href="/households/map"
+            className="inline-flex items-center px-4 py-2 bg-cocoa-600 dark:bg-cocoa-700 hover:bg-cocoa-700 dark:hover:bg-cocoa-600 text-white font-medium rounded-lg transition-colors whitespace-nowrap"
+          >
+            🗺️ View Map
+          </Link>
         </div>
 
         {error && (
@@ -225,25 +233,6 @@ export default function HouseholdsPage() {
             </select>
           </div>
         </div>
-
-
-
-        {/* Stats */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-cocoa-800 rounded-lg p-4 border border-cocoa-200 dark:border-cocoa-700">
-            <p className="text-sm text-cocoa-600 dark:text-cocoa-400">Total Households</p>
-            <p className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">{total.toLocaleString()}</p>
-          </div>
-          <div className="bg-white dark:bg-cocoa-800 rounded-lg p-4 border border-cocoa-200 dark:border-cocoa-700">
-            <p className="text-sm text-cocoa-600 dark:text-cocoa-400">Displayed</p>
-            <p className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">{households.length}</p>
-          </div>
-          <div className="bg-white dark:bg-cocoa-800 rounded-lg p-4 border border-cocoa-200 dark:border-cocoa-700">
-            <p className="text-sm text-cocoa-600 dark:text-cocoa-400">Geocoded</p>
-            <p className="text-2xl font-bold text-cocoa-900 dark:text-cream-50">{households.filter((h) => h.geocoded).length}</p>
-          </div>
-        </div>
-
         {/* Households Table */}
         <div className="bg-white dark:bg-cocoa-800 rounded-lg shadow-sm border border-cocoa-200 dark:border-cocoa-700 overflow-hidden">
           {households.length > 0 ? (
