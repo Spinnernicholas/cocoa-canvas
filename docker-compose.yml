@@ -4,9 +4,7 @@
 services:
   # Main Next.js application
   web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/spinnernicholas/cocoa-canvas:latest
     ports:
       - "3000:3000"
     environment:
