@@ -138,46 +138,13 @@ export default defineConfig({
 
 **Add to `docker-compose.dev.yml`:**
 
-```yaml
-services:
-  # ... existing services ...
-
-  postgres-test:
-    profiles: ["test"]  # Only starts with --profile test
-    image: postgres:16
-    container_name: cocoa-canvas-postgres-test
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: cocoa_canvas_test
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_test_data:/var/lib/postgresql/data
-    networks:
-      - cocoa-network
-
-  redis-test:
-    profiles: ["test"]  # Only starts with --profile test
-    image: redis:7-alpine
-    container_name: cocoa-canvas-redis-test
-    ports:
-      - "6380:6379"
-    networks:
-      - cocoa-network
-
-volumes:
-  postgres_test_data:
-```
-
 **Update package.json scripts:**
 
 ```json
 {
   "scripts": {
-    "docker:dev:up": "docker-compose -f docker-compose.dev.yml --profile dev up -d",
-    "docker:test:up": "docker-compose -f docker-compose.dev.yml --profile test up -d",
-    "docker:all:up": "docker-compose -f docker-compose.dev.yml --profile dev --profile test up -d"
+    "docker:dev:up": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down"
   }
 }
 ```
