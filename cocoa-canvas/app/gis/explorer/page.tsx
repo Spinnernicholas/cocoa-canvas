@@ -281,6 +281,8 @@ export default function MapExplorer() {
   const [selectedServiceUrl, setSelectedServiceUrl] = useState<string | null>(null);
   const [loadedServiceHierarchies, setLoadedServiceHierarchies] = useState<Map<string, ServiceHierarchy>>(new Map());
   const [loadingServices, setLoadingServices] = useState<Map<string, boolean>>(new Map());
+  const [serviceDetailsQueue, setServiceDetailsQueue] = useState<string[]>([]);
+  const [currentlyLoadingServiceUrl, setCurrentlyLoadingServiceUrl] = useState<string | null>(null);
   const [drawerWidth, setDrawerWidth] = useState(340); // Default width in pixels
   const resultsRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -360,6 +362,8 @@ export default function MapExplorer() {
       setSelectedServiceUrl(null);
       setLoadedServiceHierarchies(new Map());
       setLoadingServices(new Map());
+      setServiceDetailsQueue([]);
+      setCurrentlyLoadingServiceUrl(null);
       
       // Wait for map to load
       setLoading(true);
@@ -635,6 +639,90 @@ export default function MapExplorer() {
     fetchDatasetTypes();
   }, []);
 
+  // Queue services for background loading when mapConfig changes
+  useEffect(() => {
+    if (!mapConfig?.services) return;
+
+    // Find services that haven't had details loaded yet
+    const servicesToLoad = mapConfig.services
+      .filter(service => !service.detailsLoaded)
+      .map(service => service.serviceUrl);
+
+    if (servicesToLoad.length > 0) {
+      console.log(`[Services] Queueing ${servicesToLoad.length} services for background loading`);
+      setServiceDetailsQueue(servicesToLoad);
+    }
+  }, [mapConfig]);
+
+  // Process service details queue one at a time
+  useEffect(() => {
+    if (serviceDetailsQueue.length === 0 || currentlyLoadingServiceUrl) return;
+    if (!mapConfig?.services) return;
+
+    const loadNextService = async () => {
+      const serviceUrl = serviceDetailsQueue[0];
+      setCurrentlyLoadingServiceUrl(serviceUrl);
+
+      try {
+        console.log(`[Services] Loading details for: ${serviceUrl}`);
+        
+        const response = await fetch(
+          `/api/v1/gis/layer-details?url=${encodeURIComponent(serviceUrl)}`
+        );
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          const serviceDetails = data.data;
+
+          // Update the service in mapConfig with full details
+          setMapConfig(prev => {
+            if (!prev) return prev;
+
+            const updatedServices = prev.services?.map(service => {
+              if (service.serviceUrl === serviceUrl) {
+                return {
+                  ...service,
+                  name: serviceDetails.mapName || serviceDetails.name || service.name,
+                  description: serviceDetails.description || serviceDetails.serviceDescription,
+                  copyrightText: serviceDetails.copyrightText,
+                  currentVersion: serviceDetails.currentVersion,
+                  capabilities: serviceDetails.capabilities,
+                  supportedQueryFormats: serviceDetails.supportedQueryFormats,
+                  spatialReference: serviceDetails.spatialReference,
+                  initialExtent: serviceDetails.initialExtent,
+                  fullExtent: serviceDetails.fullExtent,
+                  extent: serviceDetails.extent,
+                  layerCount: serviceDetails.layers?.length || 0,
+                  tableCount: serviceDetails.tables?.length || 0,
+                  tables: serviceDetails.tables,
+                  detailsLoaded: true,
+                };
+              }
+              return service;
+            });
+
+            return {
+              ...prev,
+              services: updatedServices,
+            };
+          });
+
+          console.log(`[Services] Loaded details for ${serviceUrl}`);
+        } else {
+          console.warn(`[Services] Failed to load details for ${serviceUrl}:`, data.error);
+        }
+      } catch (err) {
+        console.error(`[Services] Error loading details for ${serviceUrl}:`, err);
+      } finally {
+        // Remove from queue and clear currently loading
+        setServiceDetailsQueue(prev => prev.slice(1));
+        setCurrentlyLoadingServiceUrl(null);
+      }
+    };
+
+    loadNextService();
+  }, [serviceDetailsQueue, currentlyLoadingServiceUrl, mapConfig]);
+
   const handleExploreMap = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -652,6 +740,8 @@ export default function MapExplorer() {
     setSelectedServiceUrl(null);
     setLoadedServiceHierarchies(new Map());
     setLoadingServices(new Map());
+    setServiceDetailsQueue([]);
+    setCurrentlyLoadingServiceUrl(null);
 
     try {
       const isServiceUrl = mapUrl.includes('/rest/services/') ||
@@ -1352,34 +1442,64 @@ export default function MapExplorer() {
                       /* Services List View */
                       mapConfig.services && mapConfig.services.length > 0 ? (
                         <div className="space-y-2">
-                          {mapConfig.services.map((service, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => setSelectedServiceUrl(service.serviceUrl)}
-                              className="w-full text-left p-3 bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 hover:border-cocoa-400 dark:hover:border-cocoa-500 hover:shadow-md transition-all"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-semibold text-cocoa-900 dark:text-white truncate">
-                                    {service.name}
+                          {mapConfig.services.map((service, idx) => {
+                            const isCurrentlyLoading = currentlyLoadingServiceUrl === service.serviceUrl;
+                            const isQueued = serviceDetailsQueue.includes(service.serviceUrl);
+                            const queuePosition = isQueued ? serviceDetailsQueue.indexOf(service.serviceUrl) : -1;
+                            const showLoading = !service.detailsLoaded && (isCurrentlyLoading || isQueued);
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setSelectedServiceUrl(service.serviceUrl)}
+                                className="w-full text-left p-3 bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 hover:border-cocoa-400 dark:hover:border-cocoa-500 hover:shadow-md transition-all relative"
+                              >
+                                {showLoading && (
+                                  <div className="absolute top-2 right-2">
+                                    {isCurrentlyLoading ? (
+                                      <div className="flex items-center gap-1 text-[10px] text-cocoa-600 dark:text-cocoa-400 bg-cocoa-100 dark:bg-cocoa-700 px-2 py-1 rounded">
+                                        <span className="animate-spin">⏳</span>
+                                        <span>Loading...</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1 text-[10px] text-cocoa-500 dark:text-cocoa-500 bg-cocoa-50 dark:bg-cocoa-750 px-2 py-1 rounded">
+                                        <span>⏸</span>
+                                        <span>Queue #{queuePosition + 1}</span>
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1 truncate">
-                                    {service.layerCount} layer{service.layerCount !== 1 ? 's' : ''}{service.tableCount > 0 ? ` • ${service.tableCount} table${service.tableCount !== 1 ? 's' : ''}` : ''}
-                                  </div>
-                                  {service.description && (
-                                    <div className="text-xs text-cocoa-700 dark:text-cocoa-300 mt-1 line-clamp-1">
-                                      {stripHtml(service.description)}
+                                )}
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0 pr-20">
+                                    <div className="text-sm font-semibold text-cocoa-900 dark:text-white truncate">
+                                      {service.name}
                                     </div>
-                                  )}
+                                    {service.detailsLoaded ? (
+                                      <>
+                                        <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1 truncate">
+                                          {service.layerCount} layer{service.layerCount !== 1 ? 's' : ''}{service.tableCount > 0 ? ` • ${service.tableCount} table${service.tableCount !== 1 ? 's' : ''}` : ''}
+                                        </div>
+                                        {service.description && (
+                                          <div className="text-xs text-cocoa-700 dark:text-cocoa-300 mt-1 line-clamp-1">
+                                            {stripHtml(service.description)}
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div className="text-xs text-cocoa-500 dark:text-cocoa-500 mt-1 italic">
+                                        {isCurrentlyLoading ? 'Loading details...' : isQueued ? 'Waiting to load...' : 'Details not loaded'}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-shrink-0">
+                                    <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                      {service.type}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex-shrink-0">
-                                  <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded whitespace-nowrap">
-                                    {service.type}
-                                  </span>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">

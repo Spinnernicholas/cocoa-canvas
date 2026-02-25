@@ -43,6 +43,7 @@ interface ServiceInfo {
   layerCount: number;
   tableCount: number;
   tables?: any[];
+  detailsLoaded?: boolean; // Flag to indicate if full details have been fetched
 }
 
 interface ServiceHierarchy {
@@ -202,6 +203,11 @@ async function enrichLayerMetadata(serviceUrl: string, layers: any[]): Promise<a
 function extractWidgets(webAppData: any): Widget[] {
   const widgets: Widget[] = [];
   
+  // Helper to normalize service URLs by removing layer IDs
+  const normalizeServiceUrl = (url: string): string => {
+    return url.replace(/\/\d+$/, '');
+  };
+  
   // Handle both widgetOnScreen and widgetPool structures
   const onScreenWidgets = webAppData?.widgetOnScreen?.widgets || [];
   const pooledWidgets = webAppData?.widgetPool?.widgets || [];
@@ -213,11 +219,12 @@ function extractWidgets(webAppData: any): Widget[] {
     // Extract service URLs from widget config using regex
     if (widget.config) {
       const configStr = JSON.stringify(widget.config);
-      const serviceUrlRegex = /(https?:\/\/[^\s"']+\/arcgis\/rest\/services\/[^\s"']+?\/[A-Za-z]+Server)/gi;
+      const serviceUrlRegex = /(https?:\/\/[^\s"']+\/arcgis\/rest\/services\/[^\s"']+?\/[A-Za-z]+Server(?:\/\d+)?)/gi;
       let match;
       while ((match = serviceUrlRegex.exec(configStr)) !== null) {
-        if (!serviceUrls.includes(match[1])) {
-          serviceUrls.push(match[1]);
+        const normalized = normalizeServiceUrl(match[1]);
+        if (!serviceUrls.includes(normalized)) {
+          serviceUrls.push(normalized);
         }
       }
     }
@@ -254,77 +261,82 @@ async function fetchMapConfiguration(
       concurrency: 8,
     });
 
+    // Helper function to normalize service URLs by removing layer IDs
+    const normalizeServiceUrl = (url: string): string => {
+      // Remove trailing /layerId pattern (e.g., /2, /10, /123)
+      return url.replace(/\/\d+$/, '');
+    };
+
     // Collect all unique service URLs
     const serviceUrls = new Set<string>();
     result.lists.services.forEach((service) => {
       if (service.serviceUrl) {
-        serviceUrls.add(service.serviceUrl);
+        serviceUrls.add(normalizeServiceUrl(service.serviceUrl));
       }
     });
     result.lists.layers.forEach((layer) => {
       if (layer.serviceUrl) {
-        serviceUrls.add(layer.serviceUrl);
+        serviceUrls.add(normalizeServiceUrl(layer.serviceUrl));
       }
     });
 
     console.log(`[Explorer] Found ${serviceUrls.size} unique service URLs:`);
     serviceUrls.forEach(url => console.log(`  - ${url}`));
 
-    // Fetch full service details for each service
+    // Build basic service info immediately without fetching full details
+    const services: ServiceInfo[] = [];
+    const operationalLayers: ServiceHierarchy[] = [];
+    let extent: Extent | undefined;
+
+    for (const serviceUrl of serviceUrls) {
+      // Determine service type from URL - extract any *Server pattern
+      let serviceType = 'Service';
+      const serverTypeMatch = serviceUrl.match(/\/([A-Za-z]+Server)(?:\/|$)/i);
+      if (serverTypeMatch) {
+        serviceType = serverTypeMatch[1];
+      }
+
+      // Extract service name from URL - match everything between /services/ and /*Server
+      const serviceNameMatch = serviceUrl.match(/\/services\/(.+?)\/[A-Za-z]+Server/);
+      const serviceName = serviceNameMatch ? serviceNameMatch[1].replace(/\//g, ' / ') : serviceUrl.split('/').slice(-2, -1)[0];
+
+      // Create basic service info object (details will be fetched by frontend one at a time)
+      const serviceInfo: ServiceInfo = {
+        serviceUrl,
+        name: serviceName,
+        type: serviceType,
+        layerCount: 0,
+        tableCount: 0,
+        detailsLoaded: false, // Mark as not loaded yet
+      };
+
+      services.push(serviceInfo);
+    }
+
+    // Fetch full service details only for operational layers (for the Layers tab)
+    // This ensures Layers tab works immediately
     const serviceDetailsMap = new Map<string, any>();
-    const serviceDetailsPromises = Array.from(serviceUrls).map(async (serviceUrl) => {
+    const layerServiceUrls = new Set<string>();
+    result.lists.layers.forEach((layer) => {
+      if (layer.serviceUrl) {
+        layerServiceUrls.add(normalizeServiceUrl(layer.serviceUrl));
+      }
+    });
+
+    const serviceDetailsPromises = Array.from(layerServiceUrls).map(async (serviceUrl) => {
       const details = await fetchServiceDetails(serviceUrl);
       serviceDetailsMap.set(serviceUrl, details);
     });
 
     await Promise.all(serviceDetailsPromises);
 
-    // Build both service info and hierarchical structures with full layer metadata
-    const services: ServiceInfo[] = [];
-    const operationalLayers: ServiceHierarchy[] = [];
-    let extent: Extent | undefined;
-
-    for (const serviceUrl of serviceUrls) {
+    // Build operational layers hierarchy from fetched details
+    for (const serviceUrl of layerServiceUrls) {
       const serviceDetails = serviceDetailsMap.get(serviceUrl);
       if (!serviceDetails) {
         console.warn(`[Explorer] No details fetched for service: ${serviceUrl}`);
         continue;
       }
-
-      // Determine service type from URL - extract any *Server pattern
-      let serviceType = 'Service';
-      const serverTypeMatch = serviceUrl.match(/\/([A-Za-z]+Server)(?:\/|$)/i);
-      if (serverTypeMatch) {
-        serviceType = serverTypeMatch[1];
-      } else if (serviceDetails.type) {
-        serviceType = serviceDetails.type;
-      }
-
-      // Extract service name from URL - match everything between /services/ and /*Server
-      const serviceNameMatch = serviceUrl.match(/\/services\/(.+?)\/[A-Za-z]+Server/);
-      const serviceName = serviceDetails.mapName || serviceDetails.name || 
-        (serviceNameMatch ? serviceNameMatch[1].replace(/\//g, ' / ') : serviceUrl.split('/').slice(-2, -1)[0]);
-
-      // Create service info object
-      const serviceInfo: ServiceInfo = {
-        serviceUrl,
-        name: serviceName,
-        type: serviceType,
-        description: serviceDetails.description || serviceDetails.serviceDescription,
-        copyrightText: serviceDetails.copyrightText,
-        currentVersion: serviceDetails.currentVersion,
-        capabilities: serviceDetails.capabilities,
-        supportedQueryFormats: serviceDetails.supportedQueryFormats,
-        spatialReference: serviceDetails.spatialReference,
-        initialExtent: serviceDetails.initialExtent,
-        fullExtent: serviceDetails.fullExtent,
-        extent: serviceDetails.extent,
-        layerCount: serviceDetails.layers?.length || 0,
-        tableCount: serviceDetails.tables?.length || 0,
-        tables: serviceDetails.tables,
-      };
-
-      services.push(serviceInfo);
 
       // Enrich layers with detailed metadata and use the full layer metadata from the service
       if (serviceDetails.layers) {

@@ -11,11 +11,21 @@ export interface ScanResult {
   itemIds: Set<string>;
 }
 
+/**
+ * Normalize service URL by removing layer ID suffix
+ * e.g., https://example.com/MapServer/2 -> https://example.com/MapServer
+ */
+function normalizeServiceUrl(url: string): string {
+  return url.replace(/\/\d+$/, '');
+}
+
 function scanString(value: string, result: ScanResult): void {
   let match: RegExpExecArray | null = null;
 
   while ((match = SERVICE_URL_REGEX.exec(value)) !== null) {
-    result.serviceUrls.add(match[1]);
+    // Normalize URL to remove layer IDs before adding to result
+    const normalized = normalizeServiceUrl(match[1]);
+    result.serviceUrls.add(normalized);
   }
 
   while ((match = ITEM_ID_CONTEXT_REGEX.exec(value)) !== null) {
