@@ -152,6 +152,7 @@ export default function ExplorerMap({
     return L.latLngBounds(southwest, northeast);
   };
 
+
   // Check feature count for a layer
   const checkFeatureCount = async (
     serviceUrl: string,
@@ -309,47 +310,71 @@ export default function ExplorerMap({
         ymax: bounds.getNorth(),
       };
 
-      // Cancel any inflight requests for these layers before starting new ones
-      for (const layerId of layerServiceMap.keys()) {
-        abortLayerRequest(layerId);
-      }
-
-      // Fetch features from ESRI services with feature count check
+      // Fetch features from ESRI services for current viewport
       for (const [layerId, serviceUrl] of layerServiceMap) {
         try {
-          // First, check feature count for this viewport
-          const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
-          
-          if (featureCount === null) {
-            console.warn(`Could not determine feature count for layer ${layerId}`);
-            continue;
-          }
-
-          // Fetch all features as vectors with pagination support
+          // Cancel any existing request for this layer
+          abortLayerRequest(layerId);
           const controller = createLayerRequestController(layerId);
           
-          // Clear any previous feature limit warning for this layer
+          // Clear any previous feature limit warning
           onFeatureLimitExceeded?.(layerId, false);
           
           try {
-            const accumulatedFeatures: any[] = [];
+            let allFeatures: any[] = [];
+            let limitExceeded = false;
             
+            // Check feature count for this area
+            const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
+            if (featureCount === null || featureCount === 0) continue;
+            
+            // Fetch features with pagination
             await fetchFeaturesWithPagination(
               serviceUrl,
               layerId,
               bbox,
               featureCount,
               controller.signal,
-              (batch, totalSoFar, limitExceeded) => {
-                // Stream features as they arrive
-                accumulatedFeatures.push(...batch);
-                onFeaturesLoad?.(layerId, [...accumulatedFeatures]);
-                // Notify parent when feature limit is reached
+              (batch) => {
+                allFeatures.push(...batch);
+                
+                // Check if we've hit the limit
+                if (allFeatures.length >= MAX_FEATURES_TO_DISPLAY) {
+                  limitExceeded = true;
+                }
+                
+                // Deduplicate and stream features
+                const deduplicatedFeatures = allFeatures.reduce((acc, feature) => {
+                  const id = feature.id || feature.properties?.OBJECTID || feature.properties?.FID;
+                  if (id) {
+                    if (!acc.seenIds.has(id)) {
+                      acc.seenIds.add(id);
+                      acc.features.push(feature);
+                    }
+                  } else {
+                    acc.features.push(feature);
+                  }
+                  return acc;
+                }, { seenIds: new Set<any>(), features: [] as any[] }).features;
+                
+                // Cap at limit
+                let displayFeatures = deduplicatedFeatures;
+                if (displayFeatures.length > MAX_FEATURES_TO_DISPLAY) {
+                  displayFeatures = displayFeatures.slice(0, MAX_FEATURES_TO_DISPLAY);
+                  limitExceeded = true;
+                }
+                
+                onFeaturesLoad?.(layerId, displayFeatures);
                 if (limitExceeded) {
                   onFeatureLimitExceeded?.(layerId, true);
                 }
               }
             );
+            
+            // Notify of limit if we hit it
+            if (allFeatures.length >= MAX_FEATURES_TO_DISPLAY) {
+              onFeatureLimitExceeded?.(layerId, true);
+            }
           } catch (fetchErr) {
             if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
               continue;
@@ -404,46 +429,71 @@ export default function ExplorerMap({
 
     // Fetch features for all layers
     const fetchAllLayers = async () => {
-      // Cancel any inflight requests before starting new ones
+      // Cancel any existing requests
       for (const layerId of layerServiceMap.keys()) {
         abortLayerRequest(layerId);
       }
 
       for (const [layerId, serviceUrl] of layerServiceMap) {
         try {
-          // First, check feature count for this viewport
-          const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
-          
-          if (featureCount === null) {
-            console.warn(`Could not determine feature count for layer ${layerId}`);
-            continue;
-          }
-
-          // Fetch all features as vectors with pagination support
           const controller = createLayerRequestController(layerId);
           
-          // Clear any previous feature limit warning for this layer
+          // Clear any previous limit warn ing
           onFeatureLimitExceeded?.(layerId, false);
           
           try {
-            const accumulatedFeatures: any[] = [];
+            let allFeatures: any[] = [];
+            let limitExceeded = false;
             
+            // Check feature count
+            const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
+            if (featureCount === null || featureCount === 0) continue;
+            
+            // Fetch features
             await fetchFeaturesWithPagination(
               serviceUrl,
               layerId,
               bbox,
               featureCount,
               controller.signal,
-              (batch, totalSoFar, limitExceeded) => {
-                // Stream features as they arrive
-                accumulatedFeatures.push(...batch);
-                onFeaturesLoad?.(layerId, [...accumulatedFeatures]);
-                // Notify parent when feature limit is reached
+              (batch) => {
+                allFeatures.push(...batch);
+                
+                if (allFeatures.length >= MAX_FEATURES_TO_DISPLAY) {
+                  limitExceeded = true;
+                }
+                
+                // Deduplicate and display
+                const deduplicatedFeatures = allFeatures.reduce((acc, feature) => {
+                  const id = feature.id || feature.properties?.OBJECTID || feature.properties?.FID;
+                  if (id) {
+                    if (!acc.seenIds.has(id)) {
+                      acc.seenIds.add(id);
+                      acc.features.push(feature);
+                    }
+                  } else {
+                    acc.features.push(feature);
+                  }
+                  return acc;
+                }, { seenIds: new Set<any>(), features: [] as any[] }).features;
+                
+                // Cap and display
+                let displayFeatures = deduplicatedFeatures;
+                if (displayFeatures.length > MAX_FEATURES_TO_DISPLAY) {
+                  displayFeatures = displayFeatures.slice(0, MAX_FEATURES_TO_DISPLAY);
+                  limitExceeded = true;
+                }
+                
+                onFeaturesLoad?.(layerId, displayFeatures);
                 if (limitExceeded) {
                   onFeatureLimitExceeded?.(layerId, true);
                 }
               }
             );
+            
+            if (allFeatures.length >= MAX_FEATURES_TO_DISPLAY) {
+              onFeatureLimitExceeded?.(layerId, true);
+            }
           } catch (fetchErr) {
             if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
               continue;
@@ -471,12 +521,12 @@ export default function ExplorerMap({
 
   // Cancel requests when a layer is unselected
   useEffect(() => {
-    // Track which layers we have active requests for
-    const previousLayerIds = new Set(layerRequestControllersRef.current.keys());
+    // Track which layers exist
     const currentLayerIds = new Set(layerServiceMap.keys());
     
     // Cancel requests for layers that were removed
-    for (const layerId of previousLayerIds) {
+    const activeRequests = new Set(layerRequestControllersRef.current.keys());
+    for (const layerId of activeRequests) {
       if (!currentLayerIds.has(layerId)) {
         abortLayerRequest(layerId);
       }
