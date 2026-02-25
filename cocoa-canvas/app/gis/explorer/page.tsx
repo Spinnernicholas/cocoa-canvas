@@ -279,6 +279,8 @@ export default function MapExplorer() {
   const [isRestoringFromUrl, setIsRestoringFromUrl] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'layers' | 'widgets' | 'selected'>('services');
   const [selectedServiceUrl, setSelectedServiceUrl] = useState<string | null>(null);
+  const [loadedServiceHierarchies, setLoadedServiceHierarchies] = useState<Map<string, ServiceHierarchy>>(new Map());
+  const [loadingServices, setLoadingServices] = useState<Map<string, boolean>>(new Map());
   const [drawerWidth, setDrawerWidth] = useState(340); // Default width in pixels
   const resultsRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -356,6 +358,8 @@ export default function MapExplorer() {
       setFeatureLimitExceeded(new Map());
       setLayerDetails(null);
       setSelectedServiceUrl(null);
+      setLoadedServiceHierarchies(new Map());
+      setLoadingServices(new Map());
       
       // Wait for map to load
       setLoading(true);
@@ -646,6 +650,8 @@ export default function MapExplorer() {
     setLayerOpacity(new Map());
     setLayerVisibility(new Map());
     setSelectedServiceUrl(null);
+    setLoadedServiceHierarchies(new Map());
+    setLoadingServices(new Map());
 
     try {
       const isServiceUrl = mapUrl.includes('/rest/services/') ||
@@ -978,6 +984,65 @@ export default function MapExplorer() {
     alert('Copied to clipboard!');
   };
 
+  // Load service details and hierarchy
+  const loadServiceDetails = async (serviceUrl: string) => {
+    // Mark as loading
+    setLoadingServices(prev => {
+      const newMap = new Map(prev);
+      newMap.set(serviceUrl, true);
+      return newMap;
+    });
+
+    try {
+      const response = await fetch(
+        `/api/v1/gis/layer-details?url=${encodeURIComponent(serviceUrl)}`
+      );
+      const data = await response.json();
+
+      if (!data.success || !data.data) {
+        throw new Error(data.error || 'Failed to load service details');
+      }
+
+      // Build hierarchy from layers
+      const hierarchy = buildLayerHierarchyFromLayers(data.data.layers || []);
+      
+      // Store the hierarchy
+      setLoadedServiceHierarchies(prev => {
+        const newMap = new Map(prev);
+        newMap.set(serviceUrl, {
+          _serviceUrl: serviceUrl,
+          _hierarchy: hierarchy,
+          _allLayers: data.data.layers || [],
+        });
+        return newMap;
+      });
+
+      // Also update the layerServiceMap for all layers in this service
+      const newLayerServiceMap = new Map(layerServiceMap);
+      const addLayersToMap = (nodes: LayerTreeNode[]) => {
+        for (const node of nodes) {
+          newLayerServiceMap.set(node.id, serviceUrl);
+          if (node.children) {
+            addLayersToMap(node.children);
+          }
+        }
+      };
+      addLayersToMap(hierarchy);
+      setLayerServiceMap(newLayerServiceMap);
+
+    } catch (err) {
+      console.error('Failed to load service details:', err);
+      alert('Failed to load service details: ' + (err as Error).message);
+    } finally {
+      // Mark as not loading
+      setLoadingServices(prev => {
+        const newMap = new Map(prev);
+        newMap.set(serviceUrl, false);
+        return newMap;
+      });
+    }
+  };
+
   // Resize handle mouse event handlers
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1113,8 +1178,10 @@ export default function MapExplorer() {
                           const service = mapConfig.services.find(s => s.serviceUrl === selectedServiceUrl);
                           if (!service) return null;
 
-                          // Find the service hierarchy
-                          const serviceHierarchy = mapConfig.operationalLayers?.find(s => s._serviceUrl === selectedServiceUrl);
+                          // Find the service hierarchy - check both operationalLayers and loadedServiceHierarchies
+                          const serviceHierarchy = mapConfig.operationalLayers?.find(s => s._serviceUrl === selectedServiceUrl) || loadedServiceHierarchies.get(selectedServiceUrl);
+                          const isLoading = loadingServices.get(selectedServiceUrl) || false;
+                          const hasBeenLoaded = loadedServiceHierarchies.has(selectedServiceUrl) || mapConfig.operationalLayers?.some(s => s._serviceUrl === selectedServiceUrl);
 
                           return (
                             <div className="space-y-4">
@@ -1221,7 +1288,28 @@ export default function MapExplorer() {
                                   📍 Layer Hierarchy ({service.layerCount})
                                 </h4>
                                 <div>
-                                  {serviceHierarchy && serviceHierarchy._hierarchy && serviceHierarchy._hierarchy.length > 0 ? (
+                                  {!hasBeenLoaded && !isLoading ? (
+                                    // Show button to load service details
+                                    <div className="text-center py-6">
+                                      <button
+                                        onClick={() => loadServiceDetails(selectedServiceUrl)}
+                                        className="px-4 py-2 bg-cocoa-600 hover:bg-cocoa-700 dark:bg-cocoa-700 dark:hover:bg-cocoa-600 text-white rounded font-semibold transition-colors text-sm"
+                                      >
+                                        📥 Load Service Details & Layers
+                                      </button>
+                                      <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-2">
+                                        Click to fetch detailed layer information
+                                      </p>
+                                    </div>
+                                  ) : isLoading ? (
+                                    // Show loading state
+                                    <div className="text-center py-6">
+                                      <div className="text-cocoa-600 dark:text-cocoa-400 text-sm">
+                                        ⏳ Loading service details...
+                                      </div>
+                                    </div>
+                                  ) : serviceHierarchy && serviceHierarchy._hierarchy && serviceHierarchy._hierarchy.length > 0 ? (
+                                    // Show hierarchy
                                     <div className="space-y-0">
                                       {serviceHierarchy._hierarchy.map((rootLayer, layerIdx) => (
                                         <LayerHierarchyTree
@@ -1235,6 +1323,7 @@ export default function MapExplorer() {
                                       ))}
                                     </div>
                                   ) : (
+                                    // Show no layers only after loading
                                     <p className="text-xs text-cocoa-600 dark:text-cocoa-400 p-2">No layers available</p>
                                   )}
                                 </div>
