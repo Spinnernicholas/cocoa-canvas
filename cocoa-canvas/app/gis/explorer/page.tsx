@@ -812,67 +812,72 @@ export default function MapExplorer() {
 
                 {/* Service Details */}
                 {serviceDetails && (
-                  <div className="px-2 text-xs text-cocoa-700 dark:text-cocoa-300 space-y-2">
-                    <div>
-                      <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white">Service Info</h4>
-                      <p className="text-xs text-cocoa-600 dark:text-cocoa-400">
-                        {serviceDetails.mapName || serviceDetails.name || 'Map Service'}
-                      </p>
-                    </div>
-                    {serviceDetails.description && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-2 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
+                      ℹ️ Service Info
+                    </summary>
+                    <div className="px-2 mt-2 text-xs text-cocoa-700 dark:text-cocoa-300 space-y-2">
                       <div>
-                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Description</h5>
-                        <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-3">
-                          {serviceDetails.description}
+                        <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200">Name</h5>
+                        <p className="text-xs text-cocoa-600 dark:text-cocoa-400">
+                          {serviceDetails.mapName || serviceDetails.name || 'Map Service'}
                         </p>
                       </div>
-                    )}
-                    {(serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent) && (
-                      <div>
-                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Initial Extent</h5>
-                        <div className="bg-cocoa-100 dark:bg-cocoa-700 p-1.5 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100">
-                          {(() => {
-                            const ext = serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent;
-                            if (!ext) return null;
-                            return (
-                              <>
-                                <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
-                                <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
-                              </>
-                            );
-                          })()}
+                      {serviceDetails.description && (
+                        <div>
+                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Description</h5>
+                          <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-3">
+                            {serviceDetails.description}
+                          </p>
                         </div>
-                      </div>
-                    )}
-                    {(serviceDetails.currentVersion || serviceDetails.capabilities || serviceDetails.supportedQueryFormats) && (
-                      <div>
-                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities</h5>
-                        <div className="text-cocoa-700 dark:text-cocoa-300 space-y-1">
-                          {serviceDetails.currentVersion && (
-                            <p>Version: {serviceDetails.currentVersion}</p>
-                          )}
-                          {serviceDetails.capabilities && (
-                            <p className="line-clamp-2">Capabilities: {serviceDetails.capabilities}</p>
-                          )}
-                          {serviceDetails.supportedQueryFormats && (
-                            <p>Query: {serviceDetails.supportedQueryFormats}</p>
-                          )}
+                      )}
+                      {(serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent) && (
+                        <div>
+                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Initial Extent</h5>
+                          <div className="bg-cocoa-100 dark:bg-cocoa-700 p-1.5 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100">
+                            {(() => {
+                              const ext = serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent;
+                              if (!ext) return null;
+                              return (
+                                <>
+                                  <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
+                                  <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {serviceDetails.tables && serviceDetails.tables.length > 0 && (
-                      <div>
-                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
-                        <ul className="space-y-1">
-                          {serviceDetails.tables.map((table) => (
-                            <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300">
-                              • {table.name}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                      {(serviceDetails.currentVersion || serviceDetails.capabilities || serviceDetails.supportedQueryFormats) && (
+                        <div>
+                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities</h5>
+                          <div className="text-cocoa-700 dark:text-cocoa-300 space-y-1">
+                            {serviceDetails.currentVersion && (
+                              <p>Version: {serviceDetails.currentVersion}</p>
+                            )}
+                            {serviceDetails.capabilities && (
+                              <p className="line-clamp-2">Capabilities: {serviceDetails.capabilities}</p>
+                            )}
+                            {serviceDetails.supportedQueryFormats && (
+                              <p>Query: {serviceDetails.supportedQueryFormats}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {serviceDetails.tables && serviceDetails.tables.length > 0 && (
+                        <div>
+                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
+                          <ul className="space-y-1">
+                            {serviceDetails.tables.map((table) => (
+                              <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300">
+                                • {table.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 )}
 
                 {/* Operational Layers */}
