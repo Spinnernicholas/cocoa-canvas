@@ -278,6 +278,7 @@ export default function MapExplorer() {
   const [featureLimitExceeded, setFeatureLimitExceeded] = useState<Map<string, boolean>>(new Map());
   const [isRestoringFromUrl, setIsRestoringFromUrl] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'layers' | 'widgets' | 'selected'>('services');
+  const [selectedServiceUrl, setSelectedServiceUrl] = useState<string | null>(null);
   const [drawerWidth, setDrawerWidth] = useState(340); // Default width in pixels
   const resultsRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -354,6 +355,7 @@ export default function MapExplorer() {
       setMapFeaturesByLayer(new Map());
       setFeatureLimitExceeded(new Map());
       setLayerDetails(null);
+      setSelectedServiceUrl(null);
       
       // Wait for map to load
       setLoading(true);
@@ -643,6 +645,7 @@ export default function MapExplorer() {
     setLayerDetails(null);
     setLayerOpacity(new Map());
     setLayerVisibility(new Map());
+    setSelectedServiceUrl(null);
 
     try {
       const isServiceUrl = mapUrl.includes('/rest/services/') ||
@@ -1095,126 +1098,205 @@ export default function MapExplorer() {
                 {/* Services Tab */}
                 {activeTab === 'services' && (
                   <div className="space-y-4">
-                    {/* Services List */}
-                    {mapConfig.services && mapConfig.services.length > 0 ? (
-                    <div className="space-y-1 p-2">
-                      {mapConfig.services.map((service, idx) => (
-                        <details key={idx} className="text-xs bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600">
-                          <summary className="cursor-pointer px-3 py-2 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-cocoa-900 dark:text-white block truncate">
-                                {service.name}
-                              </span>
-                              <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded flex-shrink-0">
-                                {service.type}
-                              </span>
-                            </div>
-                          </summary>
-                          <div className="px-3 pb-3 pt-1 space-y-2 text-xs text-cocoa-700 dark:text-cocoa-300">
-                            {/* URL */}
-                            <div>
-                              <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">URL</h5>
-                              <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px] break-all">
-                                <a
-                                  href={service.serviceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-cocoa-600 dark:text-cocoa-400 hover:underline"
-                                >
-                                  {service.serviceUrl}
-                                </a>
-                              </div>
-                            </div>
+                    {/* Service Drill-Down View */}
+                    {selectedServiceUrl && mapConfig.services ? (
+                      <div>
+                        {/* Back Button */}
+                        <button
+                          onClick={() => setSelectedServiceUrl(null)}
+                          className="mb-3 px-3 py-2 text-sm font-semibold bg-cocoa-100 dark:bg-cocoa-700 text-cocoa-900 dark:text-white rounded hover:bg-cocoa-200 dark:hover:bg-cocoa-600 transition-colors flex items-center gap-2"
+                        >
+                          ← Back to Services
+                        </button>
 
-                            {/* Description */}
-                            {service.description && (
-                              <div>
-                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Description</h5>
-                                <p className="text-cocoa-700 dark:text-cocoa-300">
-                                  {stripHtml(service.description)}
-                                </p>
-                              </div>
-                            )}
+                        {(() => {
+                          const service = mapConfig.services.find(s => s.serviceUrl === selectedServiceUrl);
+                          if (!service) return null;
 
-                            {/* Stats */}
-                            <div className="flex gap-4">
-                              <div>
-                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Layers</h5>
-                                <p className="text-cocoa-700 dark:text-cocoa-300">{service.layerCount}</p>
+                          // Find the service hierarchy
+                          const serviceHierarchy = mapConfig.operationalLayers?.find(s => s._serviceUrl === selectedServiceUrl);
+
+                          return (
+                            <div className="space-y-4">
+                              {/* Service Header */}
+                              <div className="bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 p-4">
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div className="flex-1">
+                                    <h3 className="text-sm font-semibold text-cocoa-900 dark:text-white">
+                                      {service.name}
+                                    </h3>
+                                    <span className="inline-block text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded mt-1">
+                                      {service.type}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* URL */}
+                                <div className="mb-3">
+                                  <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">URL</h5>
+                                  <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px] break-all">
+                                    <a
+                                      href={service.serviceUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-cocoa-600 dark:text-cocoa-400 hover:underline"
+                                    >
+                                      {service.serviceUrl}
+                                    </a>
+                                  </div>
+                                </div>
+
+                                {/* Description */}
+                                {service.description && (
+                                  <div className="mb-3">
+                                    <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Description</h5>
+                                    <p className="text-xs text-cocoa-700 dark:text-cocoa-300">
+                                      {stripHtml(service.description)}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Stats */}
+                                <div className="flex gap-4 mb-3">
+                                  <div>
+                                    <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200">Layers</h5>
+                                    <p className="text-xs text-cocoa-700 dark:text-cocoa-300">{service.layerCount}</p>
+                                  </div>
+                                  {service.tableCount > 0 && (
+                                    <div>
+                                      <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
+                                      <p className="text-xs text-cocoa-700 dark:text-cocoa-300">{service.tableCount}</p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Extent */}
+                                {(service.initialExtent || service.fullExtent || service.extent) && (
+                                  <div className="mb-3">
+                                    <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Extent</h5>
+                                    <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px]">
+                                      {(() => {
+                                        const ext = service.initialExtent || service.fullExtent || service.extent;
+                                        if (!ext) return null;
+                                        return (
+                                          <>
+                                            <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
+                                            <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
+                                            {ext.spatialReference?.wkid && (
+                                              <p>WKID: {ext.spatialReference.wkid}</p>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Version & Capabilities */}
+                                {(service.currentVersion || service.capabilities) && (
+                                  <div className="mb-3 space-y-1">
+                                    {service.currentVersion && (
+                                      <p className="text-xs"><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Version:</span> {service.currentVersion}</p>
+                                    )}
+                                    {service.capabilities && (
+                                      <p className="text-xs"><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities:</span> {service.capabilities}</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Copyright */}
+                                {service.copyrightText && (
+                                  <div>
+                                    <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Copyright</h5>
+                                    <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400">
+                                      {service.copyrightText}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                              {service.tableCount > 0 && (
+
+                              {/* Layer Hierarchy */}
+                              <div className="bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 p-4">
+                                <h4 className="text-sm font-semibold text-cocoa-900 dark:text-white mb-3">
+                                  📍 Layer Hierarchy ({service.layerCount})
+                                </h4>
                                 <div>
-                                  <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
-                                  <p className="text-cocoa-700 dark:text-cocoa-300">{service.tableCount}</p>
+                                  {serviceHierarchy && serviceHierarchy._hierarchy && serviceHierarchy._hierarchy.length > 0 ? (
+                                    <div className="space-y-0">
+                                      {serviceHierarchy._hierarchy.map((rootLayer, layerIdx) => (
+                                        <LayerHierarchyTree
+                                          key={layerIdx}
+                                          node={rootLayer}
+                                          level={0}
+                                          selectedLayers={selectedLayers}
+                                          onToggleLayer={handleToggleLayer}
+                                          onZoomTo={(layerId) => setZoomToLayerId(layerId)}
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-cocoa-600 dark:text-cocoa-400 p-2">No layers available</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Tables */}
+                              {service.tables && service.tables.length > 0 && (
+                                <div className="bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 p-4">
+                                  <h4 className="text-sm font-semibold text-cocoa-900 dark:text-white mb-2">
+                                    📋 Tables ({service.tables.length})
+                                  </h4>
+                                  <ul className="space-y-1">
+                                    {service.tables.map((table) => (
+                                      <li key={table.id} className="text-xs text-cocoa-700 dark:text-cocoa-300">
+                                        • {table.name}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </div>
                               )}
                             </div>
-
-                            {/* Extent */}
-                            {(service.initialExtent || service.fullExtent || service.extent) && (
-                              <div>
-                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Extent</h5>
-                                <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px]">
-                                  {(() => {
-                                    const ext = service.initialExtent || service.fullExtent || service.extent;
-                                    if (!ext) return null;
-                                    return (
-                                      <>
-                                        <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
-                                        <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
-                                        {ext.spatialReference?.wkid && (
-                                          <p>WKID: {ext.spatialReference.wkid}</p>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      /* Services List View */
+                      mapConfig.services && mapConfig.services.length > 0 ? (
+                        <div className="space-y-2">
+                          {mapConfig.services.map((service, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedServiceUrl(service.serviceUrl)}
+                              className="w-full text-left p-3 bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600 hover:border-cocoa-400 dark:hover:border-cocoa-500 hover:shadow-md transition-all"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-semibold text-cocoa-900 dark:text-white truncate">
+                                    {service.name}
+                                  </div>
+                                  <div className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1 truncate">
+                                    {service.layerCount} layer{service.layerCount !== 1 ? 's' : ''}{service.tableCount > 0 ? ` • ${service.tableCount} table${service.tableCount !== 1 ? 's' : ''}` : ''}
+                                  </div>
+                                  {service.description && (
+                                    <div className="text-xs text-cocoa-700 dark:text-cocoa-300 mt-1 line-clamp-1">
+                                      {stripHtml(service.description)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-shrink-0">
+                                  <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                    {service.type}
+                                  </span>
                                 </div>
                               </div>
-                            )}
-
-                            {/* Version & Capabilities */}
-                            {(service.currentVersion || service.capabilities) && (
-                              <div className="space-y-1">
-                                {service.currentVersion && (
-                                  <p><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Version:</span> {service.currentVersion}</p>
-                                )}
-                                {service.capabilities && (
-                                  <p><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities:</span> {service.capabilities}</p>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Tables */}
-                            {service.tables && service.tables.length > 0 && (
-                              <div>
-                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Tables</h5>
-                                <ul className="space-y-1">
-                                  {service.tables.map((table) => (
-                                    <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300 text-[10px]">
-                                      • {table.name}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {/* Copyright */}
-                            {service.copyrightText && (
-                              <div>
-                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Copyright</h5>
-                                <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400">
-                                  {service.copyrightText}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      ))}
-                    </div>
-                    ) : (
-                      <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
-                        No services found
-                      </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
+                          No services found
+                        </div>
+                      )
                     )}
                   </div>
                 )}
