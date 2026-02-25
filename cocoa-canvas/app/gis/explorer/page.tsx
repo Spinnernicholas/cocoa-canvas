@@ -114,6 +114,19 @@ interface GeoJSONFeature {
 }
 
 /**
+ * Strip HTML tags from text
+ */
+function stripHtml(html: string | undefined): string {
+  if (!html) return '';
+  // Remove HTML tags
+  const withoutTags = html.replace(/<[^>]*>/g, '');
+  // Decode HTML entities
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = withoutTags;
+  return textarea.value;
+}
+
+/**
  * Recursive component to display layer hierarchy tree
  */
 function LayerHierarchyTree({
@@ -169,6 +182,11 @@ function LayerHierarchyTree({
             <p className="font-semibold text-cocoa-900 dark:text-white text-sm">
               {node.name}
             </p>
+            {node.description && node.description.trim() && (
+              <p className="text-xs text-cocoa-700 dark:text-cocoa-300 mt-0.5 line-clamp-2">
+                {stripHtml(node.description)}
+              </p>
+            )}
             <div className="flex gap-2 flex-wrap mt-1">
               {node.type && (
                 <span className="text-xs bg-cocoa-100 dark:bg-cocoa-700 text-cocoa-700 dark:text-cocoa-300 px-2 py-0.5 rounded">
@@ -1107,7 +1125,7 @@ export default function MapExplorer() {
                               <div>
                                 <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Description</h5>
                                 <p className="text-cocoa-700 dark:text-cocoa-300">
-                                  {service.description}
+                                  {stripHtml(service.description)}
                                 </p>
                               </div>
                             )}
@@ -1204,33 +1222,31 @@ export default function MapExplorer() {
                           📍 Layers ({mapConfig.operationalLayers.reduce((sum, s) => sum + (s._hierarchy?.length || 0), 0)})
                         </h4>
                         <div className="space-y-1">
-                      {mapConfig.operationalLayers.map((service, idx) => (
-                        <details key={idx} className="text-xs">
-                          {(() => {
-                            const serviceUrl = service._serviceUrl;
-                            const meta = serviceDetailsByUrl.get(serviceUrl);
-                            const serviceName = meta?.mapName || meta?.name || getServiceNameFromUrl(serviceUrl);
-                            const serviceType = meta?.type || getServiceTypeFromUrl(serviceUrl);
-                            const serviceDescription = meta?.description;
+                      {mapConfig.operationalLayers.map((service, idx) => {
+                        const serviceUrl = service._serviceUrl;
+                        // Find the matching service info from mapConfig.services
+                        const serviceInfo = mapConfig.services?.find(s => s.serviceUrl === serviceUrl);
+                        const serviceName = serviceInfo?.name || getServiceNameFromUrl(serviceUrl);
+                        const serviceType = serviceInfo?.type || getServiceTypeFromUrl(serviceUrl);
+                        const serviceDescription = serviceInfo?.description;
 
-                            return (
-                              <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-3 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs block truncate">
-                                    {serviceName}
-                                  </span>
-                                  <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded">
-                                    {serviceType}
-                                  </span>
-                                </div>
-                                {serviceDescription && (
-                                  <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400 mt-1 line-clamp-2">
-                                    {serviceDescription}
-                                  </p>
-                                )}
-                              </summary>
-                            );
-                          })()}
+                        return (
+                        <details key={idx} className="text-xs">
+                          <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-3 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs block truncate">
+                                {serviceName}
+                              </span>
+                              <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded">
+                                {serviceType}
+                              </span>
+                            </div>
+                            {serviceDescription && (
+                              <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400 mt-1 line-clamp-2">
+                                {stripHtml(serviceDescription)}
+                              </p>
+                            )}
+                          </summary>
                           <div className="ml-2 space-y-0">
                             {service._hierarchy && service._hierarchy.length > 0 ? (
                               service._hierarchy.map((rootLayer, layerIdx) => (
@@ -1248,7 +1264,8 @@ export default function MapExplorer() {
                             )}
                           </div>
                         </details>
-                      ))}
+                        );
+                      })}
                         </div>
                       </div>
                     ) : (

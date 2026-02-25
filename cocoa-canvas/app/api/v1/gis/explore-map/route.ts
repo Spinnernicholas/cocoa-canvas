@@ -141,6 +141,52 @@ async function fetchServiceDetails(serviceUrl: string): Promise<any> {
 }
 
 /**
+ * Fetch detailed metadata for individual layer from MapServer
+ */
+async function fetchLayerDetails(serviceUrl: string, layerId: number): Promise<any> {
+  try {
+    const layerUrl = `${serviceUrl}/${layerId}`;
+    const response = await fetch(`${layerUrl}?f=json`);
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.warn(`[Explorer] Failed to fetch layer ${layerId} details from ${serviceUrl}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Enrich layers with detailed metadata by fetching individual layer details
+ */
+async function enrichLayerMetadata(serviceUrl: string, layers: any[]): Promise<any[]> {
+  if (!layers || !Array.isArray(layers)) {
+    return layers || [];
+  }
+
+  // Fetch details for each layer in parallel
+  const enrichPromises = layers.map(async (layer) => {
+    const layerDetails = await fetchLayerDetails(serviceUrl, layer.id);
+    if (layerDetails) {
+      // Merge detailed metadata
+      return {
+        ...layer,
+        name: layerDetails.name || layer.name || `Layer ${layer.id}`,
+        description: layerDetails.description || layer.description,
+        geometryType: layerDetails.geometryType || layer.geometryType,
+        type: layerDetails.type || layer.type,
+        fields: layerDetails.fields,
+        extent: layerDetails.extent || layer.extent,
+      };
+    }
+    return layer;
+  });
+
+  return Promise.all(enrichPromises);
+}
+
+/**
  * Fetch and parse ArcGIS map configuration using arcgis library
  * 
  * The arcgis library handles:
@@ -228,14 +274,15 @@ async function fetchMapConfiguration(
 
       services.push(serviceInfo);
 
-      // Use the full layer metadata from the service
+      // Enrich layers with detailed metadata and use the full layer metadata from the service
       if (serviceDetails.layers) {
-        const hierarchy = buildLayerHierarchy(serviceDetails.layers);
+        const enrichedLayers = await enrichLayerMetadata(serviceUrl, serviceDetails.layers);
+        const hierarchy = buildLayerHierarchy(enrichedLayers);
         
         operationalLayers.push({
           _serviceUrl: serviceUrl,
           _hierarchy: hierarchy,
-          _allLayers: serviceDetails.layers,
+          _allLayers: enrichedLayers,
         });
       }
 
