@@ -55,6 +55,24 @@ interface ServiceTable {
   description?: string;
 }
 
+interface ServiceInfo {
+  serviceUrl: string;
+  name: string;
+  type: string;
+  description?: string;
+  copyrightText?: string;
+  currentVersion?: string;
+  capabilities?: string;
+  supportedQueryFormats?: string;
+  spatialReference?: { wkid?: number };
+  initialExtent?: Extent;
+  fullExtent?: Extent;
+  extent?: Extent;
+  layerCount: number;
+  tableCount: number;
+  tables?: ServiceTable[];
+}
+
 interface ServiceDetails {
   name?: string;
   mapName?: string;
@@ -76,6 +94,7 @@ interface MapConfig {
   success: boolean;
   mapTitle?: string;
   portalUrl?: string;
+  services?: ServiceInfo[];
   operationalLayers?: ServiceHierarchy[];
   baseLayers?: ServiceHierarchy[];
   extent?: Extent;
@@ -230,6 +249,7 @@ export default function MapExplorer() {
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [featureLimitExceeded, setFeatureLimitExceeded] = useState<Map<string, boolean>>(new Map());
   const [isRestoringFromUrl, setIsRestoringFromUrl] = useState(false);
+  const [activeTab, setActiveTab] = useState<'services' | 'layers' | 'selected'>('services');
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Serialize current state to URL parameters
@@ -974,6 +994,57 @@ export default function MapExplorer() {
             </h2>
           </div>
 
+          {/* Tab Navigation */}
+          {mapConfig && (
+            <div className="flex border-b border-cocoa-200 dark:border-cocoa-700 bg-cocoa-50 dark:bg-cocoa-800">
+              <button
+                onClick={() => setActiveTab('services')}
+                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
+                  activeTab === 'services'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+              >
+                🌐 Services
+                {mapConfig.services && mapConfig.services.length > 0 && (
+                  <span className="ml-1 text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1.5 py-0.5 rounded">
+                    {mapConfig.services.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('layers')}
+                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
+                  activeTab === 'layers'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+              >
+                📍 Layers
+                {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 && (
+                  <span className="ml-1 text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1.5 py-0.5 rounded">
+                    {mapConfig.operationalLayers.reduce((sum, s) => sum + (s._hierarchy?.length || 0), 0)}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('selected')}
+                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
+                  activeTab === 'selected'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+              >
+                ✓ Selected
+                {selectedLayers.size > 0 && (
+                  <span className="ml-1 text-[10px] bg-cinnamon-200 dark:bg-cinnamon-600 text-cinnamon-700 dark:text-cinnamon-300 px-1.5 py-0.5 rounded">
+                    {selectedLayers.size}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Drawer Content */}
           <div className="flex-1 overflow-y-auto">
             {error && (
@@ -997,100 +1068,142 @@ export default function MapExplorer() {
 
             {mapConfig && (
               <div className="space-y-4">
-                {/* Portal Info */}
-                {mapConfig.portalUrl && (
-                  <div className="text-xs text-cocoa-600 dark:text-cocoa-400 p-2">
-                    <p className="truncate">
-                      <strong>Portal:</strong>{' '}
-                      <a
-                        href={mapConfig.portalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-cocoa-600 dark:text-cocoa-400 hover:underline"
-                      >
-                        {mapConfig.portalUrl.replace(/^https?:\/\//, '').split('/')[0]}
-                      </a>
-                    </p>
+                {/* Services Tab */}
+                {activeTab === 'services' && (
+                  <div className="space-y-4">
+                    {/* Services List */}
+                    {mapConfig.services && mapConfig.services.length > 0 ? (
+                    <div className="space-y-1 p-2">
+                      {mapConfig.services.map((service, idx) => (
+                        <details key={idx} className="text-xs bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600">
+                          <summary className="cursor-pointer px-3 py-2 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-cocoa-900 dark:text-white block truncate">
+                                {service.name}
+                              </span>
+                              <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded flex-shrink-0">
+                                {service.type}
+                              </span>
+                            </div>
+                          </summary>
+                          <div className="px-3 pb-3 pt-1 space-y-2 text-xs text-cocoa-700 dark:text-cocoa-300">
+                            {/* URL */}
+                            <div>
+                              <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">URL</h5>
+                              <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px] break-all">
+                                <a
+                                  href={service.serviceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-cocoa-600 dark:text-cocoa-400 hover:underline"
+                                >
+                                  {service.serviceUrl}
+                                </a>
+                              </div>
+                            </div>
+
+                            {/* Description */}
+                            {service.description && (
+                              <div>
+                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Description</h5>
+                                <p className="text-cocoa-700 dark:text-cocoa-300">
+                                  {service.description}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Stats */}
+                            <div className="flex gap-4">
+                              <div>
+                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Layers</h5>
+                                <p className="text-cocoa-700 dark:text-cocoa-300">{service.layerCount}</p>
+                              </div>
+                              {service.tableCount > 0 && (
+                                <div>
+                                  <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
+                                  <p className="text-cocoa-700 dark:text-cocoa-300">{service.tableCount}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Extent */}
+                            {(service.initialExtent || service.fullExtent || service.extent) && (
+                              <div>
+                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Extent</h5>
+                                <div className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded font-mono text-[10px]">
+                                  {(() => {
+                                    const ext = service.initialExtent || service.fullExtent || service.extent;
+                                    if (!ext) return null;
+                                    return (
+                                      <>
+                                        <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
+                                        <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
+                                        {ext.spatialReference?.wkid && (
+                                          <p>WKID: {ext.spatialReference.wkid}</p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Version & Capabilities */}
+                            {(service.currentVersion || service.capabilities) && (
+                              <div className="space-y-1">
+                                {service.currentVersion && (
+                                  <p><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Version:</span> {service.currentVersion}</p>
+                                )}
+                                {service.capabilities && (
+                                  <p><span className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities:</span> {service.capabilities}</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Tables */}
+                            {service.tables && service.tables.length > 0 && (
+                              <div>
+                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Tables</h5>
+                                <ul className="space-y-1">
+                                  {service.tables.map((table) => (
+                                    <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300 text-[10px]">
+                                      • {table.name}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Copyright */}
+                            {service.copyrightText && (
+                              <div>
+                                <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Copyright</h5>
+                                <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400">
+                                  {service.copyrightText}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
+                        No services found
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Service Details */}
-                {serviceDetails && (
-                  <details className="text-xs">
-                    <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-2 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
-                      ℹ️ Service Info
-                    </summary>
-                    <div className="px-2 mt-2 text-xs text-cocoa-700 dark:text-cocoa-300 space-y-2">
+                {/* Layers Tab */}
+                {activeTab === 'layers' && (
+                  <div className="space-y-4">
+                    {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 ? (
                       <div>
-                        <h5 className="text-xs font-semibold text-cocoa-800 dark:text-cocoa-200">Name</h5>
-                        <p className="text-xs text-cocoa-600 dark:text-cocoa-400">
-                          {serviceDetails.mapName || serviceDetails.name || 'Map Service'}
-                        </p>
-                      </div>
-                      {serviceDetails.description && (
-                        <div>
-                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Description</h5>
-                          <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-3">
-                            {serviceDetails.description}
-                          </p>
-                        </div>
-                      )}
-                      {(serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent) && (
-                        <div>
-                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Initial Extent</h5>
-                          <div className="bg-cocoa-100 dark:bg-cocoa-700 p-1.5 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100">
-                            {(() => {
-                              const ext = serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent;
-                              if (!ext) return null;
-                              return (
-                                <>
-                                  <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
-                                  <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                      {(serviceDetails.currentVersion || serviceDetails.capabilities || serviceDetails.supportedQueryFormats) && (
-                        <div>
-                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities</h5>
-                          <div className="text-cocoa-700 dark:text-cocoa-300 space-y-1">
-                            {serviceDetails.currentVersion && (
-                              <p>Version: {serviceDetails.currentVersion}</p>
-                            )}
-                            {serviceDetails.capabilities && (
-                              <p className="line-clamp-2">Capabilities: {serviceDetails.capabilities}</p>
-                            )}
-                            {serviceDetails.supportedQueryFormats && (
-                              <p>Query: {serviceDetails.supportedQueryFormats}</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {serviceDetails.tables && serviceDetails.tables.length > 0 && (
-                        <div>
-                          <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
-                          <ul className="space-y-1">
-                            {serviceDetails.tables.map((table) => (
-                              <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300">
-                                • {table.name}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                )}
-
-                {/* Operational Layers */}
-                {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white px-2 py-1 bg-cocoa-100 dark:bg-cocoa-700">
-                      📍 Services ({mapConfig.operationalLayers.length})
-                    </h4>
-                    <div className="space-y-1">
+                        <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white px-2 py-1 bg-cocoa-100 dark:bg-cocoa-700">
+                          📍 Layers ({mapConfig.operationalLayers.reduce((sum, s) => sum + (s._hierarchy?.length || 0), 0)})
+                        </h4>
+                        <div className="space-y-1">
                       {mapConfig.operationalLayers.map((service, idx) => (
                         <details key={idx} className="text-xs">
                           {(() => {
@@ -1136,17 +1249,21 @@ export default function MapExplorer() {
                           </div>
                         </details>
                       ))}
-                    </div>
-                  </div>
-                )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
+                        No layers found
+                      </div>
+                    )}
 
-                {/* Base Layers */}
-                {mapConfig.baseLayers && mapConfig.baseLayers.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white px-2 py-1 bg-cocoa-100 dark:bg-cocoa-700">
-                      🗺️ Base Services ({mapConfig.baseLayers.length})
-                    </h4>
-                    <div className="space-y-1">
+                    {/* Base Layers */}
+                    {mapConfig.baseLayers && mapConfig.baseLayers.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white px-2 py-1 bg-cocoa-100 dark:bg-cocoa-700 mt-4">
+                          🗺️ Base Layers ({mapConfig.baseLayers.length})
+                        </h4>
+                        <div className="space-y-1">
                       {mapConfig.baseLayers.map((service, idx) => (
                         <details key={idx} className="text-xs">
                           <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-3 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
@@ -1172,15 +1289,17 @@ export default function MapExplorer() {
                           </div>
                         </details>
                       ))}
+                      </div>
                     </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Layer Control Panel */}
-            {selectedLayers.size > 0 && (
-              <div className="mt-4 border-t border-cocoa-200 dark:border-cocoa-700 pt-4">
+                {/* Selected Tab */}
+                {activeTab === 'selected' && (
+                  <div className="space-y-4">
+                    {selectedLayers.size > 0 ? (
+                      <div className="mt-4 border-t border-cocoa-200 dark:border-cocoa-700 pt-4">
                 <LayerPanel
                   layers={Array.from(selectedLayers.values()).map((layer) => ({
                     id: layer.id,
@@ -1268,6 +1387,14 @@ export default function MapExplorer() {
                           <p>X: {layerDetails.data.extent.xmin.toFixed(2)} to {layerDetails.data.extent.xmax.toFixed(2)}</p>
                           <p>Y: {layerDetails.data.extent.ymin.toFixed(2)} to {layerDetails.data.extent.ymax.toFixed(2)}</p>
                         </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
+                        No layers selected
                       </div>
                     )}
                   </div>

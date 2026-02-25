@@ -20,8 +20,29 @@ interface LayerTreeNode {
   type?: string;
   geometryType?: string;
   description?: string;
+  minScale?: number;
+  maxScale?: number;
+  defaultVisibility?: boolean;
   parentLayerId?: number;
   children?: LayerTreeNode[];
+}
+
+interface ServiceInfo {
+  serviceUrl: string;
+  name: string;
+  type: string;
+  description?: string;
+  copyrightText?: string;
+  currentVersion?: string;
+  capabilities?: string;
+  supportedQueryFormats?: string;
+  spatialReference?: { wkid?: number };
+  initialExtent?: Extent;
+  fullExtent?: Extent;
+  extent?: Extent;
+  layerCount: number;
+  tableCount: number;
+  tables?: any[];
 }
 
 interface ServiceHierarchy {
@@ -44,6 +65,7 @@ interface MapExploreResult {
   success: boolean;
   mapTitle?: string;
   portalUrl?: string;
+  services?: ServiceInfo[];
   operationalLayers?: (Layer | ServiceHierarchy)[];
   baseLayers?: (Layer | ServiceHierarchy)[];
   extent?: Extent;
@@ -60,34 +82,62 @@ interface ServiceExtentResponse {
 }
 
 /**
- * Build hierarchical layer structure from flat layer array
+ * Build hierarchical layer structure from service layers with full metadata
  */
-function buildLayerHierarchy(flatLayers: any[]): LayerTreeNode[] {
-  const layerMap = new Map<string, LayerTreeNode>();
+function buildLayerHierarchy(serviceLayers: any[]): LayerTreeNode[] {
+  const layerMap = new Map<number, LayerTreeNode>();
   const rootLayers: LayerTreeNode[] = [];
 
-  // First pass: create nodes
-  flatLayers.forEach((layer) => {
-    const nodeId = `${layer.id}`;
-    layerMap.set(nodeId, {
-      id: nodeId,
-      name: layer.label || `Layer ${layer.id}`,
-      description: `Layer ID: ${layer.layerId}`,
+  // First pass: create nodes with full metadata
+  serviceLayers.forEach((layer) => {
+    const node: LayerTreeNode = {
+      id: `${layer.id}`,
+      name: layer.name || `Layer ${layer.id}`,
+      type: layer.type,
+      geometryType: layer.geometryType,
+      description: layer.description,
+      minScale: layer.minScale,
+      maxScale: layer.maxScale,
+      defaultVisibility: layer.defaultVisibility,
+      parentLayerId: layer.parentLayerId,
       children: [],
-    });
+    };
+    layerMap.set(layer.id, node);
   });
 
-  // Second pass: build hierarchy (for now, everything is a root layer)
-  // since the arcgis library doesn't preserve parent-child relationships
-  flatLayers.forEach((layer) => {
-    const nodeId = `${layer.id}`;
-    const node = layerMap.get(nodeId);
-    if (node) {
+  // Second pass: build hierarchy based on parentLayerId
+  layerMap.forEach((node) => {
+    if (node.parentLayerId !== undefined && node.parentLayerId !== -1) {
+      const parent = layerMap.get(node.parentLayerId);
+      if (parent) {
+        parent.children = parent.children || [];
+        parent.children.push(node);
+      } else {
+        // Parent not found, add as root
+        rootLayers.push(node);
+      }
+    } else {
       rootLayers.push(node);
     }
   });
 
   return rootLayers;
+}
+
+/**
+ * Fetch full service metadata including all layers with complete details
+ */
+async function fetchServiceDetails(serviceUrl: string): Promise<any> {
+  try {
+    const response = await fetch(`${serviceUrl}?f=json`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch service details: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.warn(`[Explorer] Failed to fetch service details for ${serviceUrl}:`, error);
+    return { layers: [], tables: [] };
+  }
 }
 
 /**
@@ -97,6 +147,8 @@ function buildLayerHierarchy(flatLayers: any[]): LayerTreeNode[] {
  * - URL normalization for web app viewers, item pages, and REST endpoints
  * - Recursive resolution of web maps, services, and layers
  * - Error resilience and graceful degradation
+ * 
+ * Enhanced to fetch full service metadata for all discovered services
  */
 async function fetchMapConfiguration(
   mapUrl: string
@@ -107,42 +159,94 @@ async function fetchMapConfiguration(
       concurrency: 8,
     });
 
-    // Group layers by serviceUrl to match explorer expectations
-    const serviceLayersMap = new Map<string, any[]>();
-    result.lists.layers.forEach((layer) => {
-      const serviceUrl = layer.serviceUrl || 'unknown';
-      if (!serviceLayersMap.has(serviceUrl)) {
-        serviceLayersMap.set(serviceUrl, []);
+    // Collect all unique service URLs
+    const serviceUrls = new Set<string>();
+    result.lists.services.forEach((service) => {
+      if (service.serviceUrl) {
+        serviceUrls.add(service.serviceUrl);
       }
-      serviceLayersMap.get(serviceUrl)!.push(layer);
+    });
+    result.lists.layers.forEach((layer) => {
+      if (layer.serviceUrl) {
+        serviceUrls.add(layer.serviceUrl);
+      }
     });
 
-    // Create hierarchical structure grouped by service
-    const operationalLayers: ServiceHierarchy[] = Array.from(
-      serviceLayersMap.entries()
-    ).map(([serviceUrl, layers]) => ({
-      _serviceUrl: serviceUrl,
-      _hierarchy: buildLayerHierarchy(layers),
-      _allLayers: layers,
-    }));
+    // Fetch full service details for each service
+    const serviceDetailsMap = new Map<string, any>();
+    const serviceDetailsPromises = Array.from(serviceUrls).map(async (serviceUrl) => {
+      const details = await fetchServiceDetails(serviceUrl);
+      serviceDetailsMap.set(serviceUrl, details);
+    });
 
-    // Determine extent from the first service when available
+    await Promise.all(serviceDetailsPromises);
+
+    // Build both service info and hierarchical structures with full layer metadata
+    const services: ServiceInfo[] = [];
+    const operationalLayers: ServiceHierarchy[] = [];
     let extent: Extent | undefined;
-    if (result.lists.services.length > 0) {
-      const serviceUrl = result.lists.services[0].serviceUrl;
-      try {
-        const response = await fetch(`${serviceUrl}?f=json`);
-        if (response.ok) {
-          const serviceData: ServiceExtentResponse = await response.json();
-          extent = serviceData.initialExtent || serviceData.fullExtent || serviceData.extent;
-        }
-      } catch (err) {
-        console.warn('[Explorer] Failed to fetch service extent:', err);
+
+    for (const serviceUrl of serviceUrls) {
+      const serviceDetails = serviceDetailsMap.get(serviceUrl);
+      if (!serviceDetails) {
+        continue;
+      }
+
+      // Determine service type from URL
+      const serviceType = 
+        serviceUrl.includes('/MapServer') ? 'MapServer' :
+        serviceUrl.includes('/FeatureServer') ? 'FeatureServer' :
+        serviceUrl.includes('/ImageServer') ? 'ImageServer' :
+        serviceUrl.includes('/GeocodeServer') ? 'GeocodeServer' :
+        serviceUrl.includes('/GeometryServer') ? 'GeometryServer' :
+        serviceUrl.includes('/GPServer') ? 'Geoprocessing Service' :
+        serviceDetails.type || 'Service';
+
+      // Extract service name from URL
+      const serviceNameMatch = serviceUrl.match(/\/services\/([^\/]+)/);
+      const serviceName = serviceDetails.mapName || serviceDetails.name || 
+        (serviceNameMatch ? serviceNameMatch[1].replace(/\//g, ' / ') : serviceUrl.split('/').slice(-2, -1)[0]);
+
+      // Create service info object
+      const serviceInfo: ServiceInfo = {
+        serviceUrl,
+        name: serviceName,
+        type: serviceType,
+        description: serviceDetails.description || serviceDetails.serviceDescription,
+        copyrightText: serviceDetails.copyrightText,
+        currentVersion: serviceDetails.currentVersion,
+        capabilities: serviceDetails.capabilities,
+        supportedQueryFormats: serviceDetails.supportedQueryFormats,
+        spatialReference: serviceDetails.spatialReference,
+        initialExtent: serviceDetails.initialExtent,
+        fullExtent: serviceDetails.fullExtent,
+        extent: serviceDetails.extent,
+        layerCount: serviceDetails.layers?.length || 0,
+        tableCount: serviceDetails.tables?.length || 0,
+        tables: serviceDetails.tables,
+      };
+
+      services.push(serviceInfo);
+
+      // Use the full layer metadata from the service
+      if (serviceDetails.layers) {
+        const hierarchy = buildLayerHierarchy(serviceDetails.layers);
+        
+        operationalLayers.push({
+          _serviceUrl: serviceUrl,
+          _hierarchy: hierarchy,
+          _allLayers: serviceDetails.layers,
+        });
+      }
+
+      // Use extent from first service if available
+      if (!extent && (serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent)) {
+        extent = serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent;
       }
     }
 
     // Default extent (US bounds) if services were found and no extent returned
-    if (!extent && result.lists.services.length > 0) {
+    if (!extent && operationalLayers.length > 0) {
       extent = {
         xmin: -125.0,
         ymin: 25.0,
@@ -164,15 +268,23 @@ async function fetchMapConfiguration(
     // Log resolution results
     console.log(`[Explorer] Resolved ArcGIS web app:`);
     console.log(`  - Items: ${result.lists.items.length}`);
-    console.log(`  - Services: ${result.lists.services.length}`);
+    console.log(`  - Services: ${services.length}`);
     console.log(`  - Layers: ${result.lists.layers.length}`);
     console.log(`  - Service groups: ${operationalLayers.length}`);
     console.log(`  - Warnings: ${result.warnings.length}`);
+    
+    // Log service details
+    services.forEach((service) => {
+      console.log(`  - Service: ${service.name} (${service.type})`);
+      console.log(`    URL: ${service.serviceUrl}`);
+      console.log(`    Layers: ${service.layerCount}, Tables: ${service.tableCount}`);
+    });
 
     return {
       success: true,
       mapTitle: 'ArcGIS Web App',
       portalUrl,
+      services: services.length > 0 ? services : undefined,
       operationalLayers:
         operationalLayers.length > 0 ? operationalLayers : undefined,
       extent,
