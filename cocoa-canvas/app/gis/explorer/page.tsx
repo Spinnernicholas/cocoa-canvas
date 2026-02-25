@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ImportToCatalogDialog } from '@/components/ImportToCatalogDialog';
 import ExplorerMap from '@/components/ExplorerMap';
 import LayerPanel from '@/components/LayerPanel';
+import BookmarkManager from '@/components/BookmarkManager';
 
 interface LayerTreeNode {
   id: string;
@@ -201,6 +203,9 @@ function LayerHierarchyTree({
 }
 
 export default function MapExplorer() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [mapUrl, setMapUrl] = useState(
     'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer'
   );
@@ -224,7 +229,200 @@ export default function MapExplorer() {
   const [layerOpacity, setLayerOpacity] = useState<Map<string, number>>(new Map());
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [featureLimitExceeded, setFeatureLimitExceeded] = useState<Map<string, boolean>>(new Map());
+  const [isRestoringFromUrl, setIsRestoringFromUrl] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Serialize current state to URL parameters
+  const getCurrentStateUrl = useCallback(() => {
+    const params = new URLSearchParams();
+    
+    // Add map service URL
+    if (mapUrl) {
+      params.set('map', encodeURIComponent(mapUrl));
+    }
+    
+    // Add selected layers
+    if (selectedLayers.size > 0) {
+      const layerIds = Array.from(selectedLayers.keys());
+      params.set('layers', layerIds.join(','));
+    }
+    
+    // Add layer opacity
+    if (layerOpacity.size > 0) {
+      const opacityEntries: string[] = [];
+      layerOpacity.forEach((opacity, layerId) => {
+        if (opacity !== 1) { // Only save non-default
+          opacityEntries.push(`${layerId}:${opacity}`);
+        }
+      });
+      if (opacityEntries.length > 0) {
+        params.set('opacity', opacityEntries.join(','));
+      }
+    }
+    
+    // Add layer visibility
+    if (layerVisibility.size > 0) {
+      const invisibleLayers: string[] = [];
+      layerVisibility.forEach((visible, layerId) => {
+        if (!visible) { // Only save invisible layers
+          invisibleLayers.push(layerId);
+        }
+      });
+      if (invisibleLayers.length > 0) {
+        params.set('hidden', invisibleLayers.join(','));
+      }
+    }
+    
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    return url.toString();
+  }, [mapUrl, selectedLayers, layerOpacity, layerVisibility]);
+
+  // Load state from URL parameters
+  const loadStateFromUrl = useCallback(async (url: string) => {
+    try {
+      setIsRestoringFromUrl(true);
+      const urlObj = new URL(url);
+      const params = urlObj.searchParams;
+      
+      // Load map URL
+      const mapParam = params.get('map');
+      if (!mapParam) return;
+      
+      const decodedMapUrl = decodeURIComponent(mapParam);
+      setMapUrl(decodedMapUrl);
+      
+      // Clear existing state
+      setError(null);
+      setMapConfig(null);
+      setServiceDetails(null);
+      setServiceDetailsByUrl(new Map());
+      setSelectedLayers(new Map());
+      setLayerServiceMap(new Map());
+      setMapFeaturesByLayer(new Map());
+      setFeatureLimitExceeded(new Map());
+      setLayerDetails(null);
+      
+      // Wait for map to load
+      setLoading(true);
+      
+      const isServiceUrl = decodedMapUrl.includes('/rest/services/') ||
+        decodedMapUrl.includes('/MapServer') ||
+        decodedMapUrl.includes('/FeatureServer');
+
+      let config: MapConfig | null = null;
+      let details: ServiceDetails | null = null;
+
+      if (isServiceUrl) {
+        const response = await fetch(
+          `/api/v1/gis/layer-details?url=${encodeURIComponent(decodedMapUrl)}`
+        );
+        const data = await response.json();
+
+        if (!data.success || !data.data) {
+          setError(data.error || 'Failed to load service details');
+          return;
+        }
+
+        details = data.data;
+        setServiceDetails(details);
+
+        const hierarchy = buildLayerHierarchyFromLayers(data.data.layers || []);
+        const extent = details.initialExtent || details.fullExtent || details.extent;
+
+        config = {
+          success: true,
+          mapTitle: details.mapName || details.name || 'Map Service',
+          operationalLayers: [
+            {
+              _serviceUrl: decodedMapUrl,
+              _hierarchy: hierarchy,
+              _allLayers: data.data.layers || [],
+            },
+          ],
+          extent,
+        };
+      } else {
+        const response = await fetch(
+          `/api/v1/gis/explore-map?url=${encodeURIComponent(decodedMapUrl)}`
+        );
+        config = await response.json();
+
+        if (!config || !config.success) {
+          setError(config?.error || 'Failed to load map configuration');
+          return;
+        }
+      }
+      
+      if (!config) return;
+      setMapConfig(config);
+      
+      // Restore selected layers
+      const layersParam = params.get('layers');
+      if (layersParam && config.operationalLayers) {
+        const layerIds = layersParam.split(',');
+        const newSelectedLayers = new Map<string, LayerTreeNode>();
+        const newLayerServiceMap = new Map<string, string>();
+        
+        // Find layers in the hierarchy
+        for (const serviceHierarchy of config.operationalLayers) {
+          const findLayer = (nodes: LayerTreeNode[]): void => {
+            for (const node of nodes) {
+              if (layerIds.includes(node.id)) {
+                newSelectedLayers.set(node.id, node);
+                newLayerServiceMap.set(node.id, serviceHierarchy._serviceUrl);
+              }
+              if (node.children) {
+                findLayer(node.children);
+              }
+            }
+          };
+          findLayer(serviceHierarchy._hierarchy);
+        }
+        
+        setSelectedLayers(newSelectedLayers);
+        setLayerServiceMap(newLayerServiceMap);
+        
+        // Restore opacity
+        const opacityParam = params.get('opacity');
+        if (opacityParam) {
+          const newOpacity = new Map<string, number>();
+          opacityParam.split(',').forEach(entry => {
+            const [layerId, opacity] = entry.split(':');
+            if (layerId && opacity) {
+              newOpacity.set(layerId, parseFloat(opacity));
+            }
+          });
+          setLayerOpacity(newOpacity);
+        }
+        
+        // Restore visibility
+        const hiddenParam = params.get('hidden');
+        if (hiddenParam) {
+          const newVisibility = new Map<string, boolean>();
+          const hiddenLayerIds = hiddenParam.split(',');
+          layerIds.forEach(layerId => {
+            newVisibility.set(layerId, !hiddenLayerIds.includes(layerId));
+          });
+          setLayerVisibility(newVisibility);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load state from URL:', err);
+      setError('Failed to restore bookmark state');
+    } finally {
+      setLoading(false);
+      setIsRestoringFromUrl(false);
+    }
+  }, []);
+
+  // Load state from URL on mount
+  useEffect(() => {
+    const mapParam = searchParams.get('map');
+    if (mapParam && !isRestoringFromUrl) {
+      loadStateFromUrl(window.location.href);
+    }
+  }, []); // Only run on mount
 
   // Memoized callback to handle features loaded from map
   const handleFeaturesLoad = useCallback((layerId: string, features: GeoJSONFeature[]) => {
@@ -748,6 +946,12 @@ export default function MapExplorer() {
             className="flex-1 bg-transparent border-none outline-none text-cocoa-900 dark:text-white placeholder-cocoa-400 dark:placeholder-cocoa-500 disabled:opacity-60"
           />
         </form>
+
+        {/* Bookmark Manager */}
+        <BookmarkManager 
+          currentUrl={getCurrentStateUrl()}
+          onLoadBookmark={loadStateFromUrl}
+        />
 
         {/* Explore Button */}
         <button
