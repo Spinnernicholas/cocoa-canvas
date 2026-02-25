@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ImportToCatalogDialog } from '@/components/ImportToCatalogDialog';
 import ExplorerMap from '@/components/ExplorerMap';
+import LayerPanel from '@/components/LayerPanel';
 
 interface LayerTreeNode {
   id: string;
@@ -43,6 +44,30 @@ interface Extent {
   spatialReference?: {
     wkid: number;
   };
+}
+
+interface ServiceTable {
+  id: number;
+  name: string;
+  type?: string;
+  description?: string;
+}
+
+interface ServiceDetails {
+  name?: string;
+  mapName?: string;
+  type?: string;
+  description?: string;
+  currentVersion?: string;
+  capabilities?: string;
+  supportedQueryFormats?: string;
+  copyrightText?: string;
+  spatialReference?: { wkid?: number };
+  initialExtent?: Extent;
+  fullExtent?: Extent;
+  extent?: Extent;
+  tables?: ServiceTable[];
+  layers?: any[];
 }
 
 interface MapConfig {
@@ -108,16 +133,16 @@ function LayerHierarchyTree({
           )}
           {!hasChildren && <span className="mr-2 w-4 flex-shrink-0"></span>}
 
-          <button
-            onClick={(e) => {
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
               e.stopPropagation();
-              onToggleLayer(node, !isSelected);
+              onToggleLayer(node, e.target.checked);
             }}
-            className="mr-2 flex-shrink-0 text-lg"
+            className="mr-2 flex-shrink-0 w-4 h-4 cursor-pointer"
             title={isSelected ? 'Hide layer' : 'Show layer'}
-          >
-            {isSelected ? '👁️' : '👁️‍🗨️'}
-          </button>
+          />
 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-cocoa-900 dark:text-white text-sm">
@@ -177,10 +202,12 @@ function LayerHierarchyTree({
 
 export default function MapExplorer() {
   const [mapUrl, setMapUrl] = useState(
-    'https://www.arcgis.com/apps/webappviewer/index.html?id=92d542bcb39247e8b558021bd0446d18'
+    'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer'
   );
   const [loading, setLoading] = useState(false);
   const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
+  const [serviceDetails, setServiceDetails] = useState<ServiceDetails | null>(null);
+  const [serviceDetailsByUrl, setServiceDetailsByUrl] = useState<Map<string, ServiceDetails>>(new Map());
   const [selectedLayers, setSelectedLayers] = useState<Map<string, LayerTreeNode>>(new Map());
   const [layerServiceMap, setLayerServiceMap] = useState<Map<string, string>>(new Map()); // layerId -> serviceUrl
   const [layerDetails, setLayerDetails] = useState<LayerDetailsResponse | null>(
@@ -194,6 +221,9 @@ export default function MapExplorer() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [mapFeaturesByLayer, setMapFeaturesByLayer] = useState<Map<string, GeoJSONFeature[]>>(new Map());
   const [zoomToLayerId, setZoomToLayerId] = useState<string | undefined>(undefined);
+  const [layerOpacity, setLayerOpacity] = useState<Map<string, number>>(new Map());
+  const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
+  const [featureLimitExceeded, setFeatureLimitExceeded] = useState<Map<string, boolean>>(new Map());
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Memoized callback to handle features loaded from map
@@ -209,6 +239,118 @@ export default function MapExplorer() {
   const handleZoomComplete = useCallback(() => {
     setZoomToLayerId(undefined);
   }, []);
+
+  // Memoized callback to handle feature limit exceeded
+  const handleFeatureLimitExceeded = useCallback((layerId: string, limitReached: boolean) => {
+    setFeatureLimitExceeded(prev => {
+      const newMap = new Map(prev);
+      newMap.set(layerId, limitReached);
+      return newMap;
+    });
+  }, []);
+
+  const getServiceTypeFromUrl = (serviceUrl: string): string => {
+    const match = serviceUrl.match(/\/(MapServer|FeatureServer|ImageServer)$/i);
+    return match ? match[1] : 'Service';
+  };
+
+  const getServiceNameFromUrl = (serviceUrl: string): string => {
+    const match = serviceUrl.match(/\/services\/(.+)\/(MapServer|FeatureServer|ImageServer)$/i);
+    if (match && match[1]) {
+      return match[1].replace(/\//g, ' / ');
+    }
+    return serviceUrl.replace(/^https?:\/\//, '').split('/')[0];
+  };
+
+  useEffect(() => {
+    if (!mapConfig?.operationalLayers) return;
+
+    let isActive = true;
+    const fetchServiceDetails = async () => {
+      const nextMap = new Map(serviceDetailsByUrl);
+
+      for (const service of mapConfig.operationalLayers || []) {
+        const serviceUrl = (service as ServiceHierarchy)._serviceUrl;
+        if (!serviceUrl || nextMap.has(serviceUrl)) continue;
+
+        try {
+          const response = await fetch(
+            `/api/v1/gis/layer-details?url=${encodeURIComponent(serviceUrl)}`
+          );
+          if (!response.ok) continue;
+          const data = await response.json();
+          if (!data.success || !data.data) continue;
+          nextMap.set(serviceUrl, data.data as ServiceDetails);
+        } catch (err) {
+          console.warn('Failed to fetch service details:', serviceUrl, err);
+        }
+      }
+
+      if (isActive) {
+        setServiceDetailsByUrl(new Map(nextMap));
+      }
+    };
+
+    fetchServiceDetails();
+
+    return () => {
+      isActive = false;
+    };
+  }, [mapConfig]);
+
+  // Handle layer opacity changes
+  const handleLayerOpacityChange = useCallback((layerId: string, opacity: number) => {
+    setLayerOpacity(prev => {
+      const newMap = new Map(prev);
+      newMap.set(layerId, opacity);
+      return newMap;
+    });
+  }, []);
+
+  // Handle layer visibility changes
+  const handleLayerVisibilityToggle = useCallback((layerId: string, visible: boolean) => {
+    setLayerVisibility(prev => {
+      const newMap = new Map(prev);
+      newMap.set(layerId, visible);
+      return newMap;
+    });
+  }, []);
+
+  // Handle layer removal from the panel
+  const handleLayerRemove = useCallback((layerId: string) => {
+    // Remove from selected layers
+    const newSelectedLayers = new Map(selectedLayers);
+    newSelectedLayers.delete(layerId);
+    setSelectedLayers(newSelectedLayers);
+
+    // Remove from service map
+    const newLayerServiceMap = new Map(layerServiceMap);
+    newLayerServiceMap.delete(layerId);
+    setLayerServiceMap(newLayerServiceMap);
+
+    // Remove from features
+    const newMapFeatures = new Map(mapFeaturesByLayer);
+    newMapFeatures.delete(layerId);
+    setMapFeaturesByLayer(newMapFeatures);
+
+    // Remove from opacity and visibility
+    const newOpacity = new Map(layerOpacity);
+    newOpacity.delete(layerId);
+    setLayerOpacity(newOpacity);
+
+    const newVisibility = new Map(layerVisibility);
+    newVisibility.delete(layerId);
+    setLayerVisibility(newVisibility);
+
+    const newFeatureLimitExceeded = new Map(featureLimitExceeded);
+    newFeatureLimitExceeded.delete(layerId);
+    setFeatureLimitExceeded(newFeatureLimitExceeded);
+
+    // Clear details if no layers selected
+    if (newSelectedLayers.size === 0) {
+      setLayerDetails(null);
+    }
+  }, [selectedLayers, layerServiceMap, mapFeaturesByLayer, layerOpacity, layerVisibility]);
 
   // Fetch dataset types on component mount
   useEffect(() => {
@@ -240,27 +382,101 @@ export default function MapExplorer() {
     setLoading(true);
     setError(null);
     setMapConfig(null);
+    setServiceDetails(null);
+    setServiceDetailsByUrl(new Map());
     setSelectedLayers(new Map());
     setLayerServiceMap(new Map());
     setMapFeaturesByLayer(new Map());
+    setFeatureLimitExceeded(new Map());
     setLayerDetails(null);
+    setLayerOpacity(new Map());
+    setLayerVisibility(new Map());
 
     try {
-      const response = await fetch(
-        `/api/v1/gis/explore-map?url=${encodeURIComponent(mapUrl)}`
-      );
-      const data: MapConfig = await response.json();
+      const isServiceUrl = mapUrl.includes('/rest/services/') ||
+        mapUrl.includes('/MapServer') ||
+        mapUrl.includes('/FeatureServer');
 
-      if (!data.success) {
-        setError(data.error || 'Failed to load map configuration');
+      if (isServiceUrl) {
+        const response = await fetch(
+          `/api/v1/gis/layer-details?url=${encodeURIComponent(mapUrl)}`
+        );
+        const data = await response.json();
+
+        if (!data.success || !data.data) {
+          setError(data.error || 'Failed to load service details');
+        } else {
+          const details: ServiceDetails = data.data;
+          setServiceDetails(details);
+
+          const hierarchy = buildLayerHierarchyFromLayers(data.data.layers || []);
+          const extent = details.initialExtent || details.fullExtent || details.extent;
+
+          setMapConfig({
+            success: true,
+            mapTitle: details.mapName || details.name || 'Map Service',
+            operationalLayers: [
+              {
+                _serviceUrl: mapUrl,
+                _hierarchy: hierarchy,
+                _allLayers: data.data.layers || [],
+              },
+            ],
+            extent,
+          });
+        }
       } else {
-        setMapConfig(data);
+        const response = await fetch(
+          `/api/v1/gis/explore-map?url=${encodeURIComponent(mapUrl)}`
+        );
+        const data: MapConfig = await response.json();
+
+        if (!data.success) {
+          setError(data.error || 'Failed to load map configuration');
+        } else {
+          setMapConfig(data);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load map');
     } finally {
       setLoading(false);
     }
+  };
+
+  const buildLayerHierarchyFromLayers = (layers: any[]): LayerTreeNode[] => {
+    const layersMap = new Map<number, LayerTreeNode>();
+    const rootLayers: LayerTreeNode[] = [];
+
+    layers.forEach((layer: any) => {
+      const node: LayerTreeNode = {
+        id: `${layer.id}`,
+        name: layer.name || `Layer ${layer.id}`,
+        type: layer.type,
+        geometryType: layer.geometryType,
+        description: layer.description,
+        minScale: layer.minScale,
+        maxScale: layer.maxScale,
+        defaultVisibility: layer.defaultVisibility,
+        parentLayerId: layer.parentLayerId,
+        children: [],
+      };
+      layersMap.set(layer.id, node);
+    });
+
+    layersMap.forEach((node) => {
+      if (node.parentLayerId !== undefined && node.parentLayerId !== -1) {
+        const parent = layersMap.get(node.parentLayerId);
+        if (parent) {
+          parent.children = parent.children || [];
+          parent.children.push(node);
+        }
+      } else {
+        rootLayers.push(node);
+      }
+    });
+
+    return rootLayers;
   };
 
   const buildLayerHierarchy = async (
@@ -276,43 +492,7 @@ export default function MapExplorer() {
         return [];
       }
 
-      // Build hierarchy from flat layer list
-      const layersMap = new Map<number, LayerTreeNode>();
-      const rootLayers: LayerTreeNode[] = [];
-
-      // First pass: create all nodes
-      data.data.layers.forEach((layer: any) => {
-        const node: LayerTreeNode = {
-          id: `${layer.id}`,
-          name: layer.name || `Layer ${layer.id}`,
-          type: layer.type,
-          geometryType: layer.geometryType,
-          description: layer.description,
-          minScale: layer.minScale,
-          maxScale: layer.maxScale,
-          defaultVisibility: layer.defaultVisibility,
-          parentLayerId: layer.parentLayerId,
-          children: [],
-        };
-        layersMap.set(layer.id, node);
-      });
-
-      // Second pass: build hierarchy
-      layersMap.forEach((node, id) => {
-        if (node.parentLayerId !== undefined && node.parentLayerId !== -1) {
-          const parent = layersMap.get(node.parentLayerId);
-          if (parent) {
-            if (!parent.children) {
-              parent.children = [];
-            }
-            parent.children.push(node);
-          }
-        } else {
-          rootLayers.push(node);
-        }
-      });
-
-      return rootLayers;
+      return buildLayerHierarchyFromLayers(data.data.layers || []);
     } catch (err) {
       console.error('Error building hierarchy:', err);
       return [];
@@ -336,6 +516,19 @@ export default function MapExplorer() {
           newLayerServiceMap.set(node.id, service._serviceUrl);
         }
       }
+
+      // Initialize opacity and visibility for this layer
+      const newOpacity = new Map(layerOpacity);
+      if (!newOpacity.has(node.id)) {
+        newOpacity.set(node.id, 1);
+      }
+      setLayerOpacity(newOpacity);
+
+      const newVisibility = new Map(layerVisibility);
+      if (!newVisibility.has(node.id)) {
+        newVisibility.set(node.id, true);
+      }
+      setLayerVisibility(newVisibility);
     } else {
       // Remove layer
       newSelectedLayers.delete(node.id);
@@ -345,6 +538,15 @@ export default function MapExplorer() {
       const newMapFeatures = new Map(mapFeaturesByLayer);
       newMapFeatures.delete(node.id);
       setMapFeaturesByLayer(newMapFeatures);
+
+      // Remove opacity and visibility
+      const newOpacity = new Map(layerOpacity);
+      newOpacity.delete(node.id);
+      setLayerOpacity(newOpacity);
+
+      const newVisibility = new Map(layerVisibility);
+      newVisibility.delete(node.id);
+      setLayerVisibility(newVisibility);
     }
 
     setSelectedLayers(newSelectedLayers);
@@ -541,7 +743,7 @@ export default function MapExplorer() {
             type="url"
             value={mapUrl}
             onChange={(e) => setMapUrl(e.target.value)}
-            placeholder="https://www.arcgis.com/apps/webappviewer/index.html?id=..."
+            placeholder="https://.../arcgis/rest/services/.../MapServer"
             disabled={loading}
             className="flex-1 bg-transparent border-none outline-none text-cocoa-900 dark:text-white placeholder-cocoa-400 dark:placeholder-cocoa-500 disabled:opacity-60"
           />
@@ -581,10 +783,10 @@ export default function MapExplorer() {
               <div className="p-4 space-y-3 text-sm text-cocoa-700 dark:text-cocoa-300">
                 <h3 className="font-semibold text-cocoa-900 dark:text-white">Getting Started</h3>
                 <ol className="list-decimal list-inside space-y-2 text-xs">
-                  <li>Paste an ArcGIS Web App URL in the address bar</li>
-                  <li>Click the Explore button (←)</li>
-                  <li>Click on layers to view details</li>
-                  <li>Add layers to your catalog</li>
+                  <li>Paste an ArcGIS Map Service URL in the address bar</li>
+                  <li>Click the Explore button</li>
+                  <li>Browse the layer hierarchy and select layers</li>
+                  <li>Review service metadata and tables</li>
                 </ol>
               </div>
             )}
@@ -608,6 +810,71 @@ export default function MapExplorer() {
                   </div>
                 )}
 
+                {/* Service Details */}
+                {serviceDetails && (
+                  <div className="px-2 text-xs text-cocoa-700 dark:text-cocoa-300 space-y-2">
+                    <div>
+                      <h4 className="text-xs font-semibold text-cocoa-900 dark:text-white">Service Info</h4>
+                      <p className="text-xs text-cocoa-600 dark:text-cocoa-400">
+                        {serviceDetails.mapName || serviceDetails.name || 'Map Service'}
+                      </p>
+                    </div>
+                    {serviceDetails.description && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Description</h5>
+                        <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-3">
+                          {serviceDetails.description}
+                        </p>
+                      </div>
+                    )}
+                    {(serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent) && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Initial Extent</h5>
+                        <div className="bg-cocoa-100 dark:bg-cocoa-700 p-1.5 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100">
+                          {(() => {
+                            const ext = serviceDetails.initialExtent || serviceDetails.fullExtent || serviceDetails.extent;
+                            if (!ext) return null;
+                            return (
+                              <>
+                                <p>X: {ext.xmin.toFixed(2)} to {ext.xmax.toFixed(2)}</p>
+                                <p>Y: {ext.ymin.toFixed(2)} to {ext.ymax.toFixed(2)}</p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                    {(serviceDetails.currentVersion || serviceDetails.capabilities || serviceDetails.supportedQueryFormats) && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Capabilities</h5>
+                        <div className="text-cocoa-700 dark:text-cocoa-300 space-y-1">
+                          {serviceDetails.currentVersion && (
+                            <p>Version: {serviceDetails.currentVersion}</p>
+                          )}
+                          {serviceDetails.capabilities && (
+                            <p className="line-clamp-2">Capabilities: {serviceDetails.capabilities}</p>
+                          )}
+                          {serviceDetails.supportedQueryFormats && (
+                            <p>Query: {serviceDetails.supportedQueryFormats}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {serviceDetails.tables && serviceDetails.tables.length > 0 && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">Tables</h5>
+                        <ul className="space-y-1">
+                          {serviceDetails.tables.map((table) => (
+                            <li key={table.id} className="text-cocoa-700 dark:text-cocoa-300">
+                              • {table.name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Operational Layers */}
                 {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 && (
                   <div>
@@ -617,11 +884,31 @@ export default function MapExplorer() {
                     <div className="space-y-1">
                       {mapConfig.operationalLayers.map((service, idx) => (
                         <details key={idx} className="text-xs">
-                          <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-3 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
-                            <span className="text-xs block truncate">
-                              {service._serviceUrl.replace(/^https?:\/\//, '').split('/')[0]}
-                            </span>
-                          </summary>
+                          {(() => {
+                            const serviceUrl = service._serviceUrl;
+                            const meta = serviceDetailsByUrl.get(serviceUrl);
+                            const serviceName = meta?.mapName || meta?.name || getServiceNameFromUrl(serviceUrl);
+                            const serviceType = meta?.type || getServiceTypeFromUrl(serviceUrl);
+                            const serviceDescription = meta?.description;
+
+                            return (
+                              <summary className="cursor-pointer font-semibold text-cocoa-900 dark:text-white px-3 py-2 hover:bg-cocoa-100 dark:hover:bg-cocoa-700 rounded">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs block truncate">
+                                    {serviceName}
+                                  </span>
+                                  <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-2 py-0.5 rounded">
+                                    {serviceType}
+                                  </span>
+                                </div>
+                                {serviceDescription && (
+                                  <p className="text-[10px] text-cocoa-600 dark:text-cocoa-400 mt-1 line-clamp-2">
+                                    {serviceDescription}
+                                  </p>
+                                )}
+                              </summary>
+                            );
+                          })()}
                           <div className="ml-2 space-y-0">
                             {service._hierarchy && service._hierarchy.length > 0 ? (
                               service._hierarchy.map((rootLayer, layerIdx) => (
@@ -682,35 +969,56 @@ export default function MapExplorer() {
               </div>
             )}
 
-            {/* Layer Details Panel */}
+            {/* Layer Control Panel */}
             {selectedLayers.size > 0 && (
-              <div className="border-t border-cocoa-200 dark:border-cocoa-700 mt-4 pt-4">
-                <div className="px-2 mb-3">
-                  <h4 className="font-semibold text-cocoa-900 dark:text-white text-sm mb-2">
-                    Selected Layers ({selectedLayers.size})
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    {Array.from(selectedLayers.values()).slice(0, 3).map((layer) => (
-                      <div key={layer.id} className="bg-cocoa-50 dark:bg-cocoa-700 p-2 rounded">
-                        <p className="font-semibold text-cocoa-900 dark:text-white">{layer.name}</p>
-                        <p className="text-cocoa-600 dark:text-cocoa-400">{layer.type || 'Layer'}</p>
+              <div className="mt-4 border-t border-cocoa-200 dark:border-cocoa-700 pt-4">
+                <LayerPanel
+                  layers={Array.from(selectedLayers.values()).map((layer) => ({
+                    id: layer.id,
+                    name: layer.name,
+                    type: layer.type,
+                    geometryType: layer.geometryType,
+                    visible: layerVisibility.get(layer.id) !== false,
+                    opacity: layerOpacity.get(layer.id) || 1,
+                  }))}
+                  onVisibilityChange={handleLayerVisibilityToggle}
+                  onOpacityChange={handleLayerOpacityChange}
+                  onRemoveLayer={handleLayerRemove}
+                />
+
+                {/* Feature Limit Warnings */}
+                {Array.from(featureLimitExceeded.entries()).map(([layerId, limitExceeded]) => {
+                  if (!limitExceeded) return null;
+                  const layer = selectedLayers.get(layerId);
+                  if (!layer) return null;
+                  return (
+                    <div
+                      key={layerId}
+                      className="mt-3 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded text-sm"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 text-lg">⚠️</span>
+                        <div className="flex-1">
+                          <div className="font-semibold text-yellow-800 dark:text-yellow-200">
+                            Feature Limit Reached: {layer.name}
+                          </div>
+                          <div className="text-yellow-700 dark:text-yellow-300 mt-0.5 text-xs">
+                            Displaying first 10,000 features. Use spatial filters or zoom in to see other features.
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                    {selectedLayers.size > 3 && (
-                      <p className="text-cocoa-600 dark:text-cocoa-400 italic">+ {selectedLayers.size - 3} more layer{selectedLayers.size - 3 !== 1 ? 's' : ''}</p>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
 
-                {/* Success Message */}
-                {importSuccess && (
-                  <div className="mx-2 px-2 py-1 bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded text-green-800 dark:text-green-100 text-xs mb-2">
-                    {importSuccess}
-                  </div>
-                )}
+                {/* Import and details section */}
+                <div className="mt-3 pt-3 border-t border-cocoa-200 dark:border-cocoa-700">
+                  {importSuccess && (
+                    <div className="px-2 py-1 mb-2 bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded text-green-800 dark:text-green-100 text-xs">
+                      {importSuccess}
+                    </div>
+                  )}
 
-                {/* Import Button for first layer */}
-                <div className="px-2">
                   <button
                     onClick={handleOpenImportDialog}
                     disabled={selectedLayers.size === 0}
@@ -718,59 +1026,41 @@ export default function MapExplorer() {
                   >
                     ➕ Add to Catalog
                   </button>
-                  <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1">
+                  <p className="text-xs text-cocoa-600 dark:text-cocoa-400 mt-1 px-2">
                     Imports the first selected layer
                   </p>
                 </div>
 
-                {detailsLoading ? (
-                  <div className="text-center py-3 text-xs text-cocoa-600 dark:text-cocoa-400 px-2">
+                {detailsLoading && (
+                  <div className="text-center py-2 text-xs text-cocoa-600 dark:text-cocoa-400 mt-3">
                     Loading details...
                   </div>
-                ) : layerDetails ? (
-                  <div className="space-y-3 px-2 text-xs">
-                    {layerDetails.success ? (
-                      <>
-                        {layerDetails.data?.description && (
-                          <div>
-                            <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">
-                              Description
-                            </h5>
-                            <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-2">
-                              {layerDetails.data.description}
-                            </p>
-                          </div>
-                        )}
+                )}
 
-                        {layerDetails.data?.extent && (
-                          <div>
-                            <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">
-                              Extent
-                            </h5>
-                            <div className="bg-cocoa-100 dark:bg-cocoa-700 p-2 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100 space-y-0">
-                              <p>XMin: {layerDetails.data.extent.xmin.toFixed(2)}</p>
-                              <p>YMin: {layerDetails.data.extent.ymin.toFixed(2)}</p>
-                              <p>XMax: {layerDetails.data.extent.xmax.toFixed(2)}</p>
-                              <p>YMax: {layerDetails.data.extent.ymax.toFixed(2)}</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {layerDetails.data?.copyrightText && (
-                          <div className="text-cocoa-600 dark:text-cocoa-400 pt-2 border-t border-cocoa-200 dark:border-cocoa-600">
-                            <strong className="text-xs">©</strong> {layerDetails.data.copyrightText}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-red-600 dark:text-red-400 text-xs">
-                        Error: {layerDetails.error}
+                {layerDetails?.success && layerDetails.data && (
+                  <div className="space-y-2 text-xs mt-3 px-2">
+                    {layerDetails.data.description && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">
+                          Description
+                        </h5>
+                        <p className="text-cocoa-700 dark:text-cocoa-300 line-clamp-2">
+                          {layerDetails.data.description}
+                        </p>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="text-center py-3 text-xs text-cocoa-600 dark:text-cocoa-400 px-2">
-                    Click a layer to view details
+
+                    {layerDetails.data.extent && (
+                      <div>
+                        <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200">
+                          Extent
+                        </h5>
+                        <div className="bg-cocoa-100 dark:bg-cocoa-700 p-1.5 rounded font-mono text-xs text-cocoa-900 dark:text-cocoa-100">
+                          <p>X: {layerDetails.data.extent.xmin.toFixed(2)} to {layerDetails.data.extent.xmax.toFixed(2)}</p>
+                          <p>Y: {layerDetails.data.extent.ymin.toFixed(2)} to {layerDetails.data.extent.ymax.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -778,47 +1068,36 @@ export default function MapExplorer() {
           </div>
         </div>
 
-        {/* Right Side: Full-screen Map */}
+        {/* Right Side: Map */}
         {mapConfig ? (
           <div className="flex-1 bg-cocoa-100 dark:bg-cocoa-700 relative">
-            {selectedLayers.size > 0 ? (
-              <ExplorerMap
-                key={Array.from(selectedLayers.keys()).join(',')}
-                featuresByLayer={mapFeaturesByLayer}
-                layerServiceMap={layerServiceMap}
-                extent={mapConfig.extent}
-                zoomToLayerId={zoomToLayerId}
-                onFeaturesLoad={handleFeaturesLoad}
-                onZoomComplete={handleZoomComplete}
-              />
-            ) : (
-              <ExplorerMap
-                featuresByLayer={new Map()}
-                layerServiceMap={new Map()}
-                extent={mapConfig.extent}
-                zoomToLayerId={zoomToLayerId}
-                onZoomComplete={() => setZoomToLayerId(undefined)}
-              />
-            )}
+            <ExplorerMap
+              featuresByLayer={mapFeaturesByLayer}
+              layerServiceMap={layerServiceMap}
+              extent={mapConfig.extent}
+              zoomToLayerId={zoomToLayerId}
+              onFeaturesLoad={handleFeaturesLoad}
+              onZoomComplete={handleZoomComplete}
+              onFeatureLimitExceeded={handleFeatureLimitExceeded}
+              layerOpacity={layerOpacity}
+              layerVisibility={layerVisibility}
+            />
           </div>
         ) : (
-          <div className="flex-1 bg-gradient-to-br from-cocoa-100 to-cinnamon-100 dark:from-cocoa-700 dark:to-cinnamon-700 flex flex-col items-center justify-center text-cocoa-700 dark:text-cocoa-300">
-            <div className="text-center max-w-md">
+          <div className="flex-1 bg-gradient-to-br from-cocoa-100 to-cinnamon-100 dark:from-cocoa-700 dark:to-cinnamon-700 flex items-center justify-center">
+            <div className="text-center max-w-md text-cocoa-700 dark:text-cocoa-300">
               <p className="text-6xl mb-4">🗺️</p>
               <h3 className="text-2xl font-bold mb-2">Map Explorer</h3>
-              <p className="mb-6">Paste an ArcGIS Web App URL in the address bar above to get started.</p>
-              <div className="text-sm space-y-2 text-cocoa-600 dark:text-cocoa-400">
-                <p>💡 Try a public Web App URL like:</p>
-                <code className="block bg-cocoa-200 dark:bg-cocoa-600 p-2 rounded text-xs">
-                  arcgis.com/apps/webappviewer
-                </code>
-              </div>
+              <p className="mb-6 text-sm">Paste an ArcGIS Map Service URL to get started.</p>
+              <code className="block bg-cocoa-200 dark:bg-cocoa-600 p-2 rounded text-xs text-cocoa-900 dark:text-white">
+                .../arcgis/rest/services/.../MapServer
+              </code>
             </div>
           </div>
         )}
       </div>
 
-      {/* Import to Catalog Dialog */}
+      {/* Import Dialog */}
       {selectedLayers.size > 0 && (
         <ImportToCatalogDialog
           isOpen={importDialogOpen}

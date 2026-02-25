@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import L from 'leaflet';
+import proj4 from 'proj4';
 import 'leaflet/dist/leaflet.css';
 
 interface Feature {
@@ -27,7 +28,19 @@ interface ExplorerMapProps {
   zoomToLayerId?: string;
   onFeaturesLoad?: (layerId: string, features: Feature[]) => void;
   onZoomComplete?: (layerId: string) => void;
+  onFeatureLimitExceeded?: (layerId: string, limitReached: boolean) => void;
+  layerOpacity?: Map<string, number>;
+  layerVisibility?: Map<string, boolean>;
 }
+
+const STATE_PLANE_CA_ZONE_3 = '+proj=lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000001 +datum=NAD83 +units=ft +no_defs';
+
+proj4.defs('EPSG:2227', STATE_PLANE_CA_ZONE_3);
+proj4.defs('ESRI:102643', STATE_PLANE_CA_ZONE_3);
+
+// Feature limits for performance management
+const FETCH_BATCH_SIZE = 1000; // Features per request (typical ArcGIS limit)
+const MAX_FEATURES_TO_DISPLAY = 10000; // Maximum features to stream and display
 
 export default function ExplorerMap({
   featuresByLayer,
@@ -36,29 +49,216 @@ export default function ExplorerMap({
   zoomToLayerId,
   onFeaturesLoad,
   onZoomComplete,
+  onFeatureLimitExceeded,
+  layerOpacity,
+  layerVisibility,
 }: ExplorerMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const geoJsonLayersRef = useRef<Map<string, L.GeoJSON>>(new Map());
+  const projDefCacheRef = useRef<Map<number, string>>(new Map());
+  const layerRequestControllersRef = useRef<Map<string, AbortController>>(new Map());
 
+  const abortLayerRequest = (layerId: string) => {
+    const existing = layerRequestControllersRef.current.get(layerId);
+    if (existing) {
+      existing.abort();
+      layerRequestControllersRef.current.delete(layerId);
+    }
+  };
+
+  const createLayerRequestController = (layerId: string) => {
+    abortLayerRequest(layerId);
+    const controller = new AbortController();
+    layerRequestControllersRef.current.set(layerId, controller);
+    return controller;
+  };
+
+  const shouldAssumeWebMercator = (x: number, y: number, wkid?: number): boolean => {
+    if (wkid === 102100 || wkid === 102113 || wkid === 3857) return true;
+    // Heuristic: Web Mercator meters are far outside lon/lat degree ranges
+    if (Math.abs(x) > 180 || Math.abs(y) > 90) return true;
+    return false;
+  };
+
+  const getProj4Def = async (wkid?: number): Promise<string | null> => {
+    if (!wkid) return null;
+
+    const cache = projDefCacheRef.current;
+    if (cache.has(wkid)) return cache.get(wkid) || null;
+
+    const knownDefs: Record<number, string> = {
+      4326: 'EPSG:4326',
+      3857: 'EPSG:3857',
+      102100: 'EPSG:3857',
+      102113: 'EPSG:3857',
+      2227: 'EPSG:2227',
+      102643: 'ESRI:102643',
+    };
+
+    if (knownDefs[wkid]) {
+      cache.set(wkid, knownDefs[wkid]);
+      return knownDefs[wkid];
+    }
+
+    try {
+      const response = await fetch(`https://epsg.io/${wkid}.proj4`);
+      if (!response.ok) return null;
+      const projText = (await response.text()).trim();
+      if (!projText) return null;
+      const projName = `EPSG:${wkid}`;
+      proj4.defs(projName, projText);
+      cache.set(wkid, projName);
+      return projName;
+    } catch (err) {
+      console.warn('Failed to fetch projection definition for WKID', wkid, err);
+      return null;
+    }
+  };
+
+  const projectToLatLng = async (x: number, y: number, wkid?: number): Promise<[number, number]> => {
+    const projName = await getProj4Def(wkid);
+    if (projName && projName !== 'EPSG:4326') {
+      try {
+        const [lng, lat] = proj4(projName, 'EPSG:4326', [x, y]) as [number, number];
+        return [lat, lng];
+      } catch (err) {
+        console.warn('Projection failed for WKID', wkid, err);
+      }
+    }
+
+    if (shouldAssumeWebMercator(x, y, wkid)) {
+      const lng = (x / 20037508.34) * 180;
+      const lat = (y / 20037508.34) * 180;
+      const latRad = (lat * Math.PI) / 180;
+      const latDeg = (180 / Math.PI) * (2 * Math.atan(Math.exp(latRad)) - Math.PI / 2);
+      return [latDeg, lng];
+    }
+
+    // Assume geographic coordinates (EPSG:4326) by default
+    return [y, x];
+  };
+
+  const extentToBounds = async (inputExtent?: Extent): Promise<L.LatLngBounds | null> => {
+    if (!inputExtent) return null;
+    const { xmin, ymin, xmax, ymax, spatialReference } = inputExtent;
+    if ([xmin, ymin, xmax, ymax].some((value) => value == null || !isFinite(value))) {
+      return null;
+    }
+
+    const wkid = spatialReference?.wkid;
+    const southwest = await projectToLatLng(xmin, ymin, wkid);
+    const northeast = await projectToLatLng(xmax, ymax, wkid);
+    return L.latLngBounds(southwest, northeast);
+  };
+
+  // Check feature count for a layer
+  const checkFeatureCount = async (
+    serviceUrl: string,
+    layerId: string,
+    bbox: { xmin: number; ymin: number; xmax: number; ymax: number }
+  ): Promise<number | null> => {
+    try {
+      const esriQuery = new URLSearchParams({
+        where: '1=1',
+        geometryType: 'esriGeometryEnvelope',
+        geometry: JSON.stringify({
+          xmin: bbox.xmin,
+          ymin: bbox.ymin,
+          xmax: bbox.xmax,
+          ymax: bbox.ymax,
+          spatialRef: { wkid: 4326 },
+        }),
+        inSR: '4326',
+        returnCountOnly: 'true',
+        f: 'json',
+      });
+
+      const url = `${serviceUrl}/${layerId}/query?${esriQuery.toString()}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.count !== undefined ? data.count : null;
+    } catch (err) {
+      console.error(`Error checking feature count for layer ${layerId}:`, err);
+      return null;
+    }
+  };
+
+  // Fetch features with pagination support - streams features as they arrive
+  // Caps at MAX_FEATURES_TO_DISPLAY (10k) to prevent browser overload
+  const fetchFeaturesWithPagination = async (
+    serviceUrl: string,
+    layerId: string,
+    bbox: { xmin: number; ymin: number; xmax: number; ymax: number },
+    maxFeatures: number,
+    signal: AbortSignal,
+    onBatchReceived: (features: any[], totalSoFar: number, limitExceeded: boolean) => void
+  ): Promise<number> => {
+    let totalFetched = 0;
+    let offset = 0;
+    const fetchLimit = Math.min(maxFeatures, MAX_FEATURES_TO_DISPLAY);
+    let limitExceeded = false;
+    
+    while (totalFetched < fetchLimit) {
+      const esriQuery = new URLSearchParams({
+        where: '1=1',
+        geometryType: 'esriGeometryEnvelope',
+        geometry: JSON.stringify({
+          xmin: bbox.xmin,
+          ymin: bbox.ymin,
+          xmax: bbox.xmax,
+          ymax: bbox.ymax,
+          spatialRef: { wkid: 4326 },
+        }),
+        inSR: '4326',
+        outSR: '4326',
+        outFields: '*',
+        returnGeometry: 'true',
+        resultOffset: offset.toString(),
+        resultRecordCount: FETCH_BATCH_SIZE.toString(),
+        f: 'geojson',
+      });
+
+      const url = `${serviceUrl}/${layerId}/query?${esriQuery.toString()}`;
+      const response = await fetch(url, { signal });
+      
+      if (!response.ok) break;
+
+      const geoJsonData = await response.json();
+      if (!geoJsonData.features || geoJsonData.features.length === 0) break;
+
+      // Cap at MAX_FEATURES_TO_DISPLAY
+      const batchSize = Math.min(geoJsonData.features.length, fetchLimit - totalFetched);
+      const batchToSend = geoJsonData.features.slice(0, batchSize);
+      totalFetched += batchSize;
+      
+      // Check if we've hit the limit
+      if (maxFeatures > MAX_FEATURES_TO_DISPLAY && totalFetched >= MAX_FEATURES_TO_DISPLAY) {
+        limitExceeded = true;
+      }
+      
+      onBatchReceived(batchToSend, totalFetched, limitExceeded);
+      
+      // Stop if we've reached our display limit
+      if (limitExceeded) break;
+      
+      // If we got fewer features than requested, we've reached the end
+      if (geoJsonData.features.length < FETCH_BATCH_SIZE) break;
+      
+      offset += FETCH_BATCH_SIZE;
+    }
+
+    return totalFetched;
+  };
+
+  // Create tile layer for dense features using ArcGIS export endpoint
   // Initialize map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    // Calculate initial view based on extent
-    let initialLat = 37.7749;
-    let initialLng = -122.4194;
-    let initialZoom = 12;
-
-    if (extent && extent.xmin !== undefined && extent.ymin !== undefined) {
-      // Use extent center as initial view
-      initialLng = (extent.xmin + extent.xmax) / 2;
-      initialLat = (extent.ymin + extent.ymax) / 2;
-      // Use a high zoom level initially; will fit bounds when features load
-      initialZoom = 13;
-    }
-
-    const map = L.map(containerRef.current).setView([initialLat, initialLng], initialZoom);
+    const map = L.map(containerRef.current).setView([37.7749, -122.4194], 10);
 
     // Add OSM base layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -73,6 +273,24 @@ export default function ExplorerMap({
         mapRef.current.remove();
         mapRef.current = null;
       }
+    };
+  }, []);
+
+  // Zoom to extent bounds when extent changes
+  useEffect(() => {
+    if (!mapRef.current || !extent) return;
+
+    let isActive = true;
+    const fitExtent = async () => {
+      const bounds = await extentToBounds(extent);
+      if (!isActive || !bounds || !bounds.isValid()) return;
+      mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    };
+
+    fitExtent();
+
+    return () => {
+      isActive = false;
     };
   }, [extent]);
 
@@ -91,37 +309,60 @@ export default function ExplorerMap({
         ymax: bounds.getNorth(),
       };
 
-      // Fetch features directly from ESRI services as GeoJSON
+      // Cancel any inflight requests for these layers before starting new ones
+      for (const layerId of layerServiceMap.keys()) {
+        abortLayerRequest(layerId);
+      }
+
+      // Fetch features from ESRI services with feature count check
       for (const [layerId, serviceUrl] of layerServiceMap) {
         try {
-          const esriQuery = new URLSearchParams({
-            where: '1=1',
-            geometryType: 'esriGeometryEnvelope',
-            geometry: JSON.stringify({
-              xmin: bbox.xmin,
-              ymin: bbox.ymin,
-              xmax: bbox.xmax,
-              ymax: bbox.ymax,
-              spatialRef: { wkid: 4326 },
-            }),
-            inSR: '4326',
-            outSR: '4326',
-            outFields: '*',
-            returnGeometry: 'true',
-            f: 'geojson',
-          });
-
-          const url = `${serviceUrl}/${layerId}/query?${esriQuery.toString()}`;
-          const response = await fetch(url);
+          // First, check feature count for this viewport
+          const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
           
-          if (!response.ok) continue;
+          if (featureCount === null) {
+            console.warn(`Could not determine feature count for layer ${layerId}`);
+            continue;
+          }
 
-          const geoJsonData = await response.json();
-          if (!geoJsonData.features || geoJsonData.features.length === 0) continue;
-
-          onFeaturesLoad?.(layerId, geoJsonData.features);
+          // Fetch all features as vectors with pagination support
+          const controller = createLayerRequestController(layerId);
+          
+          // Clear any previous feature limit warning for this layer
+          onFeatureLimitExceeded?.(layerId, false);
+          
+          try {
+            const accumulatedFeatures: any[] = [];
+            
+            await fetchFeaturesWithPagination(
+              serviceUrl,
+              layerId,
+              bbox,
+              featureCount,
+              controller.signal,
+              (batch, totalSoFar, limitExceeded) => {
+                // Stream features as they arrive
+                accumulatedFeatures.push(...batch);
+                onFeaturesLoad?.(layerId, [...accumulatedFeatures]);
+                // Notify parent when feature limit is reached
+                if (limitExceeded) {
+                  onFeatureLimitExceeded?.(layerId, true);
+                }
+              }
+            );
+          } catch (fetchErr) {
+            if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
+              continue;
+            }
+            throw fetchErr;
+          }
         } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            continue;
+          }
           console.error(`Error fetching features from ${serviceUrl}:`, err);
+        } finally {
+          layerRequestControllersRef.current.delete(layerId);
         }
       }
     };
@@ -143,8 +384,11 @@ export default function ExplorerMap({
         mapRef.current.off('moveend', debouncedHandleMapChange);
         mapRef.current.off('zoomend', debouncedHandleMapChange);
       }
+      for (const layerId of layerServiceMap.keys()) {
+        abortLayerRequest(layerId);
+      }
     };
-  }, [layerServiceMap, onFeaturesLoad]);
+  }, [layerServiceMap, onFeaturesLoad, onFeatureLimitExceeded]);
 
   // Fetch features when new layers are added
   useEffect(() => {
@@ -160,42 +404,84 @@ export default function ExplorerMap({
 
     // Fetch features for all layers
     const fetchAllLayers = async () => {
+      // Cancel any inflight requests before starting new ones
+      for (const layerId of layerServiceMap.keys()) {
+        abortLayerRequest(layerId);
+      }
+
       for (const [layerId, serviceUrl] of layerServiceMap) {
         try {
-          const esriQuery = new URLSearchParams({
-            where: '1=1',
-            geometryType: 'esriGeometryEnvelope',
-            geometry: JSON.stringify({
-              xmin: bbox.xmin,
-              ymin: bbox.ymin,
-              xmax: bbox.xmax,
-              ymax: bbox.ymax,
-              spatialRef: { wkid: 4326 },
-            }),
-            inSR: '4326',
-            outSR: '4326',
-            outFields: '*',
-            returnGeometry: 'true',
-            f: 'geojson',
-          });
-
-          const url = `${serviceUrl}/${layerId}/query?${esriQuery.toString()}`;
-          const response = await fetch(url);
+          // First, check feature count for this viewport
+          const featureCount = await checkFeatureCount(serviceUrl, layerId, bbox);
           
-          if (!response.ok) continue;
+          if (featureCount === null) {
+            console.warn(`Could not determine feature count for layer ${layerId}`);
+            continue;
+          }
 
-          const geoJsonData = await response.json();
-          if (!geoJsonData.features || geoJsonData.features.length === 0) continue;
-
-          onFeaturesLoad?.(layerId, geoJsonData.features);
+          // Fetch all features as vectors with pagination support
+          const controller = createLayerRequestController(layerId);
+          
+          // Clear any previous feature limit warning for this layer
+          onFeatureLimitExceeded?.(layerId, false);
+          
+          try {
+            const accumulatedFeatures: any[] = [];
+            
+            await fetchFeaturesWithPagination(
+              serviceUrl,
+              layerId,
+              bbox,
+              featureCount,
+              controller.signal,
+              (batch, totalSoFar, limitExceeded) => {
+                // Stream features as they arrive
+                accumulatedFeatures.push(...batch);
+                onFeaturesLoad?.(layerId, [...accumulatedFeatures]);
+                // Notify parent when feature limit is reached
+                if (limitExceeded) {
+                  onFeatureLimitExceeded?.(layerId, true);
+                }
+              }
+            );
+          } catch (fetchErr) {
+            if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
+              continue;
+            }
+            throw fetchErr;
+          }
         } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            continue;
+          }
           console.error(`Error fetching features from ${serviceUrl}:`, err);
+        } finally {
+          layerRequestControllersRef.current.delete(layerId);
         }
       }
     };
 
     fetchAllLayers();
-  }, [layerServiceMap, onFeaturesLoad]);
+    return () => {
+      for (const layerId of layerServiceMap.keys()) {
+        abortLayerRequest(layerId);
+      }
+    };
+  }, [layerServiceMap, onFeaturesLoad, onFeatureLimitExceeded]);
+
+  // Cancel requests when a layer is unselected
+  useEffect(() => {
+    // Track which layers we have active requests for
+    const previousLayerIds = new Set(layerRequestControllersRef.current.keys());
+    const currentLayerIds = new Set(layerServiceMap.keys());
+    
+    // Cancel requests for layers that were removed
+    for (const layerId of previousLayerIds) {
+      if (!currentLayerIds.has(layerId)) {
+        abortLayerRequest(layerId);
+      }
+    }
+  }, [layerServiceMap]);
 
   // Validate and clean coordinates recursively
   const cleanCoordinates = useCallback(function cleanCoordinatesInner(coords: any): any {
@@ -322,7 +608,7 @@ export default function ExplorerMap({
     const layersWithFeatures = new Set(featuresByLayer.keys());
     const currentLayers = geoJsonLayersRef.current;
 
-    // Remove layers that are no longer selected
+    // Remove feature layers that are no longer selected
     for (const [layerId, layer] of currentLayers) {
       if (!layersWithFeatures.has(layerId)) {
         mapRef.current.removeLayer(layer);
@@ -330,12 +616,12 @@ export default function ExplorerMap({
       }
     }
 
-    // If no layers have features, clear everything
+    // If no layers have features, we're done
     if (layersWithFeatures.size === 0) {
       return;
     }
 
-    // Add or update layers
+    // Add or update feature layers
     let layerIndex = 0;
     let allBounds: L.LatLngBounds | null = null;
 
@@ -377,6 +663,15 @@ export default function ExplorerMap({
       const layerColor = getLayerColor(layerId, layerIndex);
 
       try {
+        // Check visibility - skip rendering if hidden
+        const isVisible = layerVisibility?.get(layerId) ?? true;
+        if (!isVisible) {
+          continue;
+        }
+
+        // Get opacity for this layer
+        const opacity = layerOpacity?.get(layerId) ?? 1;
+
         // Remove old layer if it exists
         if (currentLayers.has(layerId)) {
           mapRef.current.removeLayer(currentLayers.get(layerId)!);
@@ -396,24 +691,24 @@ export default function ExplorerMap({
                 return {
                   fillColor: layerColor,
                   weight: 2,
-                  opacity: 0.8,
+                  opacity: opacity * 0.8,
                   color: layerColor,
-                  fillOpacity: 0.3,
+                  fillOpacity: opacity * 0.3,
                 };
               case 'LineString':
               case 'MultiLineString':
                 return {
                   weight: 3,
-                  opacity: 0.8,
+                  opacity: opacity * 0.8,
                   color: layerColor,
                 };
               default:
                 return {
                   fillColor: layerColor,
                   weight: 2,
-                  opacity: 0.8,
+                  opacity: opacity * 0.8,
                   color: layerColor,
-                  fillOpacity: 0.3,
+                  fillOpacity: opacity * 0.3,
                 };
             }
           },
@@ -430,8 +725,8 @@ export default function ExplorerMap({
               fillColor: layerColor,
               color: layerColor,
               weight: 2,
-              opacity: 0.8,
-              fillOpacity: 0.7,
+              opacity: opacity * 0.8,
+              fillOpacity: opacity * 0.7,
             });
           },
           onEachFeature: (_feature, layer) => {
@@ -462,23 +757,7 @@ export default function ExplorerMap({
 
       layerIndex++;
     }
-  }, [featuresByLayer, cleanCoordinates]);
-
-  // Zoom to map extent when extent prop is available
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    // Zoom to the extent prop if available
-    if (extent && extent.xmin !== undefined && extent.ymin !== undefined && extent.xmax !== undefined && extent.ymax !== undefined) {
-      const bounds = L.latLngBounds(
-        L.latLng(extent.ymin, extent.xmin),
-        L.latLng(extent.ymax, extent.xmax)
-      );
-      if (bounds.isValid()) {
-        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }
-  }, [extent]);
+  }, [featuresByLayer, cleanCoordinates, layerOpacity, layerVisibility]);
 
   // Zoom to a specific layer when requested
   useEffect(() => {

@@ -1,35 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveArcGIS } from '@/lib/gis/arcgis';
 
 export const dynamic = 'force-dynamic';
-
-interface MapConfig {
-  portalUrl?: string;
-  operationalLayers?: Array<any>;
-  baseMap?: Array<any>;
-  title?: string;
-  subtitle?: string;
-  initialExtent?: Extent;
-  initialState?: {
-    viewpoint?: {
-      targetGeometry?: {
-        xmin: number;
-        ymin: number;
-        xmax: number;
-        ymax: number;
-        spatialReference?: {
-          wkid?: number;
-          latestWkid?: number;
-        };
-      };
-    };
-  };
-  map?: {
-    itemId?: string;
-  };
-  widgetPool?: {
-    widgets?: Array<any>;
-  };
-}
 
 interface Layer {
   id: string;
@@ -40,8 +12,22 @@ interface Layer {
   opacity?: number;
   geometryType?: string;
   description?: string;
-  source?: string;
-  itemUrl?: string;
+}
+
+interface LayerTreeNode {
+  id: string;
+  name: string;
+  type?: string;
+  geometryType?: string;
+  description?: string;
+  parentLayerId?: number;
+  children?: LayerTreeNode[];
+}
+
+interface ServiceHierarchy {
+  _serviceUrl: string;
+  _hierarchy: LayerTreeNode[];
+  _allLayers: any[];
 }
 
 interface Extent {
@@ -58,189 +44,45 @@ interface MapExploreResult {
   success: boolean;
   mapTitle?: string;
   portalUrl?: string;
-  operationalLayers?: Layer[];
-  baseLayers?: Layer[];
+  operationalLayers?: (Layer | ServiceHierarchy)[];
+  baseLayers?: (Layer | ServiceHierarchy)[];
   extent?: Extent;
   error?: string;
 }
 
-/**
- * Extract unique service URLs from web map configuration
- */
-function extractServiceUrls(webMapConfig: any): {
-  operationalServices: Map<string, any[]>;
-  baseServices: Map<string, any[]>;
-} {
-  const operationalServices = new Map<string, any[]>();
-  const baseServices = new Map<string, any[]>();
-
-  // Extract operational layer service URLs
-  if (webMapConfig.operationalLayers && Array.isArray(webMapConfig.operationalLayers)) {
-    webMapConfig.operationalLayers.forEach((layer: any) => {
-      if (layer.url) {
-        // Extract the base service URL (everything before /0, /1, etc.)
-        const match = layer.url.match(/^(.+\/MapServer|.+\/FeatureServer)(?:\/\d+)?$/);
-        if (match) {
-          const baseUrl = match[1];
-          if (!operationalServices.has(baseUrl)) {
-            operationalServices.set(baseUrl, []);
-          }
-          operationalServices.get(baseUrl)!.push(layer);
-        }
-      }
-    });
-  }
-
-  // Extract base layer service URLs
-  if (webMapConfig.baseMap?.baseMapLayers && Array.isArray(webMapConfig.baseMap.baseMapLayers)) {
-    webMapConfig.baseMap.baseMapLayers.forEach((layer: any) => {
-      if (layer.url) {
-        const match = layer.url.match(/^(.+\/MapServer|.+\/FeatureServer|.+\/TileServer)(?:\/\d+)?$/);
-        if (match) {
-          const baseUrl = match[1];
-          if (!baseServices.has(baseUrl)) {
-            baseServices.set(baseUrl, []);
-          }
-          baseServices.get(baseUrl)!.push(layer);
-        }
-      }
-    });
-  }
-
-  return { operationalServices, baseServices };
-}
-
-/**
- * Fetch and parse layer hierarchy from a MapServer endpoint
- */
-async function fetchMapServerHierarchy(serviceUrl: string): Promise<{
-  success: boolean;
-  layers?: any[];
+interface ServiceExtentResponse {
+  initialExtent?: Extent;
+  fullExtent?: Extent;
   extent?: Extent;
-  error?: string;
-}> {
-  try {
-    const url = `${serviceUrl}?f=json`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Failed to fetch service: ${response.statusText}`,
-      };
-    }
-
-    const data = await response.json();
-
-    // Return the complete layers array with hierarchy info and extent
-    if (data.layers && Array.isArray(data.layers)) {
-      return {
-        success: true,
-        layers: data.layers,
-        extent: data.extent,
-      };
-    }
-
-    return {
-      success: false,
-      error: 'No layers found in service response',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Unknown error fetching service',
-    };
-  }
-}
-
-/**
- * Combine multiple extents into a single bounding extent
- */
-function combineExtents(extent1: Extent | undefined, extent2: Extent | undefined): Extent {
-  if (!extent1) return extent2 || { xmin: 0, ymin: 0, xmax: 0, ymax: 0 };
-  if (!extent2) return extent1;
-
-  return {
-    xmin: Math.min(extent1.xmin, extent2.xmin),
-    ymin: Math.min(extent1.ymin, extent2.ymin),
-    xmax: Math.max(extent1.xmax, extent2.xmax),
-    ymax: Math.max(extent1.ymax, extent2.ymax),
-    spatialReference: extent1.spatialReference || extent2.spatialReference || { wkid: 4326 },
-  };
-}
-
-/**
- * Convert Web Mercator coordinates to WGS84 (lat/lon)
- */
-function webMercatorToWGS84(x: number, y: number): { lon: number; lat: number } {
-  const lon = (x / 20037508.34) * 180;
-  let lat = (y / 20037508.34) * 180;
-  lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((lat * Math.PI) / 180)) - Math.PI / 2);
-  return { lon, lat };
-}
-
-/**
- * Convert extent from Web Mercator to WGS84 if needed
- */
-function normalizeExtent(extent: any): Extent {
-  const wkid = extent.spatialReference?.wkid || extent.spatialReference?.latestWkid;
-  
-  // If it's Web Mercator (102100 or 3857), convert to WGS84
-  if (wkid === 102100 || wkid === 3857) {
-    const bottomLeft = webMercatorToWGS84(extent.xmin, extent.ymin);
-    const topRight = webMercatorToWGS84(extent.xmax, extent.ymax);
-    
-    return {
-      xmin: bottomLeft.lon,
-      ymin: bottomLeft.lat,
-      xmax: topRight.lon,
-      ymax: topRight.lat,
-      spatialReference: { wkid: 4326 },
-    };
-  }
-  
-  // Already in WGS84 or unknown - return as is
-  return {
-    xmin: extent.xmin,
-    ymin: extent.ymin,
-    xmax: extent.xmax,
-    ymax: extent.ymax,
-    spatialReference: { wkid: wkid || 4326 },
+  error?: {
+    message?: string;
   };
 }
 
 /**
  * Build hierarchical layer structure from flat layer array
  */
-function buildLayerHierarchy(flatLayers: any[]): any[] {
-  const layerMap = new Map<number, any>();
-  const rootLayers: any[] = [];
+function buildLayerHierarchy(flatLayers: any[]): LayerTreeNode[] {
+  const layerMap = new Map<string, LayerTreeNode>();
+  const rootLayers: LayerTreeNode[] = [];
 
   // First pass: create nodes
   flatLayers.forEach((layer) => {
-    layerMap.set(layer.id, {
-      ...layer,
+    const nodeId = `${layer.id}`;
+    layerMap.set(nodeId, {
+      id: nodeId,
+      name: layer.label || `Layer ${layer.id}`,
+      description: `Layer ID: ${layer.layerId}`,
       children: [],
     });
   });
 
-  // Second pass: build hierarchy
+  // Second pass: build hierarchy (for now, everything is a root layer)
+  // since the arcgis library doesn't preserve parent-child relationships
   flatLayers.forEach((layer) => {
-    const node = layerMap.get(layer.id)!;
-    if (
-      layer.parentLayerId !== undefined &&
-      layer.parentLayerId !== -1 &&
-      layerMap.has(layer.parentLayerId)
-    ) {
-      const parent = layerMap.get(layer.parentLayerId)!;
-      if (!parent.children) {
-        parent.children = [];
-      }
-      parent.children.push(node);
-    } else {
+    const nodeId = `${layer.id}`;
+    const node = layerMap.get(nodeId);
+    if (node) {
       rootLayers.push(node);
     }
   });
@@ -249,164 +91,101 @@ function buildLayerHierarchy(flatLayers: any[]): any[] {
 }
 
 /**
- * Fetch and parse ArcGIS map configuration with service hierarchies
+ * Fetch and parse ArcGIS map configuration using arcgis library
+ * 
+ * The arcgis library handles:
+ * - URL normalization for web app viewers, item pages, and REST endpoints
+ * - Recursive resolution of web maps, services, and layers
+ * - Error resilience and graceful degradation
  */
 async function fetchMapConfiguration(
   mapUrl: string
 ): Promise<MapExploreResult> {
   try {
-    // Ensure the URL has the proper format
-    let configUrl = mapUrl;
+    // Use the arcgis library to resolve the complete web app structure
+    const result = await resolveArcGIS(mapUrl, {
+      concurrency: 8,
+    });
 
-    // If it's a web app viewer URL, extract the item ID and fetch the config
-    if (configUrl.includes('webappviewer')) {
-      const urlParams = new URL(configUrl);
-      const itemId = urlParams.searchParams.get('id');
-
-      if (!itemId) {
-        return {
-          success: false,
-          error: 'Could not extract map ID from URL',
-        };
+    // Group layers by serviceUrl to match explorer expectations
+    const serviceLayersMap = new Map<string, any[]>();
+    result.lists.layers.forEach((layer) => {
+      const serviceUrl = layer.serviceUrl || 'unknown';
+      if (!serviceLayersMap.has(serviceUrl)) {
+        serviceLayersMap.set(serviceUrl, []);
       }
+      serviceLayersMap.get(serviceUrl)!.push(layer);
+    });
 
-      // Construct API call to get the web app configuration
-      configUrl = `https://www.arcgis.com/sharing/rest/content/items/${itemId}/data?f=json`;
-    } else if (!configUrl.includes('/data?')) {
-      // If it's a direct item URL, append /data?f=json
-      configUrl = `${configUrl.split('?')[0]}/data?f=json`;
-    }
+    // Create hierarchical structure grouped by service
+    const operationalLayers: ServiceHierarchy[] = Array.from(
+      serviceLayersMap.entries()
+    ).map(([serviceUrl, layers]) => ({
+      _serviceUrl: serviceUrl,
+      _hierarchy: buildLayerHierarchy(layers),
+      _allLayers: layers,
+    }));
 
-    const response = await fetch(configUrl);
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Failed to fetch map configuration: ${response.statusText}`,
-      };
-    }
-
-    const config: MapConfig = await response.json();
-
-    if (!config) {
-      return {
-        success: false,
-        error: 'Map configuration is empty',
-      };
-    }
-
-    let operationalLayers: any[] = [];
-    let baseLayers: any[] = [];
-    let portalUrl = config.portalUrl;
-    let webMapExtent: Extent | undefined;
-    let serviceExtent: Extent | undefined;
-
-    // Check if the initial config itself is a web map with initialExtent
-    if (config.initialExtent) {
-      webMapExtent = normalizeExtent(config.initialExtent);
-    }
-    
-    // Check for extent in initialState.viewpoint.targetGeometry (newer format)
-    if (!webMapExtent && config.initialState?.viewpoint?.targetGeometry) {
-      webMapExtent = normalizeExtent(config.initialState.viewpoint.targetGeometry);
-    }
-
-    // If this is a Web App AppBuilder config with a referenced Web Map, fetch the Web Map
-    if (config.map?.itemId) {
+    // Determine extent from the first service when available
+    let extent: Extent | undefined;
+    if (result.lists.services.length > 0) {
+      const serviceUrl = result.lists.services[0].serviceUrl;
       try {
-        const portal = config.portalUrl?.replace(/\/$/, '') || 'https://cocogis.maps.arcgis.com';
-        const webMapUrl = `${portal}/sharing/rest/content/items/${config.map.itemId}/data?f=json`;
-        
-        const webMapResponse = await fetch(webMapUrl);
-        if (webMapResponse.ok) {
-          const webMapConfig = await webMapResponse.json();
-          
-          // Extract the initial extent from the web map if available (and we haven't already set one)
-          if (!webMapExtent && webMapConfig.initialExtent) {
-            webMapExtent = normalizeExtent(webMapConfig.initialExtent);
-          }
-          
-          // Check for extent in initialState.viewpoint.targetGeometry (newer format)
-          if (!webMapExtent && webMapConfig.initialState?.viewpoint?.targetGeometry) {
-            webMapExtent = normalizeExtent(webMapConfig.initialState.viewpoint.targetGeometry);
-          }
-          
-          // Extract unique service URLs from the web map
-          const { operationalServices, baseServices } = extractServiceUrls(webMapConfig);
-          
-          // Fetch layer hierarchies from each operational service
-          for (const [serviceUrl, usedLayers] of operationalServices.entries()) {
-            try {
-              const hierarchy = await fetchMapServerHierarchy(serviceUrl);
-              if (hierarchy.success && hierarchy.layers) {
-                const hierarchicalLayers = buildLayerHierarchy(hierarchy.layers);
-                
-                // Convert to Layer type with hierarchy info
-                operationalLayers.push({
-                  // Store the raw hierarchical structure
-                  _hierarchy: hierarchicalLayers,
-                  _serviceUrl: serviceUrl,
-                  _allLayers: hierarchy.layers,
-                  _extent: hierarchy.extent,
-                });
-
-                // Accumulate service extent (separate from web map extent)
-                if (hierarchy.extent) {
-                  serviceExtent = combineExtents(serviceExtent, hierarchy.extent);
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching service hierarchy for ${serviceUrl}:`, error);
-            }
-          }
-          
-          // Fetch layer hierarchies from each base service
-          for (const [serviceUrl, usedLayers] of baseServices.entries()) {
-            try {
-              const hierarchy = await fetchMapServerHierarchy(serviceUrl);
-              if (hierarchy.success && hierarchy.layers) {
-                const hierarchicalLayers = buildLayerHierarchy(hierarchy.layers);
-                
-                baseLayers.push({
-                  // Store the raw hierarchical structure
-                  _hierarchy: hierarchicalLayers,
-                  _serviceUrl: serviceUrl,
-                  _allLayers: hierarchy.layers,
-                  _extent: hierarchy.extent,
-                });
-
-                // Accumulate service extent (separate from web map extent)
-                if (hierarchy.extent) {
-                  serviceExtent = combineExtents(serviceExtent, hierarchy.extent);
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching service hierarchy for ${serviceUrl}:`, error);
-            }
-          }
+        const response = await fetch(`${serviceUrl}?f=json`);
+        if (response.ok) {
+          const serviceData: ServiceExtentResponse = await response.json();
+          extent = serviceData.initialExtent || serviceData.fullExtent || serviceData.extent;
         }
-      } catch (webMapError) {
-        console.error('Error fetching web map:', webMapError);
+      } catch (err) {
+        console.warn('[Explorer] Failed to fetch service extent:', err);
       }
     }
 
-    // Use web map extent if available, fall back to service extent
-    const finalExtent = webMapExtent || serviceExtent;
+    // Default extent (US bounds) if services were found and no extent returned
+    if (!extent && result.lists.services.length > 0) {
+      extent = {
+        xmin: -125.0,
+        ymin: 25.0,
+        xmax: -66.0,
+        ymax: 49.0,
+        spatialReference: { wkid: 4326 },
+      };
+    }
+
+    // Try to extract portal URL from resolved items
+    let portalUrl = 'https://www.arcgis.com';
+    if (result.lists.items.length > 0) {
+      const firstItem = result.lists.items[0];
+      if ('portalBaseUrl' in firstItem && firstItem.portalBaseUrl) {
+        portalUrl = firstItem.portalBaseUrl as string;
+      }
+    }
+
+    // Log resolution results
+    console.log(`[Explorer] Resolved ArcGIS web app:`);
+    console.log(`  - Items: ${result.lists.items.length}`);
+    console.log(`  - Services: ${result.lists.services.length}`);
+    console.log(`  - Layers: ${result.lists.layers.length}`);
+    console.log(`  - Service groups: ${operationalLayers.length}`);
+    console.log(`  - Warnings: ${result.warnings.length}`);
 
     return {
       success: true,
-      mapTitle: config.title || 'Unnamed Map',
+      mapTitle: 'ArcGIS Web App',
       portalUrl,
-      operationalLayers: operationalLayers.length > 0 ? operationalLayers : undefined,
-      baseLayers: baseLayers.length > 0 ? baseLayers : undefined,
-      extent: finalExtent,
+      operationalLayers:
+        operationalLayers.length > 0 ? operationalLayers : undefined,
+      extent,
     };
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+
+    console.error('[Explorer] Error resolving ArcGIS web app:', errorMessage);
+
     return {
       success: false,
-      error: `Error fetching map configuration: ${errorMessage}`,
+      error: `Error resolving ArcGIS configuration: ${errorMessage}`,
     };
   }
 }
@@ -420,8 +199,7 @@ export async function GET(request: NextRequest) {
     if (!mapUrl && !itemId) {
       return NextResponse.json(
         {
-          error:
-            'Missing required parameter: url or itemId',
+          error: 'Missing required parameter: url or itemId',
           example:
             '/api/v1/gis/explore-map?url=https://www.arcgis.com/apps/webappviewer/index.html?id=92d542bcb39247e8b558021bd0446d18',
         },

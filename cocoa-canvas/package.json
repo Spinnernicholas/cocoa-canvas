@@ -20,7 +20,6 @@
     "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "docker:dev:restart": "docker-compose -f docker-compose.dev.yml restart"
-
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.0",
@@ -36,6 +35,7 @@
     "next": "^16.1.6",
     "next-auth": "^4.24.0",
     "pg": "^8.18.0",
+    "proj4": "^2.20.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
