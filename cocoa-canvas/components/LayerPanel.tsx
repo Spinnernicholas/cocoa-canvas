@@ -86,7 +86,7 @@ export default function LayerPanel({
               return (
                 <div
                   key={layer.id}
-                  className="rounded border border-cocoa-200 dark:border-cocoa-600 bg-cocoa-50 dark:bg-cocoa-750 overflow-hidden"
+                  className="rounded border border-cocoa-200 dark:border-cocoa-600 bg-cocoa-200 dark:bg-cocoa-900 overflow-hidden"
                 >
                   {/* Layer row */}
                   <div className="p-2 flex items-center gap-2">
@@ -114,8 +114,11 @@ export default function LayerPanel({
                         <div className="flex gap-1 mt-0.5">
                           {layer.type && (
                             <span
-                              className="text-xs px-1 py-0.5 rounded text-white"
-                              style={{ backgroundColor: color + '80' }}
+                              className="text-xs px-1 py-0.5 rounded text-white font-semibold shadow-sm"
+                              style={{ 
+                                backgroundColor: color,
+                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+                              }}
                             >
                               {layer.type}
                             </span>
