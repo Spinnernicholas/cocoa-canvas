@@ -2,7 +2,8 @@
  * Deep scanning for embedded service URLs and item IDs in JSON structures
  */
 
-const SERVICE_URL_REGEX = /(https?:\/\/[^\s"']+\/arcgis\/rest\/services\/[^\s"']+?(?:FeatureServer|MapServer|ImageServer)(?:\/\d+)?)/gi;
+// Match any ArcGIS REST service URL (MapServer, FeatureServer, or any other *Server)
+const SERVICE_URL_REGEX = /(https?:\/\/[^\s"']+\/arcgis\/rest\/services\/[^\s"']+?\/[A-Za-z]+Server(?:\/\d+)?)/gi;
 const ITEM_ID_CONTEXT_REGEX = /(?:id=|itemId\s*[:=]|\/items\/)([0-9a-fA-F]{32})/gi;
 
 export interface ScanResult {

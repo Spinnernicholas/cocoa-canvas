@@ -51,6 +51,15 @@ interface ServiceHierarchy {
   _allLayers: any[];
 }
 
+interface Widget {
+  id?: string;
+  label?: string;
+  type?: string;
+  icon?: string;
+  config?: any;
+  serviceUrls?: string[];
+}
+
 interface Extent {
   xmin: number;
   ymin: number;
@@ -68,6 +77,7 @@ interface MapExploreResult {
   services?: ServiceInfo[];
   operationalLayers?: (Layer | ServiceHierarchy)[];
   baseLayers?: (Layer | ServiceHierarchy)[];
+  widgets?: Widget[];
   extent?: Extent;
   error?: string;
 }
@@ -187,6 +197,45 @@ async function enrichLayerMetadata(serviceUrl: string, layers: any[]): Promise<a
 }
 
 /**
+ * Extract widgets from web app configuration data
+ */
+function extractWidgets(webAppData: any): Widget[] {
+  const widgets: Widget[] = [];
+  
+  // Handle both widgetOnScreen and widgetPool structures
+  const onScreenWidgets = webAppData?.widgetOnScreen?.widgets || [];
+  const pooledWidgets = webAppData?.widgetPool?.widgets || [];
+  const allWidgets = [...onScreenWidgets, ...pooledWidgets];
+  
+  for (const widget of allWidgets) {
+    const serviceUrls: string[] = [];
+    
+    // Extract service URLs from widget config using regex
+    if (widget.config) {
+      const configStr = JSON.stringify(widget.config);
+      const serviceUrlRegex = /(https?:\/\/[^\s"']+\/arcgis\/rest\/services\/[^\s"']+?\/[A-Za-z]+Server)/gi;
+      let match;
+      while ((match = serviceUrlRegex.exec(configStr)) !== null) {
+        if (!serviceUrls.includes(match[1])) {
+          serviceUrls.push(match[1]);
+        }
+      }
+    }
+    
+    widgets.push({
+      id: widget.id,
+      label: widget.label || widget.name || widget.id,
+      type: widget.uri || widget.type,
+      icon: widget.icon,
+      config: widget.config,
+      serviceUrls: serviceUrls.length > 0 ? serviceUrls : undefined,
+    });
+  }
+  
+  return widgets;
+}
+
+/**
  * Fetch and parse ArcGIS map configuration using arcgis library
  * 
  * The arcgis library handles:
@@ -218,6 +267,9 @@ async function fetchMapConfiguration(
       }
     });
 
+    console.log(`[Explorer] Found ${serviceUrls.size} unique service URLs:`);
+    serviceUrls.forEach(url => console.log(`  - ${url}`));
+
     // Fetch full service details for each service
     const serviceDetailsMap = new Map<string, any>();
     const serviceDetailsPromises = Array.from(serviceUrls).map(async (serviceUrl) => {
@@ -235,21 +287,21 @@ async function fetchMapConfiguration(
     for (const serviceUrl of serviceUrls) {
       const serviceDetails = serviceDetailsMap.get(serviceUrl);
       if (!serviceDetails) {
+        console.warn(`[Explorer] No details fetched for service: ${serviceUrl}`);
         continue;
       }
 
-      // Determine service type from URL
-      const serviceType = 
-        serviceUrl.includes('/MapServer') ? 'MapServer' :
-        serviceUrl.includes('/FeatureServer') ? 'FeatureServer' :
-        serviceUrl.includes('/ImageServer') ? 'ImageServer' :
-        serviceUrl.includes('/GeocodeServer') ? 'GeocodeServer' :
-        serviceUrl.includes('/GeometryServer') ? 'GeometryServer' :
-        serviceUrl.includes('/GPServer') ? 'Geoprocessing Service' :
-        serviceDetails.type || 'Service';
+      // Determine service type from URL - extract any *Server pattern
+      let serviceType = 'Service';
+      const serverTypeMatch = serviceUrl.match(/\/([A-Za-z]+Server)(?:\/|$)/i);
+      if (serverTypeMatch) {
+        serviceType = serverTypeMatch[1];
+      } else if (serviceDetails.type) {
+        serviceType = serviceDetails.type;
+      }
 
-      // Extract service name from URL
-      const serviceNameMatch = serviceUrl.match(/\/services\/([^\/]+)/);
+      // Extract service name from URL - match everything between /services/ and /*Server
+      const serviceNameMatch = serviceUrl.match(/\/services\/(.+?)\/[A-Za-z]+Server/);
       const serviceName = serviceDetails.mapName || serviceDetails.name || 
         (serviceNameMatch ? serviceNameMatch[1].replace(/\//g, ' / ') : serviceUrl.split('/').slice(-2, -1)[0]);
 
@@ -303,12 +355,30 @@ async function fetchMapConfiguration(
       };
     }
 
-    // Try to extract portal URL from resolved items
+    // Try to extract portal URL and widgets from resolved items
     let portalUrl = 'https://www.arcgis.com';
+    let widgets: Widget[] = [];
+    
     if (result.lists.items.length > 0) {
       const firstItem = result.lists.items[0];
       if ('portalBaseUrl' in firstItem && firstItem.portalBaseUrl) {
         portalUrl = firstItem.portalBaseUrl as string;
+      }
+      
+      // Fetch web app data to extract widgets if this is a Web Application
+      if ('itemId' in firstItem && firstItem.itemId && 
+          ('itemType' in firstItem && (firstItem.itemType === 'Web Mapping Application' || firstItem.itemType === 'Application'))) {
+        try {
+          const dataUrl = `${portalUrl}/sharing/rest/content/items/${firstItem.itemId}/data?f=json`;
+          const dataResponse = await fetch(dataUrl);
+          if (dataResponse.ok) {
+            const webAppData = await dataResponse.json();
+            widgets = extractWidgets(webAppData);
+            console.log(`[Explorer] Extracted ${widgets.length} widgets from web app`);
+          }
+        } catch (error) {
+          console.warn('[Explorer] Failed to fetch web app data for widgets:', error);
+        }
       }
     }
 
@@ -334,6 +404,7 @@ async function fetchMapConfiguration(
       services: services.length > 0 ? services : undefined,
       operationalLayers:
         operationalLayers.length > 0 ? operationalLayers : undefined,
+      widgets: widgets.length > 0 ? widgets : undefined,
       extent,
     };
   } catch (error) {

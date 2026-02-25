@@ -90,6 +90,15 @@ interface ServiceDetails {
   layers?: any[];
 }
 
+interface Widget {
+  id?: string;
+  label?: string;
+  type?: string;
+  icon?: string;
+  config?: any;
+  serviceUrls?: string[];
+}
+
 interface MapConfig {
   success: boolean;
   mapTitle?: string;
@@ -97,6 +106,7 @@ interface MapConfig {
   services?: ServiceInfo[];
   operationalLayers?: ServiceHierarchy[];
   baseLayers?: ServiceHierarchy[];
+  widgets?: Widget[];
   extent?: Extent;
   error?: string;
 }
@@ -267,8 +277,12 @@ export default function MapExplorer() {
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [featureLimitExceeded, setFeatureLimitExceeded] = useState<Map<string, boolean>>(new Map());
   const [isRestoringFromUrl, setIsRestoringFromUrl] = useState(false);
-  const [activeTab, setActiveTab] = useState<'services' | 'layers' | 'selected'>('services');
+  const [activeTab, setActiveTab] = useState<'services' | 'layers' | 'widgets' | 'selected'>('services');
+  const [drawerWidth, setDrawerWidth] = useState(340); // Default width in pixels
   const resultsRef = useRef<HTMLDivElement>(null);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
 
   // Serialize current state to URL parameters
   const getCurrentStateUrl = useCallback(() => {
@@ -486,12 +500,14 @@ export default function MapExplorer() {
   }, []);
 
   const getServiceTypeFromUrl = (serviceUrl: string): string => {
-    const match = serviceUrl.match(/\/(MapServer|FeatureServer|ImageServer)$/i);
+    // Extract any *Server pattern from the URL
+    const match = serviceUrl.match(/\/([A-Za-z]+Server)(?:\/|$)/i);
     return match ? match[1] : 'Service';
   };
 
   const getServiceNameFromUrl = (serviceUrl: string): string => {
-    const match = serviceUrl.match(/\/services\/(.+)\/(MapServer|FeatureServer|ImageServer)$/i);
+    // Match the service path before any *Server pattern
+    const match = serviceUrl.match(/\/services\/(.+?)\/([A-Za-z]+Server)(?:\/|$)/i);
     if (match && match[1]) {
       return match[1].replace(/\//g, ' / ');
     }
@@ -959,6 +975,42 @@ export default function MapExplorer() {
     alert('Copied to clipboard!');
   };
 
+  // Resize handle mouse event handlers
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = drawerWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      
+      const delta = e.clientX - startXRef.current;
+      const newWidth = Math.max(250, Math.min(800, startWidthRef.current + delta)); // Min 250px, max 800px
+      setDrawerWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [drawerWidth]);
+
   return (
     <div className="h-screen flex flex-col bg-cocoa-50 dark:bg-cocoa-900 overflow-hidden">
       {/* Browser-like Toolbar */}
@@ -1004,88 +1056,42 @@ export default function MapExplorer() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Drawer */}
-        <div className="w-80 bg-white dark:bg-cocoa-800 border-r border-cocoa-200 dark:border-cocoa-700 flex flex-col overflow-hidden shadow-lg">
-          {/* Drawer Header */}
-          <div className="px-4 py-3 border-b border-cocoa-200 dark:border-cocoa-700 bg-cocoa-50 dark:bg-cocoa-700">
-            <h2 className="font-semibold text-cocoa-900 dark:text-white text-sm">
-              {mapConfig && mapConfig.mapTitle ? mapConfig.mapTitle : 'Explorer'}
-            </h2>
-          </div>
-
-          {/* Tab Navigation */}
-          {mapConfig && (
-            <div className="flex border-b border-cocoa-200 dark:border-cocoa-700 bg-cocoa-50 dark:bg-cocoa-800">
-              <button
-                onClick={() => setActiveTab('services')}
-                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
-                  activeTab === 'services'
-                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
-                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
-                }`}
-              >
-                🌐 Services
-                {mapConfig.services && mapConfig.services.length > 0 && (
-                  <span className="ml-1 text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1.5 py-0.5 rounded">
-                    {mapConfig.services.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('layers')}
-                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
-                  activeTab === 'layers'
-                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
-                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
-                }`}
-              >
-                📍 Layers
-                {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 && (
-                  <span className="ml-1 text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1.5 py-0.5 rounded">
-                    {mapConfig.operationalLayers.reduce((sum, s) => sum + (s._hierarchy?.length || 0), 0)}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('selected')}
-                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
-                  activeTab === 'selected'
-                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-b-2 border-cocoa-600 dark:border-cocoa-400'
-                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
-                }`}
-              >
-                ✓ Selected
-                {selectedLayers.size > 0 && (
-                  <span className="ml-1 text-[10px] bg-cinnamon-200 dark:bg-cinnamon-600 text-cinnamon-700 dark:text-cinnamon-300 px-1.5 py-0.5 rounded">
-                    {selectedLayers.size}
-                  </span>
-                )}
-              </button>
-            </div>
-          )}
-
+        <div 
+          style={{ width: `${drawerWidth}px` }}
+          className="bg-white dark:bg-cocoa-800 border-r border-cocoa-200 dark:border-cocoa-700 flex overflow-hidden shadow-lg"
+        >
           {/* Drawer Content */}
-          <div className="flex-1 overflow-y-auto">
-            {error && (
-              <div className="m-3 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded text-red-800 dark:text-red-100 text-sm">
-                <p className="font-semibold">Error:</p>
-                <p className="mt-1 text-xs">{error}</p>
-              </div>
-            )}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Drawer Header */}
+            <div className="px-4 py-3 border-b border-cocoa-200 dark:border-cocoa-700 bg-cocoa-50 dark:bg-cocoa-700">
+              <h2 className="font-semibold text-cocoa-900 dark:text-white text-sm">
+                {mapConfig && mapConfig.mapTitle ? mapConfig.mapTitle : 'Explorer'}
+              </h2>
+            </div>
 
-            {!mapConfig && (
-              <div className="p-4 space-y-3 text-sm text-cocoa-700 dark:text-cocoa-300">
-                <h3 className="font-semibold text-cocoa-900 dark:text-white">Getting Started</h3>
-                <ol className="list-decimal list-inside space-y-2 text-xs">
-                  <li>Paste an ArcGIS Map Service URL in the address bar</li>
-                  <li>Click the Explore button</li>
-                  <li>Browse the layer hierarchy and select layers</li>
-                  <li>Review service metadata and tables</li>
-                </ol>
-              </div>
-            )}
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto">
+              {error && (
+                <div className="m-3 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded text-red-800 dark:text-red-100 text-sm">
+                  <p className="font-semibold">Error:</p>
+                  <p className="mt-1 text-xs">{error}</p>
+                </div>
+              )}
 
-            {mapConfig && (
-              <div className="space-y-4">
+              {!mapConfig && (
+                <div className="p-4 space-y-3 text-sm text-cocoa-700 dark:text-cocoa-300">
+                  <h3 className="font-semibold text-cocoa-900 dark:text-white">Getting Started</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-xs">
+                    <li>Paste an ArcGIS Map Service URL in the address bar</li>
+                    <li>Click the Explore button</li>
+                    <li>Browse the layer hierarchy and select layers</li>
+                    <li>Review service metadata and tables</li>
+                  </ol>
+                </div>
+              )}
+
+              {mapConfig && (
+                <div className="space-y-4">
                 {/* Services Tab */}
                 {activeTab === 'services' && (
                   <div className="space-y-4">
@@ -1312,6 +1318,82 @@ export default function MapExplorer() {
                   </div>
                 )}
 
+                {/* Widgets Tab */}
+                {activeTab === 'widgets' && (
+                  <div className="space-y-4">
+                    {mapConfig.widgets && mapConfig.widgets.length > 0 ? (
+                      <div className="space-y-1 p-2">
+                        {mapConfig.widgets.map((widget, idx) => (
+                          <details key={idx} className="text-xs bg-white dark:bg-cocoa-800 rounded border border-cocoa-200 dark:border-cocoa-600">
+                            <summary className="cursor-pointer px-3 py-2 hover:bg-cocoa-50 dark:hover:bg-cocoa-700 rounded">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-cocoa-900 dark:text-white block truncate">
+                                  {widget.icon && <span className="mr-2">{widget.icon}</span>}
+                                  {widget.label || widget.id || 'Widget'}
+                                </span>
+                                {widget.serviceUrls && widget.serviceUrls.length > 0 && (
+                                  <span className="text-[10px] uppercase bg-cinnamon-200 dark:bg-cinnamon-600 text-cinnamon-800 dark:text-cinnamon-200 px-2 py-0.5 rounded flex-shrink-0">
+                                    {widget.serviceUrls.length} service{widget.serviceUrls.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </summary>
+                            <div className="px-3 pb-3 pt-1 space-y-2 text-xs text-cocoa-700 dark:text-cocoa-300">
+                              {/* Widget Type */}
+                              {widget.type && (
+                                <div>
+                                  <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Type</h5>
+                                  <p className="text-cocoa-700 dark:text-cocoa-300 font-mono text-[10px]">
+                                    {widget.type}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Associated Services */}
+                              {widget.serviceUrls && widget.serviceUrls.length > 0 && (
+                                <div>
+                                  <h5 className="font-semibold text-cocoa-800 dark:text-cocoa-200 mb-1">Associated Services</h5>
+                                  <div className="space-y-1">
+                                    {widget.serviceUrls.map((serviceUrl, sIdx) => {
+                                      const serverTypeMatch = serviceUrl.match(/\/([A-Za-z]+Server)(?:\/|$)/i);
+                                      const serverType = serverTypeMatch ? serverTypeMatch[1] : 'Service';
+                                      const serviceNameMatch = serviceUrl.match(/\/services\/(.+?)\/[A-Za-z]+Server/);
+                                      const serviceName = serviceNameMatch ? serviceNameMatch[1].replace(/\//g, ' / ') : serviceUrl.split('/').slice(-2, -1)[0];
+                                      
+                                      return (
+                                        <div key={sIdx} className="bg-cocoa-50 dark:bg-cocoa-800 p-2 rounded">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-cocoa-800 dark:text-cocoa-200">{serviceName}</span>
+                                            <span className="text-[10px] uppercase bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-800 dark:text-cocoa-200 px-1.5 py-0.5 rounded">
+                                              {serverType}
+                                            </span>
+                                          </div>
+                                          <a
+                                            href={serviceUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-cocoa-600 dark:text-cocoa-400 hover:underline font-mono text-[10px] break-all"
+                                          >
+                                            {serviceUrl}
+                                          </a>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-cocoa-600 dark:text-cocoa-400">
+                        No widgets found
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Selected Tab */}
                 {activeTab === 'selected' && (
                   <div className="space-y-4">
@@ -1419,6 +1501,104 @@ export default function MapExplorer() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Resize Handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="w-1 bg-cocoa-300 dark:bg-cocoa-600 hover:bg-cocoa-400 dark:hover:bg-cocoa-500 cursor-col-resize hover:w-1.5 transition-all flex-shrink-0"
+          title="Drag to resize drawer"
+        />
+
+        {/* Vertical Tab Navigation */}
+        {mapConfig && (
+            <div className="flex flex-col border-l border-cocoa-200 dark:border-cocoa-700 bg-cocoa-50 dark:bg-cocoa-800">
+              <button
+                onClick={() => setActiveTab('services')}
+                className={`flex-1 px-2 py-3 transition-colors relative group ${
+                  activeTab === 'services'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-l-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+                title="Services"
+              >
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="text-lg">🌐</div>
+                  <div className="text-[10px] font-semibold mt-1" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                    SVC
+                  </div>
+                  {mapConfig.services && mapConfig.services.length > 0 && (
+                    <span className="text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1 py-0.5 rounded mt-1">
+                      {mapConfig.services.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('layers')}
+                className={`flex-1 px-2 py-3 transition-colors relative group ${
+                  activeTab === 'layers'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-l-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+                title="Layers"
+              >
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="text-lg">📍</div>
+                  <div className="text-[10px] font-semibold mt-1" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                    LYR
+                  </div>
+                  {mapConfig.operationalLayers && mapConfig.operationalLayers.length > 0 && (
+                    <span className="text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1 py-0.5 rounded mt-1">
+                      {mapConfig.operationalLayers.reduce((sum, s) => sum + (s._hierarchy?.length || 0), 0)}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('widgets')}
+                className={`flex-1 px-2 py-3 transition-colors relative group ${
+                  activeTab === 'widgets'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-l-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+                title="Widgets"
+              >
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="text-lg">🔧</div>
+                  <div className="text-[10px] font-semibold mt-1" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                    WGT
+                  </div>
+                  {mapConfig.widgets && mapConfig.widgets.length > 0 && (
+                    <span className="text-[10px] bg-cocoa-200 dark:bg-cocoa-600 text-cocoa-700 dark:text-cocoa-300 px-1 py-0.5 rounded mt-1">
+                      {mapConfig.widgets.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('selected')}
+                className={`flex-1 px-2 py-3 transition-colors relative group ${
+                  activeTab === 'selected'
+                    ? 'bg-white dark:bg-cocoa-700 text-cocoa-900 dark:text-white border-l-2 border-cocoa-600 dark:border-cocoa-400'
+                    : 'text-cocoa-600 dark:text-cocoa-400 hover:bg-cocoa-100 dark:hover:bg-cocoa-700'
+                }`}
+                title="Selected"
+              >
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="text-lg">✓</div>
+                  <div className="text-[10px] font-semibold mt-1" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                    SEL
+                  </div>
+                  {selectedLayers.size > 0 && (
+                    <span className="text-[10px] bg-cinnamon-200 dark:bg-cinnamon-600 text-cinnamon-700 dark:text-cinnamon-300 px-1 py-0.5 rounded mt-1">
+                      {selectedLayers.size}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Map */}
